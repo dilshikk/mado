@@ -9,6 +9,7 @@ import Contact from "./pages/contact/page.tsx";
 import MenuPage from "./pages/menu/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminLayout from "./pages/admin/layout.tsx";
+import AdminLoginPage from "./pages/admin/login.tsx";
 import AdminDashboard from "./pages/admin/dashboard/page.tsx";
 import CategoriesPage from "./pages/admin/menu/categories/page.tsx";
 import DishesPage from "./pages/admin/menu/dishes/page.tsx";
@@ -40,6 +41,9 @@ export default function App() {
           <Route path="/locations" element={<Locations />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/contact" element={<Contact />} />
+
+          {/* Admin login */}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
 
           {/* Admin panel */}
           <Route path="/admin" element={<AdminLayout />}>

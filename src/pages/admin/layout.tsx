@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -23,6 +23,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import api from "@/lib/api";
 
 type NavItem = {
   label: string;
@@ -159,6 +160,57 @@ export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        navigate('/admin/login', { state: { from: location } });
+        return;
+      }
+
+      try {
+        await api.getMe();
+        setIsAuthenticated(true);
+      } catch (error) {
+        localStorage.removeItem('token');
+        api.clearToken();
+        navigate('/admin/login', { state: { from: location } });
+      }
+    };
+
+    checkAuth();
+  }, [navigate, location]);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    api.clearToken();
+    localStorage.removeItem('token');
+    navigate('/admin/login');
+  };
+
+  // Loading state
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const sidebar = (
     <aside
@@ -205,13 +257,21 @@ export default function AdminLayout() {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-sidebar-border space-y-2">
         <button
           onClick={() => navigate("/")}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
           <LogOut className="w-4 h-4 shrink-0" />
           {!collapsed && <span>Back to site</span>}
+        </button>
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>{loggingOut ? 'Logging out...' : 'Logout'}</span>}
         </button>
       </div>
     </aside>
