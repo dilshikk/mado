@@ -15,6 +15,14 @@ export default defineConfig({
     },
   },
   server: {
+    host: "0.0.0.0",
     allowedHosts: ["ftp.mado.uz", "mado.uz"],
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });
