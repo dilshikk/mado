@@ -401,6 +401,10 @@ class ApiClient {
     });
   }
 
+  deleteSetting(key: string): Promise<any> {
+    return this.request(`/settings/${key}`, { method: 'DELETE' });
+  }
+
   // Users
   getUsers(): Promise<any> {
     return this.request('/users');
