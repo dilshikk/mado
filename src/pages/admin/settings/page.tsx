@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Save, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Check, AlertCircle } from "lucide-react";
+import api from "@/lib/api";
 
 const TABS = ["General", "Contact", "Social", "Restaurant", "SEO"] as const;
 type Tab = typeof TABS[number];
@@ -52,12 +53,37 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("General");
   const [settings, setSettings] = useState<Settings>(DEFAULT);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const set = (key: keyof Settings, value: string) => setSettings((s) => ({ ...s, [key]: value }));
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await api.getSettings();
+        setSettings(prev => ({ ...prev, ...data }));
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await api.updateSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save settings');
+      console.error('Save error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,12 +95,27 @@ export default function SettingsPage() {
         </div>
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          disabled={loading}
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          {saved ? "Saved!" : "Save Changes"}
+          {loading ? (
+            <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+          ) : saved ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {loading ? "Saving..." : saved ? "Saved!" : "Save Changes"}
         </button>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+          <span className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-0 border-b border-border overflow-x-auto">
