@@ -1,0 +1,5 @@
+*.local
+*.log
+*.js
+!vite-env.d.ts
+.DS_Store
