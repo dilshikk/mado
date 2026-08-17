@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Clock, Search, FileText } from "lucide-react";
+import api from "@/lib/api.ts";
 import { cn } from "@/lib/utils.ts";
 
 type AppStatus = "new" | "reviewing" | "interview" | "accepted" | "rejected";
@@ -25,20 +26,49 @@ const STATUS_META: Record<AppStatus, { label: string; color: string; next: AppSt
   rejected: { label: "Rejected", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400", next: ["reviewing"] },
 };
 
-const SAMPLE: Application[] = [
-  { id: "1", name: "Dilshod Shomuratov", position: "Waiter", branch: "Tashkent — Chilanzar", phone: "+998 90 123 45 67", email: "dilshod@mail.ru", experience: "2 years in Cafe Plov", message: "I am a friendly and hardworking person, eager to join MADO team.", status: "new", date: "16 Aug 2026" },
-  { id: "2", name: "Kamola Yusupova", position: "Barista", branch: "Tashkent — Chilanzar", phone: "+998 93 456 78 90", email: "kamola@gmail.com", experience: "3 years at Coffee House", message: "Passionate about specialty coffee and Turkish tea culture.", status: "interview", date: "15 Aug 2026" },
-  { id: "3", name: "Jasur Mirzayev", position: "Chef de Partie", branch: "All branches", phone: "+998 91 789 01 23", email: "jasur@mail.uz", experience: "5 years at Silk Road Kitchen", message: "Experienced in Turkish and Middle Eastern cuisine. HACCP certified.", status: "reviewing", date: "14 Aug 2026" },
-  { id: "4", name: "Nodira Khasanova", position: "Cashier", branch: "Tashkent — Mirzo Ulugbek", phone: "+998 99 234 56 78", email: "nodira@mail.uz", experience: "1 year at supermarket", message: "Accurate and responsible. Quick learner with POS systems.", status: "accepted", date: "12 Aug 2026" },
-  { id: "5", name: "Bobur Toshmatov", position: "Runner", branch: "Tashkent — Yunusabad", phone: "+998 94 567 89 01", email: "bobur@mail.ru", experience: "No prior experience", message: "Ready to work hard and learn fast.", status: "rejected", date: "10 Aug 2026" },
-];
-
 export default function ApplicationsPage() {
-  const [apps, setApps] = useState<Application[]>(SAMPLE);
+  const [apps, setApps] = useState<Application[]>([]);
   const [filter, setFilter] = useState<"all" | AppStatus>("all");
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<Application | null>(null);
   const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadApplications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.getApplications({});
+      const mapped = Array.isArray(data)
+        ? data.map((item: any) => ({
+            id: String(item.id),
+            name: item.name || "Unknown",
+            position: item.position || "General position",
+            branch: item.branch || "All branches",
+            phone: item.phone || "N/A",
+            email: item.email || "N/A",
+            experience: item.experience || "Not provided",
+            message: item.message || "",
+            status: (item.status || "new") as AppStatus,
+            date: new Date(item.created_at || Date.now()).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          }))
+        : [];
+      setApps(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load applications");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadApplications();
+  }, []);
 
   const filtered = apps.filter((a) => {
     const matchFilter = filter === "all" || a.status === filter;
@@ -47,9 +77,16 @@ export default function ApplicationsPage() {
     return matchFilter && matchSearch;
   });
 
-  const updateStatus = (id: string, status: AppStatus) => {
-    setApps(apps.map((a) => a.id === id ? { ...a, status } : a));
-    if (viewing?.id === id) setViewing((v) => v ? { ...v, status } : v);
+  const updateStatus = async (id: string, status: AppStatus) => {
+    try {
+      await api.updateApplicationStatus(id, status);
+      await loadApplications();
+      if (viewing?.id === id) {
+        setViewing((v) => (v ? { ...v, status } : v));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update status");
+    }
   };
 
   const counts = (Object.keys(STATUS_META) as AppStatus[]).map((s) => ({
@@ -66,7 +103,12 @@ export default function ApplicationsPage() {
         </p>
       </div>
 
-      {/* Stats strip */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-5 gap-2">
         {counts.map(({ status, count }) => (
           <button
@@ -83,7 +125,6 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {/* Search + filter pills */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -110,7 +151,6 @@ export default function ApplicationsPage() {
         </div>
       </div>
 
-      {/* List */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="divide-y divide-border">
           {filtered.map((app) => (
@@ -144,7 +184,7 @@ export default function ApplicationsPage() {
             </div>
           ))}
         </div>
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p className="text-sm">No applications</p>
@@ -152,7 +192,6 @@ export default function ApplicationsPage() {
         )}
       </div>
 
-      {/* Detail modal */}
       {viewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setViewing(null)} />
@@ -229,3 +268,4 @@ function InfoField({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

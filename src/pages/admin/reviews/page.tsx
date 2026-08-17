@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Star, Check, EyeOff, Trash2, Search, ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Star, Check, EyeOff, Trash2, Search, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import api from "@/lib/api.ts";
 
 type ReviewStatus = "new" | "approved" | "hidden";
 
@@ -9,7 +10,7 @@ type Review = {
   author: string;
   rating: number;
   text: string;
-  source: "Google" | "Website" | "Yandex";
+  source: string;
   date: string;
   status: ReviewStatus;
   location: string;
@@ -21,15 +22,6 @@ const STATUS_META: Record<ReviewStatus, { label: string; color: string }> = {
   hidden: { label: "Hidden", color: "bg-gray-100 text-gray-500 dark:bg-gray-800" },
 };
 
-const SAMPLE: Review[] = [
-  { id: "1", author: "Anna K.", rating: 5, text: "Amazing food and service! The Pistachio Kebab is absolutely incredible. Will definitely come back.", source: "Google", date: "16 Aug", status: "new", location: "Chilanzar" },
-  { id: "2", author: "Rustam M.", rating: 5, text: "Best Turkish restaurant in Tashkent. Authentic flavors, great atmosphere, very attentive staff.", source: "Google", date: "15 Aug", status: "approved", location: "Yunusabad" },
-  { id: "3", author: "Maria S.", rating: 4, text: "Lovely place, great desserts. The baklava is to die for! Service was a bit slow but food made up for it.", source: "Website", date: "14 Aug", status: "approved", location: "Chilanzar" },
-  { id: "4", author: "John D.", rating: 3, text: "Food was good but service was slow on a busy Saturday night. Hopefully they improve staffing.", source: "Google", date: "12 Aug", status: "hidden", location: "Mirzo Ulugbek" },
-  { id: "5", author: "Zulfiya T.", rating: 5, text: "Dondurma is absolutely fantastic. My kids loved it. The Turkish tea is also exceptional.", source: "Yandex", date: "11 Aug", status: "new", location: "Yunusabad" },
-  { id: "6", author: "Sanjar A.", rating: 4, text: "Great ambiance and very authentic Turkish food. The Menemen breakfast is my favourite.", source: "Google", date: "9 Aug", status: "approved", location: "Chilanzar" },
-];
-
 const SOURCE_COLORS: Record<string, string> = {
   Google: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
   Website: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400",
@@ -37,28 +29,74 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>(SAMPLE);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [filter, setFilter] = useState<"all" | ReviewStatus>("all");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = reviews.filter((r) => {
+  const loadReviews = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await api.getReviews({});
+      const mapped = Array.isArray(result)
+        ? result.map((item: any) => ({
+            id: String(item.id),
+            author: item.author_name || "Anonymous",
+            rating: Number(item.rating) || 0,
+            text: item.text || "",
+            source: item.source || "Website",
+            date: new Date(item.created_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+            }),
+            status: (item.status as ReviewStatus) || "new",
+            location: item.location_id ? `Location #${item.location_id}` : "General",
+          }))
+        : [];
+      setReviews(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load reviews");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReviews();
+  }, []);
+
+  const filtered = useMemo(() => reviews.filter((r) => {
     const matchFilter = filter === "all" || r.status === filter;
     const q = search.toLowerCase();
     const matchSearch = r.author.toLowerCase().includes(q) || r.text.toLowerCase().includes(q);
     return matchFilter && matchSearch;
-  });
+  }), [reviews, filter, search]);
 
-  const setStatus = (id: string, status: ReviewStatus) =>
-    setReviews(reviews.map((r) => r.id === id ? { ...r, status } : r));
+  const setStatus = async (id: string, status: ReviewStatus) => {
+    try {
+      await api.updateReviewStatus(id, status);
+      setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update review status");
+    }
+  };
 
-  const handleDelete = (id: string) => setReviews(reviews.filter((r) => r.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteReview(id);
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete review");
+    }
+  };
 
   const approved = reviews.filter((r) => r.status === "approved");
   const avg = approved.length
     ? (approved.reduce((a, r) => a + r.rating, 0) / approved.length).toFixed(1)
     : "—";
 
-  // Rating distribution
   const dist = [5, 4, 3, 2, 1].map((n) => ({
     n,
     count: approved.filter((r) => r.rating === n).length,
@@ -66,6 +104,14 @@ export default function ReviewsPage() {
 
   return (
     <div className="space-y-5 max-w-4xl">
+      {error && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <span className="mt-0.5 text-base">⚠</span>
+          <div className="flex-1">{error}</div>
+          <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">✕</button>
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-serif font-bold">Reviews</h1>
@@ -127,6 +173,11 @@ export default function ReviewsPage() {
       </div>
 
       {/* Review list */}
+      {loading ? (
+        <div className="flex items-center justify-center rounded-xl border border-border bg-card p-10 text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading reviews...
+        </div>
+      ) : (
       <div className="space-y-3">
         {filtered.map((rev) => (
           <div key={rev.id} className="bg-card border border-border rounded-xl p-4">
@@ -206,6 +257,7 @@ export default function ReviewsPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
