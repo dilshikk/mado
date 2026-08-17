@@ -49,6 +49,34 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Copy text to clipboard.
+ * Uses the modern Clipboard API when available (https / localhost),
+ * and falls back to the legacy execCommand approach for plain http sites.
+ */
+function copyToClipboard(text: string): void {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+  } else {
+    legacyCopy(text);
+  }
+}
+
+function legacyCopy(text: string): void {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand("copy");
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
 // ─── Drop Zone ────────────────────────────────────────────────────────────────
 
 function DropZone({
@@ -174,7 +202,7 @@ function PreviewModal({
   }, [idx, files, onClose, onNavigate]);
 
   const copyUrl = () => {
-    void navigator.clipboard.writeText(fullUrl);
+    copyToClipboard(fullUrl);
     toast.success("URL скопирован");
   };
 
@@ -521,7 +549,7 @@ export default function MediaPage() {
   // ── Copy URL ──
   const handleCopy = (fileUrl: string, id: number) => {
     const fullUrl = api.getFileUrl(fileUrl);
-    void navigator.clipboard.writeText(fullUrl);
+    copyToClipboard(fullUrl);
     setCopied(id);
     toast.success("URL скопирован");
     setTimeout(() => setCopied(null), 1500);
@@ -539,7 +567,7 @@ export default function MediaPage() {
   const selectAll = () => setSelected(new Set(files.map((f) => f.id)));
   const clearSelection = () => setSelected(new Set());
 
-  // ── Derived ──
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],
