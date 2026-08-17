@@ -164,16 +164,10 @@ export default function AdminLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
-      // DEVELOPMENT MODE: Skip auth check for testing without database
-      setIsAuthenticated(true);
-      return;
-
-      // Production: Check real authentication
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         navigate('/admin/login', { state: { from: location } });
         return;
@@ -182,15 +176,15 @@ export default function AdminLayout() {
       try {
         await api.getMe();
         setIsAuthenticated(true);
-      } catch (error) {
+      } catch {
         localStorage.removeItem('token');
         api.clearToken();
         navigate('/admin/login', { state: { from: location } });
       }
     };
 
-    checkAuth();
-  }, [navigate, location]);
+    void checkAuth();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -199,7 +193,6 @@ export default function AdminLayout() {
     navigate('/admin/login');
   };
 
-  // Loading state
   if (isAuthenticated === null) {
     return (
       <div className="flex items-center justify-center h-screen">
