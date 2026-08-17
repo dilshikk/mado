@@ -66,13 +66,25 @@ const initDb = async () => {
       )
     `);
 
-    // Locations table
+    // Locations table (with multilingual fields)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS locations (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
+        name_ru VARCHAR(255),
+        name_uz VARCHAR(255),
+        name_en VARCHAR(255),
+        name_tr VARCHAR(255),
         district VARCHAR(100) NOT NULL,
+        district_ru VARCHAR(100),
+        district_uz VARCHAR(100),
+        district_en VARCHAR(100),
+        district_tr VARCHAR(100),
         address TEXT NOT NULL,
+        address_ru TEXT,
+        address_uz TEXT,
+        address_en TEXT,
+        address_tr TEXT,
         phone VARCHAR(20) NOT NULL,
         email VARCHAR(255),
         maps_url VARCHAR(500),
@@ -81,6 +93,28 @@ const initDb = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migrate existing locations table: add multilingual columns if not exists
+    const multilingualCols = [
+      'name_ru VARCHAR(255)',
+      'name_uz VARCHAR(255)',
+      'name_en VARCHAR(255)',
+      'name_tr VARCHAR(255)',
+      'district_ru VARCHAR(100)',
+      'district_uz VARCHAR(100)',
+      'district_en VARCHAR(100)',
+      'district_tr VARCHAR(100)',
+      'address_ru TEXT',
+      'address_uz TEXT',
+      'address_en TEXT',
+      'address_tr TEXT',
+    ];
+    for (const col of multilingualCols) {
+      const colName = col.split(' ')[0];
+      await pool.query(`
+        ALTER TABLE locations ADD COLUMN IF NOT EXISTS ${colName} ${col.split(' ').slice(1).join(' ')}
+      `);
+    }
 
     // Location hours table
     await pool.query(`
