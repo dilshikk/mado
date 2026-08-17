@@ -5,6 +5,11 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
+// Server origin — strip trailing /api (or /api/) to get the base server URL.
+// Used to resolve relative paths like /uploads/file.jpg returned by the backend.
+// Example: "https://api.madouz.uz/api" → "https://api.madouz.uz"
+const SERVER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
+
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
@@ -28,6 +33,19 @@ class ApiClient {
   clearToken(): void {
     this.token = null;
     localStorage.removeItem('token');
+  }
+
+  /**
+   * Resolve a relative server path to a full URL.
+   * Works for both old rows (full http://localhost:3000/uploads/...) and
+   * new rows (relative /uploads/...).
+   */
+  getFileUrl(fileUrl: string): string {
+    if (!fileUrl) return '';
+    // Already absolute (http:// or https://)
+    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+    // Relative path — prepend server origin
+    return `${SERVER_ORIGIN}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
   }
 
   async request(endpoint: string, options: RequestOptions = {}): Promise<unknown> {
