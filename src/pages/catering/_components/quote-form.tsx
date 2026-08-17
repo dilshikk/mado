@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
@@ -13,38 +15,55 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form.tsx";
+import api from "@/lib/api.ts";
 
 const quoteSchema = z.object({
-  fullName: z.string().min(1, "Введите ваше имя"),
-  email: z.string().email("Введите корректный email"),
-  phone: z.string().min(1, "Введите номер телефона"),
-  eventType: z.string().min(1, "Укажите тип мероприятия"),
-  eventDate: z.string().min(1, "Укажите дату мероприятия"),
+  fullName:   z.string().min(1, "Введите ваше имя"),
+  email:      z.string().email("Введите корректный email"),
+  phone:      z.string().min(1, "Введите номер телефона"),
+  eventType:  z.string().min(1, "Укажите тип мероприятия"),
+  eventDate:  z.string().min(1, "Укажите дату мероприятия"),
   guestCount: z.string().min(1, "Укажите количество гостей"),
-  message: z.string().optional(),
+  budget:     z.string().optional(),
+  message:    z.string().optional(),
 });
 
 type QuoteFormValues = z.infer<typeof quoteSchema>;
 
 export default function QuoteForm() {
+  const [submitting, setSubmitting] = useState(false);
+
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema),
     defaultValues: {
-      fullName: "",
-      email: "",
-      phone: "",
-      eventType: "",
-      eventDate: "",
-      guestCount: "",
-      message: "",
+      fullName: "", email: "", phone: "",
+      eventType: "", eventDate: "", guestCount: "",
+      budget: "", message: "",
     },
   });
 
-  const onSubmit = (values: QuoteFormValues) => {
-    toast.success("Заявка отправлена!", {
-      description: `Спасибо, ${values.fullName}! Мы свяжемся с вами для обсуждения деталей мероприятия.`,
-    });
-    form.reset();
+  const onSubmit = async (values: QuoteFormValues) => {
+    try {
+      setSubmitting(true);
+      await api.createCateringRequest({
+        name:        values.fullName,
+        email:       values.email,
+        phone:       values.phone,
+        event_type:  values.eventType,
+        event_date:  values.eventDate,
+        guest_count: parseInt(values.guestCount, 10),
+        budget:      values.budget || null,
+        message:     values.message || null,
+      });
+      toast.success("Заявка отправлена!", {
+        description: `Спасибо, ${values.fullName}! Мы свяжемся с вами для обсуждения деталей мероприятия.`,
+      });
+      form.reset();
+    } catch {
+      toast.error("Не удалось отправить заявку. Попробуйте ещё раз.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -133,6 +152,19 @@ export default function QuoteForm() {
         />
         <FormField
           control={form.control}
+          name="budget"
+          render={({ field }) => (
+            <FormItem className="sm:col-span-2">
+              <FormLabel>Бюджет (необязательно)</FormLabel>
+              <FormControl>
+                <Input placeholder="Например, 5 000 000 UZS" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
           name="message"
           render={({ field }) => (
             <FormItem className="sm:col-span-2">
@@ -151,9 +183,12 @@ export default function QuoteForm() {
         <Button
           type="submit"
           size="lg"
-          className="cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 sm:col-span-2"
+          disabled={submitting}
+          className="cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 sm:col-span-2 disabled:opacity-70"
         >
-          Запросить предложение
+          {submitting
+            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Отправка…</>
+            : "Запросить предложение"}
         </Button>
       </form>
     </Form>
