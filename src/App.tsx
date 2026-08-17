@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { DefaultProviders } from "./components/providers/default.tsx";
+import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import Index from "./pages/Index.tsx";
 import Story from "./pages/Story.tsx";
 import Catering from "./pages/catering/page.tsx";
@@ -42,11 +43,18 @@ export default function App() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/contact" element={<Contact />} />
 
-          {/* Admin login */}
+          {/* Admin login — public */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
 
-          {/* Admin panel */}
-          <Route path="/admin" element={<AdminLayout />}>
+          {/* Admin panel — protected */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<AdminDashboard />} />
             <Route path="pages" element={<PagesPage />} />
             <Route path="menu/categories" element={<CategoriesPage />} />
@@ -66,7 +74,6 @@ export default function App() {
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
