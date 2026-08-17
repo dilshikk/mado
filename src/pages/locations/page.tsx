@@ -46,6 +46,22 @@ const LANG_OPTIONS: { code: LangCode; label: string; flag: string }[] = [
   { code: "tr", label: "TR", flag: "🇹🇷" },
 ];
 
+// ─── Service translations ─────────────────────────────────────────────────────
+
+const SERVICE_LABELS: Record<string, Record<LangCode, string>> = {
+  "Dine-in":     { ru: "Зал",        uz: "Zal",        en: "Dine-in",     tr: "İçeride yemek" },
+  "Takeaway":    { ru: "С собой",    uz: "Olib ketish", en: "Takeaway",    tr: "Paket servis"  },
+  "Delivery":    { ru: "Доставка",   uz: "Yetkazib berish", en: "Delivery", tr: "Teslimat"     },
+  "Reservation": { ru: "Бронь",      uz: "Bron",        en: "Reservation", tr: "Rezervasyon"  },
+  "Events":      { ru: "Мероприятия", uz: "Tadbirlar",  en: "Events",      tr: "Etkinlikler"  },
+};
+
+function translateService(service: string, lang: LangCode): string {
+  return SERVICE_LABELS[service]?.[lang] ?? service;
+}
+
+// ─── UI text ──────────────────────────────────────────────────────────────────
+
 const UI_TEXT: Record<LangCode, {
   heroLabel: string;
   heroTitle: string;
@@ -154,7 +170,6 @@ function getLocalized(loc: ApiLocation, field: "name" | "district" | "address", 
   const key = `${field}_${lang}` as keyof ApiLocation;
   const val = loc[key];
   if (val && typeof val === "string" && val.trim()) return val;
-  // Fallback chain: ru → name → ""
   const ruKey = `${field}_ru` as keyof ApiLocation;
   const ruVal = loc[ruKey];
   if (ruVal && typeof ruVal === "string" && ruVal.trim()) return ruVal;
@@ -171,12 +186,12 @@ function isOpenNow(hours: ApiHour[]): boolean {
   const cur = now.getHours() * 60 + now.getMinutes();
   const open = oh * 60 + om;
   let close = ch * 60 + cm;
-  if (close < open) close += 24 * 60; // past midnight
+  if (close < open) close += 24 * 60;
   const adj = cur < open ? cur + 24 * 60 : cur;
   return adj >= open && adj <= close;
 }
 
-function formatHours(hours: ApiHour[], lang: LangCode, t: typeof UI_TEXT[LangCode]): string {
+function formatHours(hours: ApiHour[], t: typeof UI_TEXT[LangCode]): string {
   const open = hours.filter((h) => !h.is_closed);
   if (open.length === 0) return t.closedWeek;
   const first = open[0];
@@ -347,9 +362,23 @@ export default function Locations() {
                         </div>
                         <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                           <Clock className="size-4 shrink-0 text-accent" />
-                          <span>{formatHours(loc.hours, lang, t)}</span>
+                          <span>{formatHours(loc.hours, t)}</span>
                         </div>
                       </div>
+
+                      {/* Services */}
+                      {loc.services.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-1.5">
+                          {loc.services.map((s) => (
+                            <span
+                              key={s}
+                              className="rounded-full border border-border/60 bg-secondary/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                            >
+                              {translateService(s, lang)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       {loc.maps_url && (
                         <Button size="sm" className="mt-5 w-full cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90" asChild>
