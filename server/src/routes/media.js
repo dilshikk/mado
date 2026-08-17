@@ -77,7 +77,6 @@ router.put('/categories/:id', authenticate, authorize(['admin', 'editor']), asyn
 
 router.delete('/categories/:id', authenticate, authorize(['admin']), async (req, res) => {
   const { id } = req.params;
-  // Detach files from this category
   await pool.query('UPDATE media SET category_id = NULL WHERE category_id = $1', [id]);
   const result = await pool.query('DELETE FROM media_categories WHERE id = $1 RETURNING id', [id]);
   if (result.rows.length === 0) return res.status(404).json({ error: 'Category not found' });
@@ -143,19 +142,18 @@ router.post(
     }
 
     const { category_id } = req.body;
-    const baseUrl =
-      process.env.BASE_URL ||
-      `http://localhost:${process.env.PORT || 3000}`;
 
     const inserted = [];
     for (const file of req.files) {
-      const fileUrl = `${baseUrl}/uploads/${file.filename}`;
+      // Store only the relative path — the frontend constructs the full URL
+      // using VITE_API_URL so it works in any environment (local, staging, prod)
+      const filePath = `/uploads/${file.filename}`;
       const result = await pool.query(
         `INSERT INTO media (filename, file_url, file_size, file_type, category_id, uploaded_by)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           file.originalname,
-          fileUrl,
+          filePath,
           file.size,
           file.mimetype,
           category_id || null,
@@ -193,7 +191,8 @@ router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, 
   if (result.rows.length === 0) return res.status(404).json({ error: 'File not found' });
 
   const file = result.rows[0];
-  const filename = file.file_url.split('/uploads/')[1];
+  // file_url is a relative path like /uploads/filename.jpg
+  const filename = file.file_url.replace(/^\/uploads\//, '');
   if (filename) {
     const filePath = path.join(uploadDir, filename);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -216,7 +215,7 @@ router.post('/bulk-delete', authenticate, authorize(['admin', 'editor']), async 
   );
 
   for (const file of result.rows) {
-    const filename = file.file_url.split('/uploads/')[1];
+    const filename = file.file_url.replace(/^\/uploads\//, '');
     if (filename) {
       const filePath = path.join(uploadDir, filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
