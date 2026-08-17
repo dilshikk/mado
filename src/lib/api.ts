@@ -30,9 +30,9 @@ class ApiClient {
     localStorage.removeItem('token');
   }
 
-  async request(endpoint: string, options: RequestOptions = {}): Promise<any> {
+  async request(endpoint: string, options: RequestOptions = {}): Promise<unknown> {
     const url = `${API_BASE_URL}${endpoint}`;
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -43,20 +43,18 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+      const response = await fetch(url, { ...options, headers });
 
       if (response.status === 401) {
         this.clearToken();
         window.location.href = '/admin/login';
       }
 
-      const data = await response.json();
+      const data: unknown = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'API Error');
+        const errData = data as { error?: string };
+        throw new Error(errData.error ?? 'API Error');
       }
 
       return data;
@@ -66,406 +64,316 @@ class ApiClient {
     }
   }
 
-  // Auth
-  login(email: string, password: string): Promise<any> {
-    return this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+  /** Upload files via multipart/form-data (no Content-Type header — browser sets boundary) */
+  async uploadFiles(endpoint: string, formData: FormData): Promise<unknown> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers: Record<string, string> = {};
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+
+    const response = await fetch(url, { method: 'POST', headers, body: formData });
+
+    if (response.status === 401) {
+      this.clearToken();
+      window.location.href = '/admin/login';
+    }
+
+    const data: unknown = await response.json();
+    if (!response.ok) {
+      const errData = data as { error?: string };
+      throw new Error(errData.error ?? 'Upload failed');
+    }
+    return data;
   }
 
-  register(name: string, email: string, password: string, role: string = 'editor'): Promise<any> {
-    return this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password, role }),
-    });
+  // ── Auth ────────────────────────────────────────────────────────────────────
+
+  login(email: string, password: string): Promise<unknown> {
+    return this.request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
   }
 
-  getMe(): Promise<any> {
+  register(name: string, email: string, password: string, role = 'editor'): Promise<unknown> {
+    return this.request('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password, role }) });
+  }
+
+  getMe(): Promise<unknown> {
     return this.request('/auth/me');
   }
 
-  // Categories
-  getCategories(tab?: string): Promise<any> {
-    const query = tab ? `?tab=${tab}` : '';
-    return this.request(`/categories${query}`);
+  // ── Categories ──────────────────────────────────────────────────────────────
+
+  getCategories(tab?: string): Promise<unknown> {
+    return this.request(`/categories${tab ? `?tab=${tab}` : ''}`);
   }
 
-  getCategory(id: string | number): Promise<any> {
+  getCategory(id: string | number): Promise<unknown> {
     return this.request(`/categories/${id}`);
   }
 
-  createCategory(label: string, tab: string): Promise<any> {
-    return this.request('/categories', {
-      method: 'POST',
-      body: JSON.stringify({ label, tab }),
-    });
+  createCategory(label: string, tab: string): Promise<unknown> {
+    return this.request('/categories', { method: 'POST', body: JSON.stringify({ label, tab }) });
   }
 
-  updateCategory(id: string | number, label: string): Promise<any> {
-    return this.request(`/categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ label }),
-    });
+  updateCategory(id: string | number, label: string): Promise<unknown> {
+    return this.request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify({ label }) });
   }
 
-  deleteCategory(id: string | number): Promise<any> {
+  deleteCategory(id: string | number): Promise<unknown> {
     return this.request(`/categories/${id}`, { method: 'DELETE' });
   }
 
-  // Dishes
-  getDishes(params: Record<string, any>): Promise<any> {
+  // ── Dishes ──────────────────────────────────────────────────────────────────
+
+  getDishes(params: Record<string, string>): Promise<unknown> {
     const query = new URLSearchParams(params).toString();
     return this.request(`/dishes${query ? '?' + query : ''}`);
   }
 
-  getDish(id: string | number): Promise<any> {
+  getDish(id: string | number): Promise<unknown> {
     return this.request(`/dishes/${id}`);
   }
 
-  createDish(dish: Record<string, any>): Promise<any> {
-    return this.request('/dishes', {
-      method: 'POST',
-      body: JSON.stringify(dish),
-    });
+  createDish(dish: Record<string, unknown>): Promise<unknown> {
+    return this.request('/dishes', { method: 'POST', body: JSON.stringify(dish) });
   }
 
-  updateDish(id: string | number, dish: Record<string, any>): Promise<any> {
-    return this.request(`/dishes/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(dish),
-    });
+  updateDish(id: string | number, dish: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/dishes/${id}`, { method: 'PUT', body: JSON.stringify(dish) });
   }
 
-  deleteDish(id: string | number): Promise<any> {
+  deleteDish(id: string | number): Promise<unknown> {
     return this.request(`/dishes/${id}`, { method: 'DELETE' });
   }
 
-  bulkUpdateDishStatus(ids: (string | number)[], status: string): Promise<any> {
-    return this.request('/dishes/bulk/status', {
-      method: 'PUT',
-      body: JSON.stringify({ ids, status }),
-    });
+  bulkUpdateDishStatus(ids: (string | number)[], status: string): Promise<unknown> {
+    return this.request('/dishes/bulk/status', { method: 'PUT', body: JSON.stringify({ ids, status }) });
   }
 
-  // Locations
-  getLocations(): Promise<any> {
-    return this.request('/locations');
-  }
+  // ── Locations ───────────────────────────────────────────────────────────────
 
-  getLocation(id: string | number): Promise<any> {
-    return this.request(`/locations/${id}`);
+  getLocations(): Promise<unknown> { return this.request('/locations'); }
+  getLocation(id: string | number): Promise<unknown> { return this.request(`/locations/${id}`); }
+  createLocation(location: Record<string, unknown>): Promise<unknown> {
+    return this.request('/locations', { method: 'POST', body: JSON.stringify(location) });
   }
-
-  createLocation(location: Record<string, any>): Promise<any> {
-    return this.request('/locations', {
-      method: 'POST',
-      body: JSON.stringify(location),
-    });
+  updateLocation(id: string | number, location: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(location) });
   }
-
-  updateLocation(id: string | number, location: Record<string, any>): Promise<any> {
-    return this.request(`/locations/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(location),
-    });
-  }
-
-  deleteLocation(id: string | number): Promise<any> {
+  deleteLocation(id: string | number): Promise<unknown> {
     return this.request(`/locations/${id}`, { method: 'DELETE' });
   }
 
-  // Promotions
-  getPromotions(status?: string): Promise<any> {
-    const query = status ? `?status=${status}` : '';
-    return this.request(`/promotions${query}`);
-  }
+  // ── Promotions ──────────────────────────────────────────────────────────────
 
-  getPromotion(id: string | number): Promise<any> {
-    return this.request(`/promotions/${id}`);
+  getPromotions(status?: string): Promise<unknown> {
+    return this.request(`/promotions${status ? `?status=${status}` : ''}`);
   }
-
-  createPromotion(promo: Record<string, any>): Promise<any> {
-    return this.request('/promotions', {
-      method: 'POST',
-      body: JSON.stringify(promo),
-    });
+  getPromotion(id: string | number): Promise<unknown> { return this.request(`/promotions/${id}`); }
+  createPromotion(promo: Record<string, unknown>): Promise<unknown> {
+    return this.request('/promotions', { method: 'POST', body: JSON.stringify(promo) });
   }
-
-  updatePromotion(id: string | number, promo: Record<string, any>): Promise<any> {
-    return this.request(`/promotions/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(promo),
-    });
+  updatePromotion(id: string | number, promo: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/promotions/${id}`, { method: 'PUT', body: JSON.stringify(promo) });
   }
-
-  deletePromotion(id: string | number): Promise<any> {
+  deletePromotion(id: string | number): Promise<unknown> {
     return this.request(`/promotions/${id}`, { method: 'DELETE' });
   }
 
-  // Reviews
-  getReviews(params: Record<string, any>): Promise<any> {
+  // ── Reviews ─────────────────────────────────────────────────────────────────
+
+  getReviews(params: Record<string, string>): Promise<unknown> {
     const query = new URLSearchParams(params).toString();
     return this.request(`/reviews${query ? '?' + query : ''}`);
   }
-
-  getReviewStats(): Promise<any> {
-    return this.request('/reviews/stats/summary');
+  getReviewStats(): Promise<unknown> { return this.request('/reviews/stats/summary'); }
+  createReview(review: Record<string, unknown>): Promise<unknown> {
+    return this.request('/reviews', { method: 'POST', body: JSON.stringify(review) });
   }
-
-  createReview(review: Record<string, any>): Promise<any> {
-    return this.request('/reviews', {
-      method: 'POST',
-      body: JSON.stringify(review),
-    });
+  updateReviewStatus(id: string | number, status: string): Promise<unknown> {
+    return this.request(`/reviews/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
-
-  updateReviewStatus(id: string | number, status: string): Promise<any> {
-    return this.request(`/reviews/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  }
-
-  deleteReview(id: string | number): Promise<any> {
+  deleteReview(id: string | number): Promise<unknown> {
     return this.request(`/reviews/${id}`, { method: 'DELETE' });
   }
 
-  // Requests
-  getRequests(params: Record<string, any>): Promise<any> {
+  // ── Requests ────────────────────────────────────────────────────────────────
+
+  getRequests(params: Record<string, string>): Promise<unknown> {
     const query = new URLSearchParams(params).toString();
     return this.request(`/requests${query ? '?' + query : ''}`);
   }
-
-  getRequestStats(): Promise<any> {
-    return this.request('/requests/stats/summary');
+  getRequestStats(): Promise<unknown> { return this.request('/requests/stats/summary'); }
+  createRequest(request: Record<string, unknown>): Promise<unknown> {
+    return this.request('/requests', { method: 'POST', body: JSON.stringify(request) });
   }
-
-  createRequest(request: Record<string, any>): Promise<any> {
-    return this.request('/requests', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+  updateRequestStatus(id: string | number, status: string): Promise<unknown> {
+    return this.request(`/requests/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
-
-  updateRequestStatus(id: string | number, status: string): Promise<any> {
-    return this.request(`/requests/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  }
-
-  deleteRequest(id: string | number): Promise<any> {
+  deleteRequest(id: string | number): Promise<unknown> {
     return this.request(`/requests/${id}`, { method: 'DELETE' });
   }
 
-  // Catering
-  getCateringRequests(status?: string): Promise<any> {
-    const query = status ? `?status=${status}` : '';
-    return this.request(`/catering/requests${query}`);
-  }
+  // ── Catering ────────────────────────────────────────────────────────────────
 
-  getCateringRequest(id: string | number): Promise<any> {
+  getCateringRequests(status?: string): Promise<unknown> {
+    return this.request(`/catering/requests${status ? `?status=${status}` : ''}`);
+  }
+  getCateringRequest(id: string | number): Promise<unknown> {
     return this.request(`/catering/requests/${id}`);
   }
-
-  createCateringRequest(request: Record<string, any>): Promise<any> {
-    return this.request('/catering/requests', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+  createCateringRequest(request: Record<string, unknown>): Promise<unknown> {
+    return this.request('/catering/requests', { method: 'POST', body: JSON.stringify(request) });
   }
-
-  updateCateringRequestStatus(id: string | number, status: string): Promise<any> {
-    return this.request(`/catering/requests/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
+  updateCateringRequestStatus(id: string | number, status: string): Promise<unknown> {
+    return this.request(`/catering/requests/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
-
-  getCateringContent(lang: string): Promise<any> {
+  getCateringContent(lang: string): Promise<unknown> {
     return this.request(`/catering/content?lang=${lang}`);
   }
-
-  updateCateringContent(lang: string, content: Record<string, any>): Promise<any> {
-    return this.request('/catering/content', {
-      method: 'PUT',
-      body: JSON.stringify({ lang, content }),
-    });
+  updateCateringContent(lang: string, content: Record<string, unknown>): Promise<unknown> {
+    return this.request('/catering/content', { method: 'PUT', body: JSON.stringify({ lang, content }) });
   }
 
-  // Vacancies
-  getVacancies(status?: string): Promise<any> {
-    const query = status ? `?status=${status}` : '';
-    return this.request(`/vacancies${query}`);
-  }
+  // ── Vacancies ───────────────────────────────────────────────────────────────
 
-  getVacancy(id: string | number): Promise<any> {
-    return this.request(`/vacancies/${id}`);
+  getVacancies(status?: string): Promise<unknown> {
+    return this.request(`/vacancies${status ? `?status=${status}` : ''}`);
   }
-
-  createVacancy(vacancy: Record<string, any>): Promise<any> {
-    return this.request('/vacancies', {
-      method: 'POST',
-      body: JSON.stringify(vacancy),
-    });
+  getVacancy(id: string | number): Promise<unknown> { return this.request(`/vacancies/${id}`); }
+  createVacancy(vacancy: Record<string, unknown>): Promise<unknown> {
+    return this.request('/vacancies', { method: 'POST', body: JSON.stringify(vacancy) });
   }
-
-  updateVacancy(id: string | number, vacancy: Record<string, any>): Promise<any> {
-    return this.request(`/vacancies/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(vacancy),
-    });
+  updateVacancy(id: string | number, vacancy: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/vacancies/${id}`, { method: 'PUT', body: JSON.stringify(vacancy) });
   }
-
-  deleteVacancy(id: string | number): Promise<any> {
+  deleteVacancy(id: string | number): Promise<unknown> {
     return this.request(`/vacancies/${id}`, { method: 'DELETE' });
   }
 
-  // Applications
-  getApplications(params: Record<string, any>): Promise<any> {
+  // ── Applications ────────────────────────────────────────────────────────────
+
+  getApplications(params: Record<string, string>): Promise<unknown> {
     const query = new URLSearchParams(params).toString();
     return this.request(`/applications${query ? '?' + query : ''}`);
   }
-
-  getApplication(id: string | number): Promise<any> {
-    return this.request(`/applications/${id}`);
+  getApplication(id: string | number): Promise<unknown> { return this.request(`/applications/${id}`); }
+  createApplication(app: Record<string, unknown>): Promise<unknown> {
+    return this.request('/applications', { method: 'POST', body: JSON.stringify(app) });
   }
-
-  createApplication(app: Record<string, any>): Promise<any> {
-    return this.request('/applications', {
-      method: 'POST',
-      body: JSON.stringify(app),
-    });
+  updateApplicationStatus(id: string | number, status: string): Promise<unknown> {
+    return this.request(`/applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
-
-  updateApplicationStatus(id: string | number, status: string): Promise<any> {
-    return this.request(`/applications/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  }
-
-  deleteApplication(id: string | number): Promise<any> {
+  deleteApplication(id: string | number): Promise<unknown> {
     return this.request(`/applications/${id}`, { method: 'DELETE' });
   }
 
-  // FAQ
-  getFaqItems(category?: string): Promise<any> {
-    const query = category ? `?category=${category}` : '';
-    return this.request(`/faq${query}`);
-  }
+  // ── FAQ ─────────────────────────────────────────────────────────────────────
 
-  getFaqItem(id: string | number): Promise<any> {
-    return this.request(`/faq/${id}`);
+  getFaqItems(category?: string): Promise<unknown> {
+    return this.request(`/faq${category ? `?category=${category}` : ''}`);
   }
-
-  createFaqItem(item: Record<string, any>): Promise<any> {
-    return this.request('/faq', {
-      method: 'POST',
-      body: JSON.stringify(item),
-    });
+  getFaqItem(id: string | number): Promise<unknown> { return this.request(`/faq/${id}`); }
+  createFaqItem(item: Record<string, unknown>): Promise<unknown> {
+    return this.request('/faq', { method: 'POST', body: JSON.stringify(item) });
   }
-
-  updateFaqItem(id: string | number, item: Record<string, any>): Promise<any> {
-    return this.request(`/faq/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(item),
-    });
+  updateFaqItem(id: string | number, item: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/faq/${id}`, { method: 'PUT', body: JSON.stringify(item) });
   }
-
-  deleteFaqItem(id: string | number): Promise<any> {
+  deleteFaqItem(id: string | number): Promise<unknown> {
     return this.request(`/faq/${id}`, { method: 'DELETE' });
   }
 
-  // Settings
-  getSettings(): Promise<any> {
-    return this.request('/settings');
-  }
+  // ── Settings ────────────────────────────────────────────────────────────────
 
-  getSetting(key: string): Promise<any> {
-    return this.request(`/settings/${key}`);
+  getSettings(): Promise<unknown> { return this.request('/settings'); }
+  getSetting(key: string): Promise<unknown> { return this.request(`/settings/${key}`); }
+  updateSetting(key: string, value: unknown): Promise<unknown> {
+    return this.request(`/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value }) });
   }
-
-  updateSetting(key: string, value: any): Promise<any> {
-    return this.request(`/settings/${key}`, {
-      method: 'PUT',
-      body: JSON.stringify({ value }),
-    });
+  updateSettings(settings: Record<string, unknown>): Promise<unknown> {
+    return this.request('/settings', { method: 'PUT', body: JSON.stringify(settings) });
   }
-
-  updateSettings(settings: Record<string, any>): Promise<any> {
-    return this.request('/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    });
-  }
-
-  deleteSetting(key: string): Promise<any> {
+  deleteSetting(key: string): Promise<unknown> {
     return this.request(`/settings/${key}`, { method: 'DELETE' });
   }
 
-  // Users
-  getUsers(): Promise<any> {
-    return this.request('/users');
-  }
+  // ── Users ───────────────────────────────────────────────────────────────────
 
-  getUser(id: string | number): Promise<any> {
-    return this.request(`/users/${id}`);
+  getUsers(): Promise<unknown> { return this.request('/users'); }
+  getUser(id: string | number): Promise<unknown> { return this.request(`/users/${id}`); }
+  updateUser(id: string | number, user: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(user) });
   }
-
-  updateUser(id: string | number, user: Record<string, any>): Promise<any> {
-    return this.request(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(user),
-    });
+  resetUserPassword(id: string | number, password: string): Promise<unknown> {
+    return this.request(`/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) });
   }
-
-  resetUserPassword(id: string | number, password: string): Promise<any> {
-    return this.request(`/users/${id}/reset-password`, {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    });
-  }
-
-  deleteUser(id: string | number): Promise<any> {
+  deleteUser(id: string | number): Promise<unknown> {
     return this.request(`/users/${id}`, { method: 'DELETE' });
   }
 
-  // Activity Log
-  getActivityLog(limit: number = 100, offset: number = 0): Promise<any> {
+  // ── Activity ────────────────────────────────────────────────────────────────
+
+  getActivityLog(limit = 100, offset = 0): Promise<unknown> {
     return this.request(`/activity?limit=${limit}&offset=${offset}`);
   }
-
-  getActivityForEntity(type: string, id: string | number): Promise<any> {
+  getActivityForEntity(type: string, id: string | number): Promise<unknown> {
     return this.request(`/activity/${type}/${id}`);
   }
 
-  // Pages
-  getPages(): Promise<any> {
-    return this.request('/pages');
-  }
+  // ── Pages ───────────────────────────────────────────────────────────────────
 
-  getPage(slug: string): Promise<any> {
-    return this.request(`/pages/${slug}`);
+  getPages(): Promise<unknown> { return this.request('/pages'); }
+  getPage(slug: string): Promise<unknown> { return this.request(`/pages/${slug}`); }
+  createPage(page: Record<string, unknown>): Promise<unknown> {
+    return this.request('/pages', { method: 'POST', body: JSON.stringify(page) });
   }
-
-  createPage(page: Record<string, any>): Promise<any> {
-    return this.request('/pages', {
-      method: 'POST',
-      body: JSON.stringify(page),
-    });
+  updatePage(id: string | number, page: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(page) });
   }
-
-  updatePage(id: string | number, page: Record<string, any>): Promise<any> {
-    return this.request(`/pages/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(page),
-    });
-  }
-
-  deletePage(id: string | number): Promise<any> {
+  deletePage(id: string | number): Promise<unknown> {
     return this.request(`/pages/${id}`, { method: 'DELETE' });
+  }
+
+  // ── Media ───────────────────────────────────────────────────────────────────
+
+  getMedia(params: Record<string, string>): Promise<unknown> {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/media${query ? '?' + query : ''}`);
+  }
+
+  uploadMedia(files: File[], categoryId?: string | number): Promise<unknown> {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f));
+    if (categoryId != null) form.append('category_id', String(categoryId));
+    return this.uploadFiles('/media/upload', form);
+  }
+
+  updateMediaCategory(id: string | number, categoryId: string | number | null): Promise<unknown> {
+    return this.request(`/media/${id}/category`, {
+      method: 'PATCH',
+      body: JSON.stringify({ category_id: categoryId }),
+    });
+  }
+
+  deleteMedia(id: string | number): Promise<unknown> {
+    return this.request(`/media/${id}`, { method: 'DELETE' });
+  }
+
+  bulkDeleteMedia(ids: (string | number)[]): Promise<unknown> {
+    return this.request('/media/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+  }
+
+  getMediaCategories(): Promise<unknown> { return this.request('/media/categories'); }
+
+  createMediaCategory(name: string): Promise<unknown> {
+    return this.request('/media/categories', { method: 'POST', body: JSON.stringify({ name }) });
+  }
+
+  updateMediaCategory2(id: string | number, name: string): Promise<unknown> {
+    return this.request(`/media/categories/${id}`, { method: 'PUT', body: JSON.stringify({ name }) });
+  }
+
+  deleteMediaCategory(id: string | number): Promise<unknown> {
+    return this.request(`/media/categories/${id}`, { method: 'DELETE' });
   }
 }
 
