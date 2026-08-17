@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: "\u041c\u0435\u043d\u044e", href: "/menu" },
   { label: "\u041a\u0435\u0439\u0442\u0435\u0440\u0438\u043d\u0433", href: "/catering" },
   { label: "\u0420\u0435\u0441\u0442\u043e\u0440\u0430\u043d\u044b", href: "/locations" },
+  { label: "\u041e\u0442\u0437\u044b\u0432\u044b", href: "/reviews" },
   { label: "\u041a\u0430\u0440\u044c\u0435\u0440\u0430", href: "/careers" },
   { label: "\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b", href: "/contact" },
 ] as const;
