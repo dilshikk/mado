@@ -25,7 +25,7 @@ type MediaCategory = { id: number; name: string };
 type MediaFile = {
   id: number;
   filename: string;
-  file_url: string;
+  file_url: string;   // relative (/uploads/...) or absolute URL
   file_size: number | null;
   file_type: string | null;
   category_id: number | null;
@@ -161,6 +161,7 @@ function PreviewModal({
   onNavigate: (f: MediaFile) => void;
 }) {
   const idx = files.findIndex((f) => f.id === file.id);
+  const fullUrl = api.getFileUrl(file.file_url);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -173,7 +174,7 @@ function PreviewModal({
   }, [idx, files, onClose, onNavigate]);
 
   const copyUrl = () => {
-    void navigator.clipboard.writeText(file.file_url);
+    void navigator.clipboard.writeText(fullUrl);
     toast.success("URL скопирован");
   };
 
@@ -205,7 +206,7 @@ function PreviewModal({
         {/* Image */}
         <div className="relative flex-1 bg-muted/30 flex items-center justify-center overflow-hidden min-h-[300px]">
           <img
-            src={file.file_url}
+            src={fullUrl}
             alt={file.filename}
             className="max-h-[65vh] max-w-full object-contain"
           />
@@ -518,8 +519,9 @@ export default function MediaPage() {
   };
 
   // ── Copy URL ──
-  const handleCopy = (url: string, id: number) => {
-    void navigator.clipboard.writeText(url);
+  const handleCopy = (fileUrl: string, id: number) => {
+    const fullUrl = api.getFileUrl(fileUrl);
+    void navigator.clipboard.writeText(fullUrl);
     setCopied(id);
     toast.success("URL скопирован");
     setTimeout(() => setCopied(null), 1500);
@@ -538,7 +540,7 @@ export default function MediaPage() {
   const clearSelection = () => setSelected(new Set());
 
   // ── Derived ──
-  const categoryMap = useMemo(
+  const _categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],
   );
@@ -665,99 +667,102 @@ export default function MediaPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {files.map((file) => (
-            <div
-              key={file.id}
-              className={cn(
-                "group relative bg-card border rounded-xl overflow-hidden transition-all",
-                selected.has(file.id)
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "border-border hover:border-accent/60",
-              )}
-            >
-              {/* Checkbox */}
+          {files.map((file) => {
+            const imgSrc = api.getFileUrl(file.file_url);
+            return (
               <div
-                onClick={() => toggleSelect(file.id)}
-                className="absolute top-1.5 left-1.5 z-10 cursor-pointer"
-              >
-                <div className={cn(
-                  "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
+                key={file.id}
+                className={cn(
+                  "group relative bg-card border rounded-xl overflow-hidden transition-all",
                   selected.has(file.id)
-                    ? "bg-primary border-primary"
-                    : "border-white/70 bg-black/20 group-hover:border-white",
-                )}>
-                  {selected.has(file.id) && <Check className="w-3 h-3 text-primary-foreground" />}
-                </div>
-              </div>
-
-              {/* Image */}
-              <div
-                className="aspect-square bg-muted cursor-zoom-in"
-                onClick={() => setPreview(file)}
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "border-border hover:border-accent/60",
+                )}
               >
-                <img
-                  src={file.file_url}
-                  alt={file.filename}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </div>
+                {/* Checkbox */}
+                <div
+                  onClick={() => toggleSelect(file.id)}
+                  className="absolute top-1.5 left-1.5 z-10 cursor-pointer"
+                >
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
+                    selected.has(file.id)
+                      ? "bg-primary border-primary"
+                      : "border-white/70 bg-black/20 group-hover:border-white",
+                  )}>
+                    {selected.has(file.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                  </div>
+                </div>
 
-              {/* Info */}
-              <div className="p-2">
-                <p className="text-[11px] font-medium text-foreground truncate">{file.filename}</p>
-                <div className="flex items-center justify-between mt-0.5 gap-1 flex-wrap">
-                  <span className="text-[10px] text-muted-foreground">{formatSize(file.file_size)}</span>
-                  {file.category_name && (
-                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded truncate max-w-[70px]">
-                      {file.category_name}
-                    </span>
-                  )}
+                {/* Image */}
+                <div
+                  className="aspect-square bg-muted cursor-zoom-in"
+                  onClick={() => setPreview(file)}
+                >
+                  <img
+                    src={imgSrc}
+                    alt={file.filename}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+
+                {/* Info */}
+                <div className="p-2">
+                  <p className="text-[11px] font-medium text-foreground truncate">{file.filename}</p>
+                  <div className="flex items-center justify-between mt-0.5 gap-1 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground">{formatSize(file.file_size)}</span>
+                    {file.category_name && (
+                      <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded truncate max-w-[70px]">
+                        {file.category_name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hover actions */}
+                <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCopy(file.file_url, file.id); }}
+                    className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-muted cursor-pointer"
+                    title="Скопировать URL"
+                  >
+                    {copied === file.id
+                      ? <Check className="w-3 h-3 text-emerald-600" />
+                      : <Copy className="w-3 h-3 text-muted-foreground" />}
+                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-destructive/10 cursor-pointer"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить файл?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          <strong>{file.filename}</strong> будет удалён безвозвратно.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(file.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Удалить
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
-
-              {/* Hover actions */}
-              <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCopy(file.file_url, file.id); }}
-                  className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-muted cursor-pointer"
-                  title="Скопировать URL"
-                >
-                  {copied === file.id
-                    ? <Check className="w-3 h-3 text-emerald-600" />
-                    : <Copy className="w-3 h-3 text-muted-foreground" />}
-                </button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-destructive/10 cursor-pointer"
-                      title="Удалить"
-                    >
-                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Удалить файл?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        <strong>{file.filename}</strong> будет удалён безвозвратно.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Отмена</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDelete(file.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Удалить
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
