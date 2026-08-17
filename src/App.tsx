@@ -8,6 +8,7 @@ import Locations from "./pages/locations/page.tsx";
 import Careers from "./pages/careers/page.tsx";
 import Contact from "./pages/contact/page.tsx";
 import MenuPage from "./pages/menu/page.tsx";
+import ReviewsPublicPage from "./pages/reviews/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminLayout from "./pages/admin/layout.tsx";
 import AdminLoginPage from "./pages/admin/login.tsx";
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/locations" element={<Locations />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/reviews" element={<ReviewsPublicPage />} />
 
           {/* Admin login — public */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
