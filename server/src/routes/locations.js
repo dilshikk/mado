@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
       district_ru, district_uz, district_en, district_tr,
       address,
       address_ru, address_uz, address_en, address_tr,
-      phone, email, maps_url, status, created_at
+      phone, email, maps_url, photo_url, status, created_at
     FROM locations
     ORDER BY COALESCE(name_ru, name)
   `);
@@ -53,7 +53,7 @@ router.get('/:id', async (req, res) => {
       district_ru, district_uz, district_en, district_tr,
       address,
       address_ru, address_uz, address_en, address_tr,
-      phone, email, maps_url, status
+      phone, email, maps_url, photo_url, status
     FROM locations
     WHERE id = $1
   `, [id]);
@@ -86,10 +86,9 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
     name, name_ru, name_uz, name_en, name_tr,
     district, district_ru, district_uz, district_en, district_tr,
     address, address_ru, address_uz, address_en, address_tr,
-    phone, email, maps_url, services = [], hours = []
+    phone, email, maps_url, photo_url, services = [], hours = []
   } = req.body;
 
-  // Use _ru as primary fallback for legacy `name`/`district`/`address` columns
   const primaryName = name_ru || name;
   const primaryDistrict = district_ru || district;
   const primaryAddress = address_ru || address;
@@ -103,15 +102,15 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
       name, name_ru, name_uz, name_en, name_tr,
       district, district_ru, district_uz, district_en, district_tr,
       address, address_ru, address_uz, address_en, address_tr,
-      phone, email, maps_url, status
+      phone, email, maps_url, photo_url, status
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'open')
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'open')
     RETURNING id, name
   `, [
     primaryName, name_ru || null, name_uz || null, name_en || null, name_tr || null,
     primaryDistrict, district_ru || null, district_uz || null, district_en || null, district_tr || null,
     primaryAddress, address_ru || null, address_uz || null, address_en || null, address_tr || null,
-    phone, email || null, maps_url || null
+    phone, email || null, maps_url || null, photo_url || null
   ]);
 
   const locId = locResult.rows[0].id;
@@ -148,7 +147,7 @@ router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res
     name, name_ru, name_uz, name_en, name_tr,
     district, district_ru, district_uz, district_en, district_tr,
     address, address_ru, address_uz, address_en, address_tr,
-    phone, email, maps_url, status, services = [], hours = []
+    phone, email, maps_url, photo_url, status, services = [], hours = []
   } = req.body;
 
   const primaryName = name_ru || name;
@@ -163,9 +162,9 @@ router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res
       district_ru = $7, district_uz = $8, district_en = $9, district_tr = $10,
       address = $11,
       address_ru = $12, address_uz = $13, address_en = $14, address_tr = $15,
-      phone = $16, email = $17, maps_url = $18, status = $19,
+      phone = $16, email = $17, maps_url = $18, photo_url = $19, status = $20,
       updated_at = NOW()
-    WHERE id = $20
+    WHERE id = $21
   `, [
     primaryName,
     name_ru || null, name_uz || null, name_en || null, name_tr || null,
@@ -173,7 +172,7 @@ router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res
     district_ru || null, district_uz || null, district_en || null, district_tr || null,
     primaryAddress,
     address_ru || null, address_uz || null, address_en || null, address_tr || null,
-    phone, email || null, maps_url || null, status, id
+    phone, email || null, maps_url || null, photo_url || null, status, id
   ]);
 
   // Replace hours
