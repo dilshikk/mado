@@ -9,7 +9,7 @@ router.get('/requests', async (req, res) => {
   const { status } = req.query;
 
   let query = `
-    SELECT id, name, phone, email, event_type, event_date, guest_count, budget, message, status, created_at
+    SELECT id, name, phone, email, event_type, event_date, guest_count, budget, message, note, status, created_at
     FROM catering_requests
   `;
   const params = [];
@@ -30,7 +30,7 @@ router.get('/requests/:id', async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query(`
-    SELECT id, name, phone, email, event_type, event_date, guest_count, budget, message, status, created_at
+    SELECT id, name, phone, email, event_type, event_date, guest_count, budget, message, note, status, created_at
     FROM catering_requests
     WHERE id = $1
   `, [id]);
@@ -42,7 +42,7 @@ router.get('/requests/:id', async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// Create catering request
+// Create catering request (public)
 router.post('/requests', async (req, res) => {
   const { name, phone, email, event_type, event_date, guest_count, budget, message } = req.body;
 
@@ -92,15 +92,37 @@ router.patch('/requests/:id/status', authenticate, authorize(['admin', 'editor']
   res.json(result.rows[0]);
 });
 
+// Update internal note for a catering request
+router.patch('/requests/:id/note', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+  const { id } = req.params;
+  const { note } = req.body;
+
+  if (note === undefined) {
+    return res.status(400).json({ error: 'Note field required' });
+  }
+
+  const result = await pool.query(
+    'UPDATE catering_requests SET note = $1, updated_at = NOW() WHERE id = $2 RETURNING id, note',
+    [note || null, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Request not found' });
+  }
+
+  res.json(result.rows[0]);
+});
+
 // Get catering page content
 router.get('/content', async (req, res) => {
   const lang = req.query.lang || 'ru';
   const result = await pool.query('SELECT value FROM settings WHERE key = $1', [`catering_content_${lang}`]);
-  
+
   const defaultContent = {
-    ru: { headline: 'MADO Keytring', subheadline: 'Har qanday tadbir uchun', description: '...', cta: 'Ariza qoldirish' },
-    uz: { headline: 'MADO Keytring', subheadline: '...', description: '...', cta: 'Ariza qoldirish' },
-    en: { headline: 'MADO Catering', subheadline: 'For any occasion', description: '...', cta: 'Send a request' },
+    ru: { headline: 'Кейтеринг MADO', subheadline: 'Для любых мероприятий', description: 'Мы организуем кейтеринг для корпоративных мероприятий, свадеб, дней рождения и частных вечеринок.', cta: 'Оставить заявку' },
+    uz: { headline: 'MADO Keytring', subheadline: 'Har qanday tadbir uchun', description: "Biz korporativ tadbirlar, to'ylar, tug'ilgan kunlar va xususiy partiyalar uchun keytering tashkil qilamiz.", cta: 'Ariza qoldirish' },
+    en: { headline: 'MADO Catering', subheadline: 'For any occasion', description: 'We organise catering for corporate events, weddings, birthdays and private parties.', cta: 'Send a request' },
+    tr: { headline: 'MADO Catering', subheadline: 'Her etkinlik için', description: 'Kurumsal etkinlikler, düğünler, doğum günleri ve özel partiler için catering organize ediyoruz.', cta: 'Talep gönderin' },
   };
 
   if (result.rows.length === 0) {
