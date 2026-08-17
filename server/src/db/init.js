@@ -204,11 +204,15 @@ const initDb = async () => {
         guest_count INT NOT NULL,
         budget DECIMAL(12, 2),
         message TEXT,
+        note TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'new',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Safe migration: add note column to existing catering_requests table
+    await pool.query(`ALTER TABLE catering_requests ADD COLUMN IF NOT EXISTS note TEXT`);
 
     // Career vacancies table
     await pool.query(`
