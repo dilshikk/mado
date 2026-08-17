@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import 'express-async-errors';
 
 // Import routes
@@ -19,8 +21,12 @@ import settingsRoutes from './routes/settings.js';
 import usersRoutes from './routes/users.js';
 import activityRoutes from './routes/activity.js';
 import pagesRoutes from './routes/pages.js';
+import mediaRoutes from './routes/media.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +35,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Static uploads
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -46,6 +55,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/pages', pagesRoutes);
+app.use('/api/media', mediaRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
