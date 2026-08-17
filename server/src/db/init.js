@@ -211,7 +211,6 @@ const initDb = async () => {
       )
     `);
 
-    // Safe migration: add note column to existing catering_requests table
     await pool.query(`ALTER TABLE catering_requests ADD COLUMN IF NOT EXISTS note TEXT`);
 
     // Career vacancies table
@@ -286,7 +285,25 @@ const initDb = async () => {
       )
     `);
 
-    // Media table
+    // Media categories table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS media_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default media categories
+    const defaultMediaCategories = ['Menu', 'Catering', 'Beverages', 'Desserts', 'Brand', 'Interior'];
+    for (const name of defaultMediaCategories) {
+      await pool.query(
+        'INSERT INTO media_categories (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
+        [name]
+      );
+    }
+
+    // Media table (with category_id FK)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS media (
         id SERIAL PRIMARY KEY,
@@ -294,10 +311,14 @@ const initDb = async () => {
         file_url VARCHAR(500) NOT NULL,
         file_size INT,
         file_type VARCHAR(50),
+        category_id INT REFERENCES media_categories(id) ON DELETE SET NULL,
         uploaded_by INT REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Safe migration: add category_id column to existing media table
+    await pool.query(`ALTER TABLE media ADD COLUMN IF NOT EXISTS category_id INT REFERENCES media_categories(id) ON DELETE SET NULL`);
 
     // Activity log table
     await pool.query(`
