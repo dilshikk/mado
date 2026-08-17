@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Edit2, MapPin, Phone, Clock, ToggleLeft, ToggleRight, Trash2, Globe, X, Save, Loader2 } from "lucide-react";
+import { Plus, Edit2, MapPin, Phone, Clock, ToggleLeft, ToggleRight, Trash2, Globe, X, Save, Loader2, Image } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
@@ -34,6 +34,7 @@ type Location = {
   phone: string;
   email: string;
   mapsUrl: string;
+  photoUrl: string;
   hours: WeekHours;
   status: "open" | "disabled";
   services: string[];
@@ -59,6 +60,7 @@ type ApiLocation = {
   phone: string;
   email: string | null;
   maps_url: string | null;
+  photo_url: string | null;
   status: string;
   hours: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[];
   services: string[];
@@ -97,6 +99,7 @@ function fromApi(loc: ApiLocation): Location {
     phone: loc.phone,
     email: loc.email ?? "",
     mapsUrl: loc.maps_url ?? "",
+    photoUrl: loc.photo_url ?? "",
     status: loc.status === "open" ? "open" : "disabled",
     hours,
     services: loc.services,
@@ -120,6 +123,7 @@ function toApiPayload(loc: Omit<Location, "id">) {
     phone: loc.phone,
     email: loc.email || null,
     maps_url: loc.mapsUrl || null,
+    photo_url: loc.photoUrl || null,
     status: loc.status,
     services: loc.services,
     hours: loc.hours.map((h, i) => ({
@@ -166,6 +170,7 @@ export default function LocationsPage() {
       phone: "",
       email: "",
       mapsUrl: "",
+      photoUrl: "",
       hours: defaultHours(),
       status: "open",
       services: ["Dine-in"],
@@ -265,7 +270,7 @@ export default function LocationsPage() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-xl p-5 h-52 animate-pulse" />
+            <div key={i} className="bg-card border border-border rounded-xl h-64 animate-pulse" />
           ))}
         </div>
       )}
@@ -286,88 +291,102 @@ export default function LocationsPage() {
             const displayName = loc.langs.ru.name || loc.langs.en.name;
             const displayDistrict = loc.langs.ru.district || loc.langs.en.district;
             const displayAddress = loc.langs.ru.address || loc.langs.en.address;
-
-            // How many langs have name filled
             const filledLangs = LANGS.filter((l) => loc.langs[l.code].name).map((l) => l.flag);
 
             return (
-              <div key={loc.id} className="bg-card border border-border rounded-xl p-5 space-y-4 hover:border-accent/50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 pr-3">
-                    <h3 className="font-semibold text-foreground truncate">{displayName}</h3>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" /> {displayDistrict}
-                    </p>
+              <div key={loc.id} className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-colors">
+                {/* Photo */}
+                {loc.photoUrl ? (
+                  <img
+                    src={loc.photoUrl}
+                    alt={displayName}
+                    className="w-full h-40 object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="w-full h-32 bg-muted flex items-center justify-center">
+                    <Image className="w-8 h-8 text-muted-foreground/30" />
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <span className={cn(
-                      "text-xs font-semibold px-2 py-0.5 rounded-full",
-                      loc.status === "open"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                        : "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
-                    )}>
-                      {loc.status === "open" ? "● Open" : "○ Disabled"}
-                    </span>
-                    <div className="flex gap-0.5 text-xs">{filledLangs.join(" ")}</div>
-                  </div>
-                </div>
+                )}
 
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex items-start gap-2 text-muted-foreground">
-                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span className="text-xs">{displayAddress}</span>
+                <div className="p-5 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0 pr-3">
+                      <h3 className="font-semibold text-foreground truncate">{displayName}</h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" /> {displayDistrict}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className={cn(
+                        "text-xs font-semibold px-2 py-0.5 rounded-full",
+                        loc.status === "open"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                          : "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
+                      )}>
+                        {loc.status === "open" ? "● Open" : "○ Disabled"}
+                      </span>
+                      <div className="flex gap-0.5 text-xs">{filledLangs.join(" ")}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Phone className="w-3.5 h-3.5 shrink-0" /> {loc.phone}
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-xs">
-                      {(() => {
-                        const open = loc.hours.filter((h) => !h.closed);
-                        if (open.length === 0) return "Closed all week";
-                        const first = open[0];
-                        const allSame = open.every((h) => h.open === first.open && h.close === first.close);
-                        return allSame ? `${first.open} – ${first.close} daily` : "Varies by day";
-                      })()}
-                    </span>
-                  </div>
-                  {loc.mapsUrl && (
-                    <a href={loc.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline">
-                      <Globe className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-xs">View on Google Maps</span>
-                    </a>
-                  )}
-                </div>
 
-                <div className="flex flex-wrap gap-1">
-                  {loc.services.map((s) => (
-                    <span key={s} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">{s}</span>
-                  ))}
-                </div>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span className="text-xs">{displayAddress}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Phone className="w-3.5 h-3.5 shrink-0" /> {loc.phone}
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-xs">
+                        {(() => {
+                          const open = loc.hours.filter((h) => !h.closed);
+                          if (open.length === 0) return "Closed all week";
+                          const first = open[0];
+                          const allSame = open.every((h) => h.open === first.open && h.close === first.close);
+                          return allSame ? `${first.open} – ${first.close} daily` : "Varies by day";
+                        })()}
+                      </span>
+                    </div>
+                    {loc.mapsUrl && (
+                      <a href={loc.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline">
+                        <Globe className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-xs">View on Google Maps</span>
+                      </a>
+                    )}
+                  </div>
 
-                <div className="flex gap-2 pt-1">
-                  <button onClick={() => openEdit(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
-                  </button>
-                  <button onClick={() => setHoursModal(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
-                    <Clock className="w-3.5 h-3.5" /> Hours
-                  </button>
-                  <button
-                    onClick={() => toggle(loc)}
-                    disabled={toggling === loc.id}
-                    className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
-                    title={loc.status === "open" ? "Disable" : "Enable"}
-                  >
-                    {toggling === loc.id
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : loc.status === "open"
-                        ? <ToggleRight className="w-4 h-4 text-emerald-500" />
-                        : <ToggleLeft className="w-4 h-4 text-red-500" />}
-                  </button>
-                  <button onClick={() => setDeleteConfirm(loc)} className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex flex-wrap gap-1">
+                    {loc.services.map((s) => (
+                      <span key={s} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">{s}</span>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => openEdit(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
+                      <Edit2 className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button onClick={() => setHoursModal(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
+                      <Clock className="w-3.5 h-3.5" /> Hours
+                    </button>
+                    <button
+                      onClick={() => toggle(loc)}
+                      disabled={toggling === loc.id}
+                      className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                      title={loc.status === "open" ? "Disable" : "Enable"}
+                    >
+                      {toggling === loc.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : loc.status === "open"
+                          ? <ToggleRight className="w-4 h-4 text-emerald-500" />
+                          : <ToggleLeft className="w-4 h-4 text-red-500" />}
+                    </button>
+                    <button onClick={() => setDeleteConfirm(loc)} className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -433,7 +452,7 @@ function LocationFormModal({
 }) {
   const [activeLang, setActiveLang] = useState<LangCode>("ru");
 
-  const setLang = (field: keyof LangFields, value: string) =>
+  const setLang = (field: keyof import("@/lib/utils.ts").LangFields extends never ? { name: string; district: string; address: string } : { name: string; district: string; address: string }, value: string) =>
     onChange({
       ...location,
       langs: { ...location.langs, [activeLang]: { ...location.langs[activeLang], [field]: value } },
@@ -446,6 +465,9 @@ function LocationFormModal({
 
   const cur = location.langs[activeLang];
 
+  // Photo preview state
+  const photoValid = !!location.photoUrl && location.photoUrl.startsWith("http");
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -457,6 +479,27 @@ function LocationFormModal({
         </div>
 
         <div className="p-6 space-y-5">
+          {/* Photo */}
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Restaurant Photo URL</label>
+            <input
+              value={location.photoUrl}
+              onChange={(e) => onChange({ ...location, photoUrl: e.target.value })}
+              placeholder="https://example.com/photo.jpg"
+              className="w-full px-3 py-2.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {photoValid && (
+              <div className="mt-2 rounded-lg overflow-hidden border border-border h-36">
+                <img
+                  src={location.photoUrl}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </div>
+            )}
+          </div>
+
           {/* Language tabs */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Content language</p>
