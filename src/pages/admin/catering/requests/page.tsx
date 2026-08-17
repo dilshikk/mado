@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Clock, Search, Download } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 
@@ -16,6 +16,7 @@ type CateringRequest = {
   message: string;
   status: RequestStatus;
   createdAt: string;
+  note?: string;
 };
 
 const STATUS_META: Record<RequestStatus, { label: string; color: string; next?: RequestStatus[] }> = {
@@ -27,13 +28,34 @@ const STATUS_META: Record<RequestStatus, { label: string; color: string; next?: 
   cancelled: { label: "Cancelled", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
+const STORAGE_KEY = "mado_catering_requests";
+
 const SAMPLE: CateringRequest[] = [
-  { id: "124", name: "John Smith", phone: "+998 90 123 45 67", email: "john@company.com", event: "Corporate", date: "24 Aug 2026", guests: 120, budget: "5,000,000 UZS", message: "Need catering for annual corporate event. Prefer Turkish menu. Need full service setup.", status: "new", createdAt: "16 Aug 06:30" },
-  { id: "123", name: "Sarah Jones", phone: "+998 93 456 78 90", email: "sarah@gmail.com", event: "Wedding", date: "10 Sep 2026", guests: 200, budget: "12,000,000 UZS", message: "Traditional Turkish menu preferred. Need both indoor and outdoor setup.", status: "contacted", createdAt: "15 Aug 14:20" },
-  { id: "122", name: "Alex Kim", phone: "+998 91 789 01 23", email: "alex@mail.ru", event: "Birthday", date: "5 Sep 2026", guests: 50, budget: "2,500,000 UZS", message: "Kids friendly menu needed. Birthday cake not included.", status: "confirmed", createdAt: "14 Aug 09:15" },
-  { id: "121", name: "Maria Brown", phone: "+998 99 234 56 78", email: "maria@corp.uz", event: "Workshop", date: "28 Aug 2026", guests: 30, budget: "1,200,000 UZS", message: "Business lunch setup with coffee breaks.", status: "completed", createdAt: "10 Aug 11:00" },
-  { id: "120", name: "Bobur Toshmatov", phone: "+998 94 567 89 01", email: "bobur@uz.com", event: "Private Party", date: "20 Aug 2026", guests: 80, budget: "4,000,000 UZS", message: "Evening garden party. Need outdoor setup.", status: "cancelled", createdAt: "8 Aug 18:00" },
+  { id: "124", name: "John Smith", phone: "+998 90 123 45 67", email: "john@company.com", event: "Corporate", date: "24 Aug 2026", guests: 120, budget: "5,000,000 UZS", message: "Need catering for annual corporate event. Prefer Turkish menu. Need full service setup.", status: "new", createdAt: "16 Aug 06:30", note: "Awaiting pricing confirmation." },
+  { id: "123", name: "Sarah Jones", phone: "+998 93 456 78 90", email: "sarah@gmail.com", event: "Wedding", date: "10 Sep 2026", guests: 200, budget: "12,000,000 UZS", message: "Traditional Turkish menu preferred. Need both indoor and outdoor setup.", status: "contacted", createdAt: "15 Aug 14:20", note: "Sent menu options." },
+  { id: "122", name: "Alex Kim", phone: "+998 91 789 01 23", email: "alex@mail.ru", event: "Birthday", date: "5 Sep 2026", guests: 50, budget: "2,500,000 UZS", message: "Kids friendly menu needed. Birthday cake not included.", status: "confirmed", createdAt: "14 Aug 09:15", note: "Deposit received." },
+  { id: "121", name: "Maria Brown", phone: "+998 99 234 56 78", email: "maria@corp.uz", event: "Workshop", date: "28 Aug 2026", guests: 30, budget: "1,200,000 UZS", message: "Business lunch setup with coffee breaks.", status: "completed", createdAt: "10 Aug 11:00", note: "Completed successfully." },
+  { id: "120", name: "Bobur Toshmatov", phone: "+998 94 567 89 01", email: "bobur@uz.com", event: "Private Party", date: "20 Aug 2026", guests: 80, budget: "4,000,000 UZS", message: "Evening garden party. Need outdoor setup.", status: "cancelled", createdAt: "8 Aug 18:00", note: "Client postponed." },
 ];
+
+const loadRequests = (): CateringRequest[] => {
+  if (typeof window === "undefined") return SAMPLE;
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return SAMPLE;
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : SAMPLE;
+  } catch {
+    return SAMPLE;
+  }
+};
+
+const persistRequests = (items: CateringRequest[]) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+};
 
 const FILTERS: { label: string; value: "all" | RequestStatus }[] = [
   { label: "All", value: "all" },
@@ -46,11 +68,30 @@ const FILTERS: { label: string; value: "all" | RequestStatus }[] = [
 ];
 
 export default function CateringRequestsPage() {
-  const [requests, setRequests] = useState<CateringRequest[]>(SAMPLE);
+  const [requests, setRequests] = useState<CateringRequest[]>([]);
   const [filter, setFilter] = useState<"all" | RequestStatus>("all");
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<CateringRequest | null>(null);
   const [note, setNote] = useState("");
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const data = loadRequests();
+    setRequests(data);
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (ready) {
+      persistRequests(requests);
+    }
+  }, [requests, ready]);
+
+  useEffect(() => {
+    if (viewing) {
+      setNote(viewing.note ?? "");
+    }
+  }, [viewing]);
 
   const filtered = requests.filter((r) => {
     const matchFilter = filter === "all" || r.status === filter;
@@ -60,8 +101,50 @@ export default function CateringRequestsPage() {
   });
 
   const updateStatus = (id: string, status: RequestStatus) => {
-    setRequests(requests.map((r) => r.id === id ? { ...r, status } : r));
-    if (viewing?.id === id) setViewing((v) => v ? { ...v, status } : v);
+    setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
+    if (viewing?.id === id) {
+      setViewing((v) => (v ? { ...v, status } : v));
+    }
+  };
+
+  const saveCurrentNote = () => {
+    if (!viewing) return;
+
+    setRequests((prev) =>
+      prev.map((r) => (r.id === viewing.id ? { ...r, note } : r))
+    );
+
+    setViewing((v) => (v ? { ...v, note } : v));
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) return;
+
+    const header = ["ID", "Name", "Phone", "Email", "Event", "Date", "Guests", "Budget", "Status", "Note"];
+    const rows = filtered.map((r) => [
+      r.id,
+      r.name,
+      r.phone,
+      r.email,
+      r.event,
+      r.date,
+      String(r.guests),
+      r.budget,
+      r.status,
+      (r.note ?? "").replace(/\n/g, " "),
+    ]);
+
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `catering-requests-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   const counts = (FILTERS.slice(1) as { label: string; value: RequestStatus }[]).map((f) => ({
@@ -78,7 +161,10 @@ export default function CateringRequestsPage() {
             {requests.filter((r) => r.status === "new").length} new · {requests.filter((r) => r.status === "confirmed").length} confirmed
           </p>
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted">
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted"
+        >
           <Download className="w-4 h-4" /> Export
         </button>
       </div>
@@ -246,7 +332,10 @@ export default function CateringRequestsPage() {
             <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex gap-3">
               <button onClick={() => setViewing(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Close</button>
               <button
-                onClick={() => setViewing(null)}
+                onClick={() => {
+                  saveCurrentNote();
+                  setViewing(null);
+                }}
                 className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg"
               >
                 Save & Close

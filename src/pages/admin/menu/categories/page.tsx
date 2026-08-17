@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { Plus, Edit2, Trash2, GripVertical, ChevronDown, ChevronRight, Check, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
-import { MENU_CATEGORIES } from "../../../menu/data.ts";
-import type { Category } from "../../../menu/data.ts";
+// Use mock API for development (no database needed)
+import { mockApiClient as api } from "@/lib/mock-api.ts";
 
-type LocalCategory = {
-  id: string;
+type Category = {
+  id: string | number;
   label: string;
   tab: string;
-  dishCount: number;
+  dish_count?: number;
 };
 
 const TAB_COLORS: Record<string, string> = {
@@ -27,47 +27,94 @@ const TAB_LABELS: Record<string, string> = {
 
 const TABS = ["all", "food", "beverage", "dessert", "takeaway"];
 
-const initialCategories: LocalCategory[] = MENU_CATEGORIES.map((c: Category) => ({
-  id: c.id,
-  label: c.label,
-  tab: c.tab,
-  dishCount: c.dishes.length,
-}));
-
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<LocalCategory[]>(initialCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newTab, setNewTab] = useState("food");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [savingId, setSavingId] = useState<string | number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+
+  // Load categories on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.getCategories();
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load categories');
+      console.error('Load categories error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filtered = activeTab === "all" ? categories : categories.filter((c) => c.tab === activeTab);
 
-  const grouped = ["food", "beverage", "dessert", "takeaway"].reduce<Record<string, LocalCategory[]>>((acc, tab) => {
+  const grouped = ["food", "beverage", "dessert", "takeaway"].reduce<Record<string, Category[]>>((acc, tab) => {
     acc[tab] = categories.filter((c) => c.tab === tab);
     return acc;
   }, {});
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newLabel.trim()) return;
-    setCategories([
-      ...categories,
-      { id: Date.now().toString(), label: newLabel, tab: newTab, dishCount: 0 },
-    ]);
-    setNewLabel("");
-    setAdding(false);
+    
+    try {
+      setSavingId('new');
+      await api.createCategory(newLabel, newTab);
+      setNewLabel("");
+      setAdding(false);
+      await loadCategories();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create category');
+      console.error('Add category error:', err);
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const handleDelete = (id: string) => setCategories(categories.filter((c) => c.id !== id));
-
-  const saveEdit = (id: string) => {
-    setCategories(categories.map((c) => c.id === id ? { ...c, label: editLabel } : c));
-    setEditingId(null);
+  const handleDelete = async (id: string | number) => {
+    if (!confirm('Delete this category? Dishes in this category will not be deleted.')) return;
+    
+    try {
+      setDeletingId(id);
+      await api.deleteCategory(id);
+      await loadCategories();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete category');
+      console.error('Delete category error:', err);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
-  const startEdit = (cat: LocalCategory) => {
+  const saveEdit = async (id: string | number) => {
+    if (!editLabel.trim()) return;
+    
+    try {
+      setSavingId(id);
+      await api.updateCategory(id, editLabel);
+      setEditingId(null);
+      await loadCategories();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update category');
+      console.error('Update category error:', err);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const startEdit = (cat: Category) => {
     setEditingId(cat.id);
     setEditLabel(cat.label);
   };
@@ -77,117 +124,169 @@ export default function CategoriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-serif font-bold">Menu Categories</h1>
-          <p className="text-sm text-muted-foreground mt-1">{categories.length} categories \u00b7 {categories.reduce((s, c) => s + c.dishCount, 0)} dishes total</p>
+          <p className="text-sm text-muted-foreground mt-1">{categories.length} categories</p>
         </div>
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" /> Add Category
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors uppercase",
-              activeTab === tab ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-            )}
-          >
-            {tab === "all" ? "All" : TAB_LABELS[tab]}
-            <span className="ml-1.5 text-xs opacity-70">
-              {tab === "all" ? categories.length : categories.filter((c) => c.tab === tab).length}
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* Error message */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+          <span className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</span>
+          <button onClick={() => setError(null)} className="ml-auto text-sm underline">Dismiss</button>
+        </div>
+      )}
 
-      {/* Add form */}
-      {adding && (
-        <div className="bg-card border border-accent/50 rounded-xl p-4 flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[180px]">
-            <label className="text-xs text-muted-foreground mb-1 block">Category Name</label>
-            <input
-              autoFocus
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              placeholder="e.g. Salads"
-              className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Section</label>
-            <select
-              value={newTab}
-              onChange={(e) => setNewTab(e.target.value)}
-              className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none"
-            >
-              {["food", "beverage", "dessert", "takeaway"].map((t) => (
-                <option key={t} value={t}>{TAB_LABELS[t]}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Add</button>
-            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm">Cancel</button>
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-3" />
+            <p className="text-sm text-muted-foreground">Loading categories...</p>
           </div>
         </div>
       )}
 
-      {/* Category list */}
-      {activeTab === "all" ? (
-        <div className="space-y-4">
-          {["food", "beverage", "dessert", "takeaway"].map((tab) => (
-            <TabGroup
-              key={tab}
-              tab={tab}
-              categories={grouped[tab]}
-              editingId={editingId}
-              editLabel={editLabel}
-              setEditLabel={setEditLabel}
-              onStartEdit={startEdit}
-              onSaveEdit={saveEdit}
-              onCancelEdit={() => setEditingId(null)}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <CategoryList
-            categories={filtered}
-            editingId={editingId}
-            editLabel={editLabel}
-            setEditLabel={setEditLabel}
-            onStartEdit={startEdit}
-            onSaveEdit={saveEdit}
-            onCancelEdit={() => setEditingId(null)}
-            onDelete={handleDelete}
-          />
-        </div>
+      {!loading && (
+        <>
+          {/* Tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors uppercase",
+                  activeTab === tab ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                {tab === "all" ? "All" : TAB_LABELS[tab]}
+                <span className="ml-1.5 text-xs opacity-70">
+                  {tab === "all" ? categories.length : categories.filter((c) => c.tab === tab).length}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Add form */}
+          {adding && (
+            <div className="bg-card border border-accent/50 rounded-xl p-4 flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-[180px]">
+                <label className="text-xs text-muted-foreground mb-1 block">Category Name</label>
+                <input
+                  autoFocus
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                  placeholder="e.g. Salads"
+                  disabled={savingId === 'new'}
+                  className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Section</label>
+                <select
+                  value={newTab}
+                  onChange={(e) => setNewTab(e.target.value)}
+                  disabled={savingId === 'new'}
+                  className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none disabled:opacity-50"
+                >
+                  {["food", "beverage", "dessert", "takeaway"].map((t) => (
+                    <option key={t} value={t}>{TAB_LABELS[t]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleAdd} 
+                  disabled={savingId === 'new'}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {savingId === 'new' ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Add
+                </button>
+                <button 
+                  onClick={() => setAdding(false)}
+                  disabled={savingId === 'new'}
+                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Category list */}
+          {activeTab === "all" ? (
+            <div className="space-y-4">
+              {["food", "beverage", "dessert", "takeaway"].map((tab) => (
+                <TabGroup
+                  key={tab}
+                  tab={tab}
+                  categories={grouped[tab]}
+                  editingId={editingId}
+                  editLabel={editLabel}
+                  setEditLabel={setEditLabel}
+                  onStartEdit={startEdit}
+                  onSaveEdit={saveEdit}
+                  onCancelEdit={() => setEditingId(null)}
+                  onDelete={handleDelete}
+                  savingId={savingId}
+                  deletingId={deletingId}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <CategoryList
+                categories={filtered}
+                editingId={editingId}
+                editLabel={editLabel}
+                setEditLabel={setEditLabel}
+                onStartEdit={startEdit}
+                onSaveEdit={saveEdit}
+                onCancelEdit={() => setEditingId(null)}
+                onDelete={handleDelete}
+                savingId={savingId}
+                deletingId={deletingId}
+              />
+            </div>
+          )}
+
+          {/* Empty state */}
+          {categories.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-sm">No categories yet. Create one to get started!</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 type ListProps = {
-  categories: LocalCategory[];
-  editingId: string | null;
+  categories: Category[];
+  editingId: string | number | null;
   editLabel: string;
   setEditLabel: (v: string) => void;
-  onStartEdit: (cat: LocalCategory) => void;
-  onSaveEdit: (id: string) => void;
+  onStartEdit: (cat: Category) => void;
+  onSaveEdit: (id: string | number) => void;
   onCancelEdit: () => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string | number) => void;
+  savingId: string | number | null;
+  deletingId: string | number | null;
 };
 
 function TabGroup({
-  tab, categories, editingId, editLabel, setEditLabel, onStartEdit, onSaveEdit, onCancelEdit, onDelete,
+  tab, categories, editingId, editLabel, setEditLabel, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
 }: { tab: string } & ListProps) {
   const [open, setOpen] = useState(true);
   return (
@@ -210,6 +309,8 @@ function TabGroup({
           onSaveEdit={onSaveEdit}
           onCancelEdit={onCancelEdit}
           onDelete={onDelete}
+          savingId={savingId}
+          deletingId={deletingId}
         />
       )}
     </div>
@@ -217,13 +318,12 @@ function TabGroup({
 }
 
 function CategoryList({
-  categories, editingId, editLabel, setEditLabel, onStartEdit, onSaveEdit, onCancelEdit, onDelete,
+  categories, editingId, editLabel, setEditLabel, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
 }: ListProps) {
   return (
     <div className="divide-y divide-border">
       {categories.map((cat) => (
         <div key={cat.id} className="flex items-center gap-3 px-4 py-3 group hover:bg-muted/30">
-          <GripVertical className="w-4 h-4 text-muted-foreground/40 cursor-grab shrink-0" />
           <div className="flex-1 min-w-0">
             {editingId === cat.id ? (
               <div className="flex items-center gap-2">
@@ -232,33 +332,55 @@ function CategoryList({
                   value={editLabel}
                   onChange={(e) => setEditLabel(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") onSaveEdit(cat.id); if (e.key === "Escape") onCancelEdit(); }}
-                  className="px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  disabled={savingId === cat.id}
+                  className="px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                 />
-                <button onClick={() => onSaveEdit(cat.id)} className="p-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200"><Check className="w-3.5 h-3.5" /></button>
-                <button onClick={onCancelEdit} className="p-1 rounded bg-muted text-muted-foreground"><X className="w-3.5 h-3.5" /></button>
+                <button 
+                  onClick={() => onSaveEdit(cat.id)} 
+                  disabled={savingId === cat.id}
+                  className="p-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  {savingId === cat.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                </button>
+                <button 
+                  onClick={onCancelEdit}
+                  disabled={savingId === cat.id}
+                  className="p-1 rounded bg-muted text-muted-foreground disabled:opacity-50"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
               <>
                 <p className="text-sm font-medium text-foreground truncate">{cat.label}</p>
-                <p className="text-xs text-muted-foreground">{cat.dishCount} dishes</p>
               </>
             )}
           </div>
           <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0", TAB_COLORS[cat.tab])}>{TAB_LABELS[cat.tab]}</span>
           {editingId !== cat.id && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => onStartEdit(cat)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
-                <Edit2 className="w-3.5 h-3.5" />
+              <button 
+                onClick={() => onStartEdit(cat)}
+                disabled={savingId !== null || deletingId !== null}
+                className="p-1.5 rounded hover:bg-muted disabled:opacity-50"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
               </button>
-              <button onClick={() => onDelete(cat.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
-                <Trash2 className="w-3.5 h-3.5" />
+              <button 
+                onClick={() => onDelete(cat.id)}
+                disabled={deletingId === cat.id || savingId !== null}
+                className="p-1.5 rounded hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {deletingId === cat.id ? <Loader2 className="w-3.5 h-3.5 text-destructive animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />}
               </button>
             </div>
           )}
         </div>
       ))}
       {categories.length === 0 && (
-        <div className="text-center py-10 text-sm text-muted-foreground">No categories</div>
+        <div className="text-center py-8 text-muted-foreground">
+          <p className="text-sm">No categories in this section</p>
+        </div>
       )}
     </div>
   );

@@ -72,9 +72,14 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
     is_new = false, is_signature = false, is_vegetarian = false, is_spicy = false
   } = req.body;
 
-  if (!category_id || !name_ru || !price) {
-    return res.status(400).json({ error: 'Category, name, and price required' });
+  const normalizedNames = [name_ru, name_uz, name_en, name_tr].map((value) => typeof value === 'string' ? value.trim() : '');
+  const primaryName = normalizedNames.find((value) => value.length > 0) || '';
+
+  if (!category_id || !price || !primaryName) {
+    return res.status(400).json({ error: 'Category, price, and at least one localized name are required' });
   }
+
+  const fallbackNameRu = name_ru && String(name_ru).trim() ? String(name_ru).trim() : primaryName;
 
   const result = await pool.query(`
     INSERT INTO dishes (
@@ -84,7 +89,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     RETURNING id, name_ru, price, status
   `, [
-    category_id, name_ru, name_uz, name_en, name_tr,
+    category_id, fallbackNameRu, name_uz, name_en, name_tr,
     description_ru, description_uz, description_en, description_tr,
     price, image_url, status, is_new, is_signature, is_vegetarian, is_spicy
   ]);
