@@ -52,7 +52,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create category
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { label, tab } = req.body;
 
   if (!label || !tab) {
@@ -74,7 +74,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update category
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const { label } = req.body;
 
@@ -101,7 +101,7 @@ router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res
 });
 
 // Delete category
-router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.delete('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query('DELETE FROM menu_categories WHERE id = $1 RETURNING id, label', [id]);
