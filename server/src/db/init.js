@@ -308,6 +308,22 @@ const initDb = async () => {
       )
     `);
 
+    // Safe migrations for pages: multilingual titles + SEO fields
+    const pageCols = [
+      'title_ru VARCHAR(255)',
+      'title_uz VARCHAR(255)',
+      'title_en VARCHAR(255)',
+      'title_tr VARCHAR(255)',
+      'meta_title VARCHAR(255)',
+      'meta_description TEXT',
+      'og_image VARCHAR(500)',
+    ];
+    for (const col of pageCols) {
+      const colName = col.split(' ')[0];
+      const colType = col.split(' ').slice(1).join(' ');
+      await pool.query(`ALTER TABLE pages ADD COLUMN IF NOT EXISTS ${colName} ${colType}`);
+    }
+
     // Media categories table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS media_categories (
