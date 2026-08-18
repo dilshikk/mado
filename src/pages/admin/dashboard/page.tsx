@@ -1,5 +1,7 @@
 import { UtensilsCrossed, MapPin, Inbox, Briefcase, TrendingUp, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAdminUser } from "@/pages/admin/_lib/admin-user-context.tsx";
+import type { UserRole } from "@/lib/roles.ts";
 
 const stats = [
   { label: "Dishes", value: "128", icon: UtensilsCrossed, href: "/admin/menu/dishes", color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
@@ -16,21 +18,53 @@ const recentActivity = [
   { time: "05:30", text: "Menu published — From The Oven (updated 3 items)", type: "publish" },
 ];
 
-const quickActions = [
-  { label: "+ Add Dish", href: "/admin/menu/dishes", color: "bg-primary text-primary-foreground hover:bg-primary/90" },
-  { label: "+ Add Location", href: "/admin/locations", color: "bg-secondary text-secondary-foreground hover:bg-secondary/80" },
-  { label: "+ Add Vacancy", href: "/admin/careers/vacancies", color: "bg-secondary text-secondary-foreground hover:bg-secondary/80" },
-  { label: "+ Create Promotion", href: "/admin/promotions", color: "bg-secondary text-secondary-foreground hover:bg-secondary/80" },
-];
+type QuickAction = { label: string; href: string; primary?: boolean };
+
+/** Actions tailored to what each role actually works with day-to-day. */
+const QUICK_ACTIONS_BY_ROLE: Record<UserRole, QuickAction[]> = {
+  admin: [
+    { label: "+ Add Dish",         href: "/admin/menu/dishes",            primary: true },
+    { label: "+ Add Location",     href: "/admin/locations" },
+    { label: "+ Add Vacancy",      href: "/admin/careers/vacancies" },
+    { label: "+ Create Promotion", href: "/admin/promotions" },
+    { label: "Manage Users",       href: "/admin/users" },
+    { label: "Activity Log",       href: "/admin/activity" },
+  ],
+  hr: [
+    { label: "+ Add Vacancy",          href: "/admin/careers/vacancies", primary: true },
+    { label: "View Applications",      href: "/admin/careers/applications" },
+  ],
+  marketing: [
+    { label: "+ Create Promotion",  href: "/admin/promotions",  primary: true },
+    { label: "View Reviews",        href: "/admin/reviews" },
+    { label: "View Requests",       href: "/admin/requests" },
+    { label: "Open Media Library",  href: "/admin/media" },
+  ],
+  content_manager: [
+    { label: "+ Add Dish",          href: "/admin/menu/dishes",      primary: true },
+    { label: "Edit Categories",     href: "/admin/menu/categories" },
+    { label: "Edit Pages",          href: "/admin/pages" },
+    { label: "Manage FAQ",          href: "/admin/faq" },
+    { label: "Open Media Library",  href: "/admin/media" },
+  ],
+  restaurant_manager: [
+    { label: "+ Add Location",         href: "/admin/locations",           primary: true },
+    { label: "Catering Content",       href: "/admin/catering/content" },
+    { label: "Catering Requests",      href: "/admin/catering/requests" },
+  ],
+};
 
 const typeColors: Record<string, string> = {
-  edit: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  new: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  edit:    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  new:     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
   approve: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   publish: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
 };
 
 export default function AdminDashboard() {
+  const { name, role } = useAdminUser();
+  const quickActions = QUICK_ACTIONS_BY_ROLE[role] ?? QUICK_ACTIONS_BY_ROLE.admin;
+
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -41,7 +75,7 @@ export default function AdminDashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-serif font-bold text-foreground">
-          {greeting}, Dilshot
+          {greeting}, {name || "Admin"}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">{dateStr}</p>
       </div>
@@ -100,9 +134,13 @@ export default function AdminDashboard() {
           <div className="space-y-2">
             {quickActions.map((a) => (
               <Link
-                key={a.label}
+                key={a.href}
                 to={a.href}
-                className={`w-full block text-center text-sm font-medium px-4 py-2.5 rounded-lg transition-colors ${a.color}`}
+                className={
+                  a.primary
+                    ? "w-full block text-center text-sm font-medium px-4 py-2.5 rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "w-full block text-center text-sm font-medium px-4 py-2.5 rounded-lg transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }
               >
                 {a.label}
               </Link>
