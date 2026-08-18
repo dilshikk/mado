@@ -280,6 +280,10 @@ class ApiClient {
   updateApplicationStatus(id: string | number, status: string): Promise<unknown> {
     return this.request(`/applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
+  /** Save or clear the internal HR note for an application */
+  updateApplicationNote(id: string | number, note: string): Promise<unknown> {
+    return this.request(`/applications/${id}/note`, { method: 'PATCH', body: JSON.stringify({ note }) });
+  }
   deleteApplication(id: string | number): Promise<unknown> {
     return this.request(`/applications/${id}`, { method: 'DELETE' });
   }
