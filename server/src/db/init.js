@@ -218,6 +218,10 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS vacancies (
         id SERIAL PRIMARY KEY,
         position VARCHAR(255) NOT NULL,
+        position_ru VARCHAR(255),
+        position_uz VARCHAR(255),
+        position_en VARCHAR(255),
+        position_tr VARCHAR(255),
         department VARCHAR(100) NOT NULL,
         branch VARCHAR(100) NOT NULL,
         employment_type VARCHAR(50) NOT NULL,
@@ -236,6 +240,19 @@ const initDb = async () => {
       )
     `);
 
+    // Safe migrations for vacancies: multilingual position fields
+    const vacancyCols = [
+      'position_ru VARCHAR(255)',
+      'position_uz VARCHAR(255)',
+      'position_en VARCHAR(255)',
+      'position_tr VARCHAR(255)',
+    ];
+    for (const col of vacancyCols) {
+      const colName = col.split(' ')[0];
+      const colType = col.split(' ').slice(1).join(' ');
+      await pool.query(`ALTER TABLE vacancies ADD COLUMN IF NOT EXISTS ${colName} ${colType}`);
+    }
+
     // Applications table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS applications (
@@ -246,11 +263,15 @@ const initDb = async () => {
         email VARCHAR(255) NOT NULL,
         experience TEXT,
         message TEXT,
+        note TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'new',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Safe migration: add note column to applications
+    await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS note TEXT`);
 
     // FAQ table
     await pool.query(`
