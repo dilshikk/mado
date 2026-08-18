@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   FileText, Plus, Edit2, Trash2, Eye, Search,
-  Loader2, Globe, AlertCircle, X, ExternalLink,
+  Loader2, Globe, AlertCircle, X, ExternalLink, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -41,6 +41,120 @@ type Page = {
   updated_at: string;
 };
 
+type DefaultPageDef = {
+  title: string;
+  title_ru: string;
+  title_uz: string;
+  title_en: string;
+  title_tr: string;
+  slug: string;
+  status: PageStatus;
+  meta_title: string;
+  meta_description: string;
+};
+
+// ─── Default pages seed data ──────────────────────────────────────────────────
+// All 8 public routes from App.tsx, with titles + SEO in RU / UZ / EN / TR
+
+const DEFAULT_PAGES: DefaultPageDef[] = [
+  {
+    title: "Главная",
+    slug: "",
+    title_ru: "Главная",
+    title_uz: "Bosh sahifa",
+    title_en: "Home",
+    title_tr: "Ana Sayfa",
+    status: "published",
+    meta_title: "MADO — Турецкий ресторан в Ташкенте",
+    meta_description:
+      "Аутентичная турецкая кухня, десерты и мороженое MADO в Ташкенте. Зал, доставка, кейтеринг и мероприятия.",
+  },
+  {
+    title: "Наша история",
+    slug: "story",
+    title_ru: "Наша история",
+    title_uz: "Bizning tariximiz",
+    title_en: "Our Story",
+    title_tr: "Hikayemiz",
+    status: "published",
+    meta_title: "Наша история — MADO Ташкент",
+    meta_description:
+      "История бренда MADO: от традиционного мараш-дондурмы до международной ресторанной сети с более чем 300 филиалами.",
+  },
+  {
+    title: "Меню",
+    slug: "menu",
+    title_ru: "Меню",
+    title_uz: "Menyu",
+    title_en: "Menu",
+    title_tr: "Menü",
+    status: "published",
+    meta_title: "Меню — MADO Ташкент",
+    meta_description:
+      "Полное меню ресторана MADO: турецкие блюда, десерты, мороженое дондурма, напитки и многое другое.",
+  },
+  {
+    title: "Кейтеринг",
+    slug: "catering",
+    title_ru: "Кейтеринг",
+    title_uz: "Keytering",
+    title_en: "Catering",
+    title_tr: "Catering",
+    status: "published",
+    meta_title: "Кейтеринг — MADO Ташкент",
+    meta_description:
+      "Организуйте незабываемое мероприятие с кейтерингом от MADO. Корпоративные обеды, свадьбы, праздники — аутентичная турецкая кухня.",
+  },
+  {
+    title: "Филиалы",
+    slug: "locations",
+    title_ru: "Филиалы",
+    title_uz: "Filiallar",
+    title_en: "Locations",
+    title_tr: "Şubelerimiz",
+    status: "published",
+    meta_title: "Филиалы MADO в Ташкенте",
+    meta_description:
+      "Найдите ближайший ресторан MADO в Ташкенте. Адреса, время работы и контакты всех филиалов.",
+  },
+  {
+    title: "Карьера",
+    slug: "careers",
+    title_ru: "Карьера",
+    title_uz: "Karyera",
+    title_en: "Careers",
+    title_tr: "Kariyer",
+    status: "published",
+    meta_title: "Карьера в MADO — Вакансии в Ташкенте",
+    meta_description:
+      "Присоединяйтесь к команде MADO. Открытые вакансии в ресторанах MADO в Ташкенте — работа для поваров, официантов и менеджеров.",
+  },
+  {
+    title: "Контакты",
+    slug: "contact",
+    title_ru: "Контакты",
+    title_uz: "Aloqa",
+    title_en: "Contact",
+    title_tr: "İletişim",
+    status: "published",
+    meta_title: "Контакты — MADO Ташкент",
+    meta_description:
+      "Свяжитесь с рестораном MADO в Ташкенте. Телефон, email, адреса и форма обратной связи.",
+  },
+  {
+    title: "Отзывы",
+    slug: "reviews",
+    title_ru: "Отзывы",
+    title_uz: "Sharhlar",
+    title_en: "Reviews",
+    title_tr: "Yorumlar",
+    status: "published",
+    meta_title: "Отзывы о MADO Ташкент",
+    meta_description:
+      "Читайте отзывы гостей ресторана MADO в Ташкенте. Узнайте, за что нас любят, и оставьте свой отзыв.",
+  },
+];
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<PageStatus, { label: string; color: string; dot: string }> = {
@@ -64,7 +178,7 @@ const pageSchema = z.object({
   title_uz: z.string().optional(),
   title_en: z.string().optional(),
   title_tr: z.string().optional(),
-  slug: z.string().min(1, "Slug обязателен").regex(/^[a-z0-9\-/]+$/, "Slug: только a-z, 0-9, дефисы, слеши"),
+  slug: z.string().regex(/^[a-z0-9\-/]*$/, "Slug: только a-z, 0-9, дефисы, слеши"),
   status: z.enum(["published", "draft"]),
   meta_title: z.string().optional(),
   meta_description: z.string().optional(),
@@ -197,7 +311,9 @@ function PageFormModal({
                     name="slug"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Slug <span className="text-destructive">*</span></FormLabel>
+                        <FormLabel>
+                          Slug <span className="text-muted-foreground font-normal text-xs">(пусто = главная /)</span>
+                        </FormLabel>
                         <FormControl>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none">/</span>
@@ -356,6 +472,70 @@ function PageFormModal({
   );
 }
 
+// ─── Seed confirm modal ───────────────────────────────────────────────────────
+
+function SeedConfirmModal({
+  existingCount,
+  onConfirm,
+  onClose,
+  seeding,
+}: {
+  existingCount: number;
+  onConfirm: () => void;
+  onClose: () => void;
+  seeding: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-full bg-primary/10">
+            <Download className="w-5 h-5 text-primary" />
+          </div>
+          <h2 className="font-serif font-bold text-lg">Загрузить страницы по умолчанию?</h2>
+        </div>
+
+        <p className="text-sm text-muted-foreground mb-3">
+          Будет создано <strong className="text-foreground">{DEFAULT_PAGES.length} страниц</strong> на основе
+          маршрутов сайта — с заголовками на{" "}
+          <strong className="text-foreground">4 языках (RU / UZ / EN / TR)</strong> и SEO-метаданными:
+        </p>
+
+        <ul className="text-sm space-y-1 mb-4">
+          {DEFAULT_PAGES.map((p) => (
+            <li key={p.slug} className="flex items-center gap-2">
+              <span className="font-mono text-xs text-muted-foreground w-28 shrink-0">
+                /{p.slug || ""}
+              </span>
+              <span className="text-foreground">{p.title}</span>
+            </li>
+          ))}
+        </ul>
+
+        {existingCount > 0 && (
+          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-400 mb-4">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              В базе уже есть {existingCount} страниц. Дубликаты могут появиться, если slug совпадёт — проверьте после добавления.
+            </span>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={onClose} className="flex-1 cursor-pointer" disabled={seeding}>
+            Отмена
+          </Button>
+          <Button onClick={onConfirm} className="flex-1 gap-2 cursor-pointer" disabled={seeding}>
+            {seeding && <Loader2 className="w-4 h-4 animate-spin" />}
+            {seeding ? "Создание…" : "Загрузить"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PagesPage() {
@@ -366,6 +546,8 @@ export default function PagesPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | PageStatus>("all");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Page | null>(null);
+  const [showSeed, setShowSeed] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   const loadPages = useCallback(async () => {
     try {
@@ -381,6 +563,43 @@ export default function PagesPage() {
   }, []);
 
   useEffect(() => { void loadPages(); }, [loadPages]);
+
+  // ── Seed default pages ──────────────────────────────────────────────────────
+  const handleSeed = async () => {
+    setSeeding(true);
+    let created = 0;
+    let failed = 0;
+    try {
+      for (const def of DEFAULT_PAGES) {
+        try {
+          await api.createPage({
+            title: def.title,
+            title_ru: def.title_ru,
+            title_uz: def.title_uz,
+            title_en: def.title_en,
+            title_tr: def.title_tr,
+            slug: def.slug,
+            status: def.status,
+            meta_title: def.meta_title,
+            meta_description: def.meta_description,
+            og_image: null,
+          });
+          created++;
+        } catch {
+          failed++;
+        }
+      }
+      setShowSeed(false);
+      await loadPages();
+      if (failed === 0) {
+        toast.success(`${created} страниц успешно создано`);
+      } else {
+        toast.warning(`Создано ${created}, ошибок ${failed}`);
+      }
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const handleDelete = async (page: Page) => {
     try {
@@ -421,16 +640,26 @@ export default function PagesPage() {
     <div className="space-y-5 max-w-4xl">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-serif font-bold">Страницы</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {loading ? "Загрузка страниц..." : `${publishedCount} опубликовано · ${draftCount} черновиков`}
           </p>
         </div>
-        <Button onClick={openNew} className="gap-2 cursor-pointer">
-          <Plus className="w-4 h-4" /> Новая страница
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="secondary"
+            onClick={() => setShowSeed(true)}
+            className="gap-2 cursor-pointer"
+            title="Создать все страницы сайта автоматически"
+          >
+            <Download className="w-4 h-4" /> Загрузить по умолчанию
+          </Button>
+          <Button onClick={openNew} className="gap-2 cursor-pointer">
+            <Plus className="w-4 h-4" /> Новая страница
+          </Button>
+        </div>
       </div>
 
       {/* Error */}
@@ -490,7 +719,22 @@ export default function PagesPage() {
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">Страницы не найдены</p>
+              <p className="text-sm font-medium">Страницы не найдены</p>
+              {pages.length === 0 && !search && (
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    База пустая — загрузите все страницы сайта одним кликом
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowSeed(true)}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Загрузить страницы по умолчанию
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -597,6 +841,16 @@ export default function PagesPage() {
           initial={editing}
           onClose={closeForm}
           onSaved={loadPages}
+        />
+      )}
+
+      {/* Seed confirm modal */}
+      {showSeed && (
+        <SeedConfirmModal
+          existingCount={pages.length}
+          onConfirm={() => void handleSeed()}
+          onClose={() => setShowSeed(false)}
+          seeding={seeding}
         />
       )}
     </div>
