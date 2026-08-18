@@ -24,6 +24,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Clock,
+  UserCircle,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
@@ -116,17 +118,17 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
 ];
 
 const ACTION_COLORS: Record<string, string> = {
-  create:      "bg-emerald-100 text-emerald-700",
-  update:      "bg-blue-100 text-blue-700",
-  delete:      "bg-red-100 text-red-700",
-  received:    "bg-amber-100 text-amber-700",
-  upload:      "bg-violet-100 text-violet-700",
+  create:   "bg-emerald-100 text-emerald-700",
+  update:   "bg-blue-100 text-blue-700",
+  delete:   "bg-red-100 text-red-700",
+  received: "bg-amber-100 text-amber-700",
+  upload:   "bg-violet-100 text-violet-700",
 };
 
 function timeAgo(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)   return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 60)    return `${diff}s ago`;
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }
@@ -202,7 +204,6 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
 // ── AdminLayout ───────────────────────────────────────────────────────────────
 
 export default function AdminLayout() {
-  // Restore collapsed state from localStorage
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true"; }
     catch { return false; }
@@ -221,7 +222,10 @@ export default function AdminLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  // Persist collapsed state
+  // Profile dropdown
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
   const handleToggleCollapsed = () => {
     const next = !collapsed;
     setCollapsed(next);
@@ -231,32 +235,30 @@ export default function AdminLayout() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        navigate('/admin/login', { state: { from: location } });
+        navigate("/admin/login", { state: { from: location } });
         return;
       }
       try {
         const me = (await api.getMe()) as { name?: string; role?: string; email?: string };
-        setCurrentUser({ name: me.name ?? '', role: (me.role as UserRole) ?? 'content_manager', email: me.email });
+        setCurrentUser({ name: me.name ?? "", role: (me.role as UserRole) ?? "content_manager", email: me.email });
         setIsAuthenticated(true);
       } catch {
-        localStorage.removeItem('token');
+        localStorage.removeItem("token");
         api.clearToken();
-        navigate('/admin/login', { state: { from: location } });
+        navigate("/admin/login", { state: { from: location } });
       }
     };
     void checkAuth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load notifications and compute unread badge
   const loadNotifications = useCallback(async () => {
     setNotifLoading(true);
     try {
-      const res = await api.request('/activity?limit=12&offset=0') as { data: NotificationEntry[] };
+      const res = await api.request("/activity?limit=12&offset=0") as { data: NotificationEntry[] };
       const items = res.data ?? [];
       setNotifItems(items);
-
       const seenAt = localStorage.getItem(NOTIFICATIONS_SEEN_KEY);
       if (!seenAt) {
         setUnreadCount(items.length);
@@ -264,24 +266,19 @@ export default function AdminLayout() {
         const seenDate = new Date(seenAt);
         setUnreadCount(items.filter((n) => new Date(n.created_at) > seenDate).length);
       }
-    } catch {
-      /* ignore */
-    } finally {
-      setNotifLoading(false);
-    }
+    } catch { /* ignore */ }
+    finally { setNotifLoading(false); }
   }, []);
 
-  // Initial badge count on mount
   useEffect(() => {
     if (isAuthenticated) void loadNotifications();
   }, [isAuthenticated, loadNotifications]);
 
-  // Close notifications on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false);
-      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -290,13 +287,20 @@ export default function AdminLayout() {
   const handleOpenNotifications = async () => {
     const opening = !notifOpen;
     setNotifOpen(opening);
+    setProfileOpen(false);
     if (opening) {
       await loadNotifications();
-      // Mark as seen
       try { localStorage.setItem(NOTIFICATIONS_SEEN_KEY, new Date().toISOString()); }
       catch { /* ignore */ }
       setUnreadCount(0);
     }
+  };
+
+  const handleLogout = () => {
+    setLoggingOut(true);
+    api.clearToken();
+    localStorage.removeItem("token");
+    navigate("/admin/login");
   };
 
   const visibleNavSections = useMemo(() => {
@@ -306,13 +310,6 @@ export default function AdminLayout() {
       items: section.items.filter((item) => canAccessSection(currentUser.role, item.section)),
     })).filter((section) => section.items.length > 0);
   }, [currentUser]);
-
-  const handleLogout = () => {
-    setLoggingOut(true);
-    api.clearToken();
-    localStorage.removeItem('token');
-    navigate('/admin/login');
-  };
 
   if (isAuthenticated === null || !currentUser) {
     return (
@@ -352,10 +349,7 @@ export default function AdminLayout() {
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="ml-auto p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
         >
-          {collapsed
-            ? <PanelLeftOpen className="w-4 h-4" />
-            : <PanelLeftClose className="w-4 h-4" />
-          }
+          {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
       </div>
 
@@ -383,7 +377,7 @@ export default function AdminLayout() {
           onClick={() => navigate("/")}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
-          <LogOut className="w-4 h-4 shrink-0" />
+          <ExternalLink className="w-4 h-4 shrink-0" />
           {!collapsed && <span>Back to site</span>}
         </button>
         <button
@@ -416,10 +410,7 @@ export default function AdminLayout() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Topbar */}
           <header className="flex items-center gap-4 px-4 md:px-6 py-3 border-b border-border bg-card">
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 rounded-lg hover:bg-muted"
-            >
+            <button onClick={() => setMobileOpen(true)} className="md:hidden p-2 rounded-lg hover:bg-muted">
               <Menu className="w-5 h-5" />
             </button>
 
@@ -432,11 +423,11 @@ export default function AdminLayout() {
             </div>
 
             <div className="ml-auto flex items-center gap-1">
-              {/* Notifications */}
+              {/* ── Notifications ── */}
               <div className="relative" ref={notifRef}>
                 <button
                   onClick={() => void handleOpenNotifications()}
-                  className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                   title="Notifications"
                 >
                   <Bell className="w-5 h-5" />
@@ -447,14 +438,13 @@ export default function AdminLayout() {
                   )}
                 </button>
 
-                {/* Notifications dropdown */}
                 {notifOpen && (
                   <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                       <span className="text-sm font-semibold">Recent Activity</span>
                       <button
                         onClick={() => { setNotifOpen(false); navigate("/admin/activity"); }}
-                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 cursor-pointer"
                       >
                         View all
                       </button>
@@ -478,7 +468,9 @@ export default function AdminLayout() {
                             <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 mt-0.5", ACTION_COLORS[item.action] ?? "bg-muted text-muted-foreground")}>
                               {item.action}
                             </span>
-                            <p className="text-sm text-foreground/80 leading-snug flex-1">{item.details ?? `${item.action} ${item.target_type ?? ""}`}</p>
+                            <p className="text-sm text-foreground/80 leading-snug flex-1 truncate">
+                              {item.details ?? `${item.action} ${item.target_type ?? ""}`}
+                            </p>
                           </div>
                           <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
                             <Clock className="w-3 h-3" />
@@ -492,23 +484,82 @@ export default function AdminLayout() {
                 )}
               </div>
 
-              {/* Profile button */}
-              <button
-                onClick={() => navigate("/admin/profile")}
-                className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted transition-colors"
-                title="My Profile"
-              >
-                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
-                  <span className="text-xs font-bold text-primary-foreground">
-                    {currentUser.name[0]?.toUpperCase() ?? "?"}
+              {/* ── Profile dropdown ── */}
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => { setProfileOpen((v) => !v); setNotifOpen(false); }}
+                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                  title="Account"
+                >
+                  <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-primary-foreground">
+                      {currentUser.name[0]?.toUpperCase() ?? "?"}
+                    </span>
+                  </div>
+                  <span className="hidden sm:flex flex-col items-start leading-tight">
+                    <span className="text-sm font-medium">{currentUser.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{ROLE_META[currentUser.role]?.name}</span>
                   </span>
-                </div>
-                <span className="hidden sm:flex flex-col items-start leading-tight">
-                  <span className="text-sm font-medium">{currentUser.name}</span>
-                  <span className="text-[10px] text-muted-foreground">{ROLE_META[currentUser.role]?.name}</span>
-                </span>
-                <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
-              </button>
+                  <ChevronDown className={cn("w-3 h-3 text-muted-foreground hidden sm:block transition-transform", profileOpen && "rotate-180")} />
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    {/* User info header */}
+                    <div className="px-4 py-3.5 border-b border-border flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-primary-foreground">
+                          {currentUser.name[0]?.toUpperCase() ?? "?"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{currentUser.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{currentUser.email ?? "—"}</p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-0.5">{ROLE_META[currentUser.role]?.name}</p>
+                      </div>
+                    </div>
+
+                    {/* Menu items */}
+                    <div className="p-1.5">
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate("/admin/profile"); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer text-left"
+                      >
+                        <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                        My Profile
+                      </button>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate("/admin/settings"); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer text-left"
+                      >
+                        <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
+                        Settings
+                      </button>
+                    </div>
+
+                    <div className="p-1.5 border-t border-border">
+                      <button
+                        onClick={() => { setProfileOpen(false); handleLogout(); }}
+                        disabled={loggingOut}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer disabled:opacity-50 text-left"
+                      >
+                        <LogOut className="w-4 h-4 shrink-0" />
+                        {loggingOut ? "Logging out..." : "Logout"}
+                      </button>
+                    </div>
+
+                    <div className="p-1.5 border-t border-border">
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate("/"); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer text-left"
+                      >
+                        <ExternalLink className="w-4 h-4 shrink-0" />
+                        Go to site
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
