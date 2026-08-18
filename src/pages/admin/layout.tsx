@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -24,11 +24,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api";
+import { canAccessSection, ROLE_META, type NavSectionKey, type UserRole } from "@/lib/roles.ts";
 
 type NavItem = {
   label: string;
   icon: React.ElementType;
   href?: string;
+  section: NavSectionKey;
   children?: { label: string; href: string }[];
 };
 
@@ -36,56 +38,59 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "",
     items: [
-      { label: "Dashboard", icon: LayoutDashboard, href: "/admin" },
+      { label: "Dashboard", icon: LayoutDashboard, href: "/admin", section: "dashboard" },
     ],
   },
   {
     title: "CONTENT",
     items: [
-      { label: "Pages", icon: FileText, href: "/admin/pages" },
+      { label: "Pages", icon: FileText, href: "/admin/pages", section: "pages" },
       {
         label: "Menu",
         icon: UtensilsCrossed,
+        section: "menu",
         children: [
           { label: "Categories", href: "/admin/menu/categories" },
           { label: "Dishes", href: "/admin/menu/dishes" },
         ],
       },
-      { label: "Locations", icon: MapPin, href: "/admin/locations" },
+      { label: "Locations", icon: MapPin, href: "/admin/locations", section: "locations" },
       {
         label: "Catering",
         icon: PartyPopper,
+        section: "catering",
         children: [
           { label: "Content", href: "/admin/catering/content" },
           { label: "Requests", href: "/admin/catering/requests" },
         ],
       },
-      { label: "Promotions", icon: Tag, href: "/admin/promotions" },
-      { label: "Media", icon: Image, href: "/admin/media" },
+      { label: "Promotions", icon: Tag, href: "/admin/promotions", section: "promotions" },
+      { label: "Media", icon: Image, href: "/admin/media", section: "media" },
     ],
   },
   {
     title: "BUSINESS",
     items: [
-      { label: "Requests", icon: Inbox, href: "/admin/requests" },
+      { label: "Requests", icon: Inbox, href: "/admin/requests", section: "requests" },
       {
         label: "Careers",
         icon: Briefcase,
+        section: "careers",
         children: [
           { label: "Vacancies", href: "/admin/careers/vacancies" },
           { label: "Applications", href: "/admin/careers/applications" },
         ],
       },
-      { label: "Reviews", icon: Star, href: "/admin/reviews" },
+      { label: "Reviews", icon: Star, href: "/admin/reviews", section: "reviews" },
     ],
   },
   {
     title: "SYSTEM",
     items: [
-      { label: "FAQ", icon: HelpCircle, href: "/admin/faq" },
-      { label: "Users & Roles", icon: Users, href: "/admin/users" },
-      { label: "Activity Log", icon: Activity, href: "/admin/activity" },
-      { label: "Settings", icon: Settings, href: "/admin/settings" },
+      { label: "FAQ", icon: HelpCircle, href: "/admin/faq", section: "faq" },
+      { label: "Users & Roles", icon: Users, href: "/admin/users", section: "users" },
+      { label: "Activity Log", icon: Activity, href: "/admin/activity", section: "activity" },
+      { label: "Settings", icon: Settings, href: "/admin/settings", section: "settings" },
     ],
   },
 ];
@@ -163,6 +168,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: UserRole } | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -174,7 +180,8 @@ export default function AdminLayout() {
       }
 
       try {
-        await api.getMe();
+        const me = (await api.getMe()) as { name?: string; role?: string };
+        setCurrentUser({ name: me.name ?? '', role: (me.role as UserRole) ?? 'content_manager' });
         setIsAuthenticated(true);
       } catch {
         localStorage.removeItem('token');
@@ -186,6 +193,25 @@ export default function AdminLayout() {
     void checkAuth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Redirect away from a section the current role can't access (e.g. deep link or role changed)
+  useEffect(() => {
+    if (!currentUser) return;
+    const currentSection = NAV_SECTIONS.flatMap((s) => s.items).find((item) =>
+      item.href ? location.pathname.startsWith(item.href) : item.children?.some((c) => location.pathname.startsWith(c.href))
+    );
+    if (currentSection && !canAccessSection(currentUser.role, currentSection.section)) {
+      navigate('/admin', { replace: true });
+    }
+  }, [currentUser, location.pathname, navigate]);
+
+  const visibleNavSections = useMemo(() => {
+    if (!currentUser) return [];
+    return NAV_SECTIONS.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessSection(currentUser.role, item.section)),
+    })).filter((section) => section.items.length > 0);
+  }, [currentUser]);
+
   const handleLogout = async () => {
     setLoggingOut(true);
     api.clearToken();
@@ -193,7 +219,7 @@ export default function AdminLayout() {
     navigate('/admin/login');
   };
 
-  if (isAuthenticated === null) {
+  if (isAuthenticated === null || !currentUser) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -238,7 +264,7 @@ export default function AdminLayout() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-5">
-        {NAV_SECTIONS.map((section) => (
+        {visibleNavSections.map((section) => (
           <div key={section.title}>
             {section.title && !collapsed && (
               <p className="text-[10px] font-semibold text-sidebar-foreground/40 tracking-widest uppercase px-3 mb-2">
@@ -317,9 +343,12 @@ export default function AdminLayout() {
             </button>
             <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted">
               <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-xs font-bold text-primary-foreground">D</span>
+                <span className="text-xs font-bold text-primary-foreground">{currentUser.name[0]?.toUpperCase() ?? "?"}</span>
               </div>
-              <span className="hidden sm:block text-sm font-medium">Dilshot</span>
+              <span className="hidden sm:flex flex-col items-start leading-tight">
+                <span className="text-sm font-medium">{currentUser.name}</span>
+                <span className="text-[10px] text-muted-foreground">{ROLE_META[currentUser.role]?.name}</span>
+              </span>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </button>
           </div>
