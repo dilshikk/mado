@@ -68,7 +68,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update request status
-router.patch('/:id/status', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.patch('/:id/status', authenticate, authorize(['admin', 'marketing']), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
