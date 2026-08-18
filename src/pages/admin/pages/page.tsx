@@ -45,12 +45,12 @@ type Page = {
 
 const STATUS_META: Record<PageStatus, { label: string; color: string; dot: string }> = {
   published: {
-    label: "Published",
+    label: "Опубликована",
     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
     dot: "bg-emerald-500",
   },
   draft: {
-    label: "Draft",
+    label: "Черновик",
     color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400",
     dot: "bg-yellow-400",
   },
@@ -59,12 +59,12 @@ const STATUS_META: Record<PageStatus, { label: string; color: string; dot: strin
 // ─── Form schema ──────────────────────────────────────────────────────────────
 
 const pageSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  title: z.string().min(1, "Заголовок обязателен"),
   title_ru: z.string().optional(),
   title_uz: z.string().optional(),
   title_en: z.string().optional(),
   title_tr: z.string().optional(),
-  slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9\-/]+$/, "Slug: only a-z, 0-9, hyphens, slashes"),
+  slug: z.string().min(1, "Slug обязателен").regex(/^[a-z0-9\-/]+$/, "Slug: только a-z, 0-9, дефисы, слеши"),
   status: z.enum(["published", "draft"]),
   meta_title: z.string().optional(),
   meta_description: z.string().optional(),
@@ -120,25 +120,25 @@ function PageFormModal({
       };
       if (initial) {
         await api.updatePage(initial.id, payload);
-        toast.success("Page updated");
+        toast.success("Страница обновлена");
       } else {
         await api.createPage(payload);
-        toast.success("Page created");
+        toast.success("Страница создана");
       }
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : "Не удалось сохранить");
     } finally {
       setSaving(false);
     }
   };
 
   const LANG_FIELDS: { name: "title_ru" | "title_uz" | "title_en" | "title_tr"; label: string; placeholder: string }[] = [
-    { name: "title_ru", label: "Title RU", placeholder: "Главная" },
-    { name: "title_uz", label: "Title UZ", placeholder: "Bosh sahifa" },
-    { name: "title_en", label: "Title EN", placeholder: "Home" },
-    { name: "title_tr", label: "Title TR", placeholder: "Ana Sayfa" },
+    { name: "title_ru", label: "Заголовок RU", placeholder: "Главная" },
+    { name: "title_uz", label: "Заголовок UZ", placeholder: "Bosh sahifa" },
+    { name: "title_en", label: "Заголовок EN", placeholder: "Home" },
+    { name: "title_tr", label: "Заголовок TR", placeholder: "Ana Sayfa" },
   ];
 
   return (
@@ -149,7 +149,7 @@ function PageFormModal({
         {/* Header */}
         <div className="sticky top-0 bg-card px-6 py-4 border-b border-border flex items-center justify-between z-10">
           <h2 className="font-serif font-bold text-lg">
-            {initial ? "Edit Page" : "New Page"}
+            {initial ? "Редактировать страницу" : "Новая страница"}
           </h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground cursor-pointer">
             <X className="w-5 h-5" />
@@ -169,7 +169,7 @@ function PageFormModal({
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              {t === "basic" ? "Basic Info" : "SEO & Meta"}
+              {t === "basic" ? "Основная информация" : "SEO и мета"}
             </button>
           ))}
         </div>
@@ -185,8 +185,8 @@ function PageFormModal({
                     name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Title (admin label) <span className="text-destructive">*</span></FormLabel>
-                        <FormControl><Input placeholder="Home" {...field} /></FormControl>
+                        <FormLabel>Заголовок (для адм.) <span className="text-destructive">*</span></FormLabel>
+                        <FormControl><Input placeholder="Главная" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -214,15 +214,15 @@ function PageFormModal({
                     name="status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Status</FormLabel>
+                        <FormLabel>Статус</FormLabel>
                         <FormControl>
                           <select
                             value={field.value}
                             onChange={field.onChange}
                             className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
                           >
-                            <option value="published">Published</option>
-                            <option value="draft">Draft</option>
+                            <option value="published">Опубликована</option>
+                            <option value="draft">Черновик</option>
                           </select>
                         </FormControl>
                       </FormItem>
@@ -231,7 +231,7 @@ function PageFormModal({
 
                   <div className="pt-2">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Multilingual Titles
+                      Многоязычные заголовки
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       {LANG_FIELDS.map(({ name, label, placeholder }) => (
@@ -258,7 +258,7 @@ function PageFormModal({
                 <>
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-xl text-xs text-muted-foreground">
                     <Globe className="w-4 h-4 shrink-0" />
-                    <span>These fields control how the page appears in search engines and social media previews.</span>
+                    <span>Эти поля определяют отображение страницы в поисковых системах и социальных сетях.</span>
                   </div>
 
                   <FormField
@@ -266,7 +266,7 @@ function PageFormModal({
                     name="meta_title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Meta Title</FormLabel>
+                        <FormLabel>Мета-заголовок</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="MADO — Главная | Ресторан турецкой кухни"
@@ -275,7 +275,7 @@ function PageFormModal({
                           />
                         </FormControl>
                         <p className="text-xs text-muted-foreground">
-                          Recommended: 50–60 characters.{" "}
+                          Рекомендуется: 50–60 символов.{" "}
                           <span className={(field.value ?? "").length > 60 ? "text-destructive font-semibold" : ""}>
                             {(field.value ?? "").length}/60
                           </span>
@@ -289,7 +289,7 @@ function PageFormModal({
                     name="meta_description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Meta Description</FormLabel>
+                        <FormLabel>Мета-описание</FormLabel>
                         <FormControl>
                           <Textarea
                             rows={3}
@@ -299,7 +299,7 @@ function PageFormModal({
                           />
                         </FormControl>
                         <p className="text-xs text-muted-foreground">
-                          Recommended: 120–160 characters.{" "}
+                          Рекомендуется: 120–160 символов.{" "}
                           <span className={(field.value ?? "").length > 160 ? "text-destructive font-semibold" : ""}>
                             {(field.value ?? "").length}/160
                           </span>
@@ -313,7 +313,7 @@ function PageFormModal({
                     name="og_image"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>OG Image URL</FormLabel>
+                        <FormLabel>URL OG-изображения</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="https://madouz.uz/images/og-home.jpg"
@@ -322,7 +322,7 @@ function PageFormModal({
                           />
                         </FormControl>
                         <p className="text-xs text-muted-foreground">
-                          Shown when shared on social media. Recommended: 1200×630px.
+                          Отображается при репосте в социальных сетях. Рекомендуется: 1200×630px.
                         </p>
                         {field.value && (
                           <img
@@ -342,11 +342,11 @@ function PageFormModal({
             {/* Footer */}
             <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex gap-3">
               <Button type="button" variant="secondary" onClick={onClose} className="flex-1 cursor-pointer">
-                Cancel
+                Отмена
               </Button>
               <Button type="submit" disabled={saving} className="flex-1 gap-2 cursor-pointer">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {saving ? "Saving…" : initial ? "Save Changes" : "Create Page"}
+                {saving ? "Сохранение…" : initial ? "Сохранить" : "Создать"}
               </Button>
             </div>
           </form>
@@ -374,7 +374,7 @@ export default function PagesPage() {
       const data = await api.getPages();
       setPages(Array.isArray(data) ? (data as Page[]) : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load pages");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить страницы");
     } finally {
       setLoading(false);
     }
@@ -386,9 +386,9 @@ export default function PagesPage() {
     try {
       await api.deletePage(page.id);
       setPages((prev) => prev.filter((p) => p.id !== page.id));
-      toast.success(`Page "${page.title}" deleted`);
+      toast.success(`Страница "${page.title}" удалена`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete");
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить");
     }
   };
 
@@ -423,13 +423,13 @@ export default function PagesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-serif font-bold">Pages</h1>
+          <h1 className="text-2xl font-serif font-bold">Страницы</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {loading ? "Loading…" : `${publishedCount} published · ${draftCount} draft`}
+            {loading ? "Загрузка страниц..." : `${publishedCount} опубликовано · ${draftCount} черновиков`}
           </p>
         </div>
         <Button onClick={openNew} className="gap-2 cursor-pointer">
-          <Plus className="w-4 h-4" /> New Page
+          <Plus className="w-4 h-4" /> Новая страница
         </Button>
       </div>
 
@@ -451,7 +451,7 @@ export default function PagesPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search pages..."
+            placeholder="Поиск страниц..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -468,10 +468,10 @@ export default function PagesPage() {
               )}
             >
               {s === "all"
-                ? `All (${pages.length})`
+                ? `Все (${pages.length})`
                 : s === "published"
-                  ? `Published (${publishedCount})`
-                  : `Draft (${draftCount})`}
+                  ? `Опубликованные (${publishedCount})`
+                  : `Черновики (${draftCount})`}
             </button>
           ))}
         </div>
@@ -480,7 +480,7 @@ export default function PagesPage() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading pages...
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загрузка страниц...
         </div>
       )}
 
@@ -490,7 +490,7 @@ export default function PagesPage() {
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">No pages found</p>
+              <p className="text-sm">Страницы не найдены</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -509,12 +509,10 @@ export default function PagesPage() {
                     key={page.id}
                     className="group flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors"
                   >
-                    {/* Icon */}
                     <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
                       <FileText className="w-4 h-4 text-muted-foreground" />
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-foreground truncate">{page.title}</p>
@@ -534,23 +532,22 @@ export default function PagesPage() {
                       <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                         <p className="text-xs text-muted-foreground font-mono">/{page.slug}</p>
                         {page.sections > 0 && (
-                          <span className="text-xs text-muted-foreground">{page.sections} sections</span>
+                          <span className="text-xs text-muted-foreground">{page.sections} разделов</span>
                         )}
                         {langs.length > 0 && (
                           <span className="text-xs text-muted-foreground">{langs.join(" · ")}</span>
                         )}
-                        <span className="text-xs text-muted-foreground">Updated {formatDate(page.updated_at)}</span>
+                        <span className="text-xs text-muted-foreground">Обновлено {formatDate(page.updated_at)}</span>
                       </div>
                     </div>
 
-                    {/* Actions — visible on hover */}
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <a
                         href={`/${page.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted cursor-pointer"
-                        title="Open page"
+                        title="Открыть страницу"
                       >
                         <Eye className="w-3 h-3" />
                         <ExternalLink className="w-2.5 h-2.5" />
@@ -559,7 +556,7 @@ export default function PagesPage() {
                         onClick={() => openEdit(page)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted cursor-pointer"
                       >
-                        <Edit2 className="w-3 h-3" /> Edit
+                        <Edit2 className="w-3 h-3" /> Редактировать
                       </button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -569,18 +566,18 @@ export default function PagesPage() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete page?</AlertDialogTitle>
+                            <AlertDialogTitle>Удалить страницу?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Page <strong>{page.title}</strong> (/{page.slug}) will be permanently deleted. This cannot be undone.
+                              Страница <strong>{page.title}</strong> (/{page.slug}) будет удалена безвозвратно.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel>Отмена</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(page)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              Delete
+                              Удалить
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
