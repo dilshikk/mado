@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import { canAccessSection, ROLE_META, type NavSectionKey, type UserRole } from "@/lib/roles.ts";
-import { AdminUserContext } from "@/pages/admin/_lib/admin-user-context.tsx";
+import { AdminUserContext, type AdminUser } from "@/pages/admin/_lib/admin-user-context.tsx";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -133,6 +133,28 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }
 
+// ── UserAvatar ────────────────────────────────────────────────────────────────
+
+function UserAvatar({ user, size = "sm" }: { user: AdminUser; size?: "sm" | "md" }) {
+  const sizeClass = size === "sm" ? "w-7 h-7 text-xs" : "w-10 h-10 text-sm";
+  if (user.avatar_url) {
+    return (
+      <img
+        src={user.avatar_url}
+        alt={user.name}
+        className={`${sizeClass} rounded-full object-cover shrink-0`}
+      />
+    );
+  }
+  return (
+    <div className={`${sizeClass} rounded-full bg-primary flex items-center justify-center shrink-0`}>
+      <span className="font-bold text-primary-foreground">
+        {user.name[0]?.toUpperCase() ?? "?"}
+      </span>
+    </div>
+  );
+}
+
 // ── NavItemComponent ──────────────────────────────────────────────────────────
 
 function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
@@ -213,7 +235,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: UserRole; email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
   // Notifications
   const [notifOpen, setNotifOpen] = useState(false);
@@ -241,8 +263,13 @@ export default function AdminLayout() {
         return;
       }
       try {
-        const me = (await api.getMe()) as { name?: string; role?: string; email?: string };
-        setCurrentUser({ name: me.name ?? "", role: (me.role as UserRole) ?? "content_manager", email: me.email });
+        const me = (await api.getMe()) as { name?: string; role?: string; email?: string; avatar_url?: string };
+        setCurrentUser({
+          name: me.name ?? "",
+          role: (me.role as UserRole) ?? "content_manager",
+          email: me.email,
+          avatar_url: me.avatar_url,
+        });
         setIsAuthenticated(true);
       } catch {
         localStorage.removeItem("token");
@@ -252,6 +279,15 @@ export default function AdminLayout() {
     };
     void checkAuth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for avatar updates from profile page via custom event
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ avatar_url: string }>) => {
+      setCurrentUser((prev) => prev ? { ...prev, avatar_url: e.detail.avatar_url } : prev);
+    };
+    window.addEventListener("mado:avatar-updated", handler as EventListener);
+    return () => window.removeEventListener("mado:avatar-updated", handler as EventListener);
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     setNotifLoading(true);
@@ -308,84 +344,86 @@ export default function AdminLayout() {
     return NAV_SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) => canAccessSection(currentUser.role, item.section)),
-    })).filter((section) => section.items.length > 0);
+    })).filter((s) => s.items.length > 0);
   }, [currentUser]);
 
-  if (isAuthenticated === null || !currentUser) {
+  if (isAuthenticated === null) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin">
-            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-          <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
-        </div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
 
-  if (!isAuthenticated) return null;
+  if (!currentUser) return null;
 
   const sidebar = (
     <aside
       className={cn(
-        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-200",
+        collapsed ? "w-14" : "w-60"
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
-        <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
-          <span className="font-serif text-accent-foreground text-sm font-bold">M</span>
-        </div>
+      <div className={cn("flex items-center gap-2 px-4 py-4 border-b border-sidebar-border", collapsed && "justify-center px-0")}>
         {!collapsed && (
-          <div>
-            <div className="font-serif text-sidebar-foreground font-bold text-base leading-none">MADO</div>
-            <div className="text-xs text-sidebar-foreground/50 mt-0.5">Admin Panel</div>
-          </div>
+          <span className="font-serif text-lg font-bold text-sidebar-primary tracking-wide">MADO</span>
         )}
         <button
           onClick={handleToggleCollapsed}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="ml-auto p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+          className="ml-auto p-1 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
+          title={collapsed ? "Expand" : "Collapse"}
         >
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-5">
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
         {visibleNavSections.map((section) => (
           <div key={section.title}>
             {section.title && !collapsed && (
-              <p className="text-[10px] font-semibold text-sidebar-foreground/40 tracking-widest uppercase px-3 mb-2">
+              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
                 {section.title}
               </p>
             )}
             <div className="space-y-0.5">
               {section.items.map((item) => (
-                <NavItemComponent key={item.label} item={item} collapsed={collapsed} />
+                <NavItemComponent key={item.section} item={item} collapsed={collapsed} />
               ))}
             </div>
           </div>
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-sidebar-border space-y-1">
+      {/* Bottom user info */}
+      <div className={cn("border-t border-sidebar-border px-3 py-3", collapsed && "px-1")}>
         <button
-          onClick={() => navigate("/")}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          onClick={() => navigate("/admin/profile")}
+          className={cn(
+            "w-full flex items-center gap-2.5 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer text-left",
+            collapsed ? "justify-center p-1.5" : "px-2 py-2"
+          )}
+          title={collapsed ? currentUser.name : undefined}
         >
-          <ExternalLink className="w-4 h-4 shrink-0" />
-          {!collapsed && <span>Back to site</span>}
+          <UserAvatar user={currentUser} size="sm" />
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate">{currentUser.name}</p>
+              <p className="text-[10px] text-sidebar-foreground/50 truncate">{ROLE_META[currentUser.role]?.name}</p>
+            </div>
+          )}
         </button>
         <button
           onClick={handleLogout}
           disabled={loggingOut}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+          className={cn(
+            "w-full mt-1 flex items-center gap-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer disabled:opacity-50",
+            collapsed ? "justify-center p-1.5" : "px-2 py-2"
+          )}
+          title={collapsed ? "Logout" : undefined}
         >
-          <LogOut className="w-4 h-4 shrink-0" />
+          <LogOut className="shrink-0 w-4 h-4" />
           {!collapsed && <span>{loggingOut ? "Logging out..." : "Logout"}</span>}
         </button>
       </div>
@@ -491,11 +529,7 @@ export default function AdminLayout() {
                   className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                   title="Account"
                 >
-                  <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-primary-foreground">
-                      {currentUser.name[0]?.toUpperCase() ?? "?"}
-                    </span>
-                  </div>
+                  <UserAvatar user={currentUser} size="sm" />
                   <span className="hidden sm:flex flex-col items-start leading-tight">
                     <span className="text-sm font-medium">{currentUser.name}</span>
                     <span className="text-[10px] text-muted-foreground">{ROLE_META[currentUser.role]?.name}</span>
@@ -507,11 +541,7 @@ export default function AdminLayout() {
                   <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                     {/* User info header */}
                     <div className="px-4 py-3.5 border-b border-border flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
-                        <span className="text-sm font-bold text-primary-foreground">
-                          {currentUser.name[0]?.toUpperCase() ?? "?"}
-                        </span>
-                      </div>
+                      <UserAvatar user={currentUser} size="md" />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">{currentUser.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{currentUser.email ?? "—"}</p>
