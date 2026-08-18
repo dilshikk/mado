@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import pool from '../db/pool.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, VALID_ROLES } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -28,6 +28,10 @@ router.get('/:id', authenticate, authorize(['admin']), async (req, res) => {
 router.put('/:id', authenticate, authorize(['admin']), async (req, res) => {
   const { id } = req.params;
   const { name, role, status } = req.body;
+
+  if (role && !VALID_ROLES.includes(role)) {
+    return res.status(400).json({ error: `Role must be one of: ${VALID_ROLES.join(', ')}` });
+  }
 
   await pool.query(
     'UPDATE users SET name = $1, role = $2, status = $3 WHERE id = $4',
