@@ -29,6 +29,7 @@ import RequestsPage from "./pages/admin/requests/page.tsx";
 import PagesPage from "./pages/admin/pages/page.tsx";
 import UsersPage from "./pages/admin/users/page.tsx";
 import ActivityPage from "./pages/admin/activity/page.tsx";
+import RoleGuard from "./pages/admin/_components/role-guard.tsx";
 
 export default function App() {
   return (
@@ -57,23 +58,142 @@ export default function App() {
               </ProtectedRoute>
             }
           >
+            {/* Dashboard: accessible to all authenticated roles — no guard needed */}
             <Route index element={<AdminDashboard />} />
-            <Route path="pages" element={<PagesPage />} />
-            <Route path="menu/categories" element={<CategoriesPage />} />
-            <Route path="menu/dishes" element={<DishesPage />} />
-            <Route path="locations" element={<LocationsAdminPage />} />
-            <Route path="catering/content" element={<CateringContentPage />} />
-            <Route path="catering/requests" element={<CateringRequestsPage />} />
-            <Route path="media" element={<MediaPage />} />
-            <Route path="promotions" element={<PromotionsPage />} />
-            <Route path="requests" element={<RequestsPage />} />
-            <Route path="careers/vacancies" element={<VacanciesPage />} />
-            <Route path="careers/applications" element={<ApplicationsPage />} />
-            <Route path="reviews" element={<ReviewsPage />} />
-            <Route path="faq" element={<FaqPage />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="activity" element={<ActivityPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+
+            {/* Content */}
+            <Route
+              path="pages"
+              element={
+                <RoleGuard section="pages">
+                  <PagesPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="menu/categories"
+              element={
+                <RoleGuard section="menu">
+                  <CategoriesPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="menu/dishes"
+              element={
+                <RoleGuard section="menu">
+                  <DishesPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="locations"
+              element={
+                <RoleGuard section="locations">
+                  <LocationsAdminPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="catering/content"
+              element={
+                <RoleGuard section="catering">
+                  <CateringContentPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="catering/requests"
+              element={
+                <RoleGuard section="catering">
+                  <CateringRequestsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="media"
+              element={
+                <RoleGuard section="media">
+                  <MediaPage />
+                </RoleGuard>
+              }
+            />
+
+            {/* Business */}
+            <Route
+              path="promotions"
+              element={
+                <RoleGuard section="promotions">
+                  <PromotionsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="requests"
+              element={
+                <RoleGuard section="requests">
+                  <RequestsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="careers/vacancies"
+              element={
+                <RoleGuard section="careers">
+                  <VacanciesPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="careers/applications"
+              element={
+                <RoleGuard section="careers">
+                  <ApplicationsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="reviews"
+              element={
+                <RoleGuard section="reviews">
+                  <ReviewsPage />
+                </RoleGuard>
+              }
+            />
+
+            {/* System */}
+            <Route
+              path="faq"
+              element={
+                <RoleGuard section="faq">
+                  <FaqPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <RoleGuard section="users">
+                  <UsersPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="activity"
+              element={
+                <RoleGuard section="activity">
+                  <ActivityPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RoleGuard section="settings">
+                  <SettingsPage />
+                </RoleGuard>
+              }
+            />
           </Route>
 
           <Route path="*" element={<NotFound />} />
