@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
 
     try {
       if (!email || !password) {
-        setError('Email and password are required');
+        setError('Email и пароль обязательны');
         setLoading(false);
         return;
       }
@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
       const response = await api.login(email, password);
 
       if (!response.token) {
-        setError('Invalid credentials');
+        setError('Неверные данные для входа');
         setLoading(false);
         return;
       }
@@ -48,7 +48,7 @@ export default function AdminLoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Login failed. Please check your credentials.'
+          : 'Ошибка входа. Проверьте данные и попробуйте снова.'
       );
       setLoading(false);
     }
@@ -65,12 +65,12 @@ export default function AdminLoginPage() {
             </div>
           </div>
           <h1 className="text-3xl font-serif font-bold text-white">MADO</h1>
-          <p className="text-slate-400 text-sm mt-2">Admin Panel</p>
+          <p className="text-slate-400 text-sm mt-2">Панель администратора</p>
         </div>
 
         {/* Login Card */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
-          <h2 className="text-xl font-bold text-white mb-6">Admin Login</h2>
+          <h2 className="text-xl font-bold text-white mb-6">Вход в систему</h2>
 
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex gap-3">
@@ -83,7 +83,7 @@ export default function AdminLoginPage() {
             {/* Email Input */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Email Address
+                Адрес электронной почты
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -91,7 +91,7 @@ export default function AdminLoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  placeholder="Введите email"
                   disabled={loading}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 />
@@ -101,7 +101,7 @@ export default function AdminLoginPage() {
             {/* Password Input */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Password
+                Пароль
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -109,7 +109,7 @@ export default function AdminLoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="Введите пароль"
                   disabled={loading}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 />
@@ -125,10 +125,10 @@ export default function AdminLoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Logging in...
+                  Вход...
                 </>
               ) : (
-                'Log In'
+                'Войти'
               )}
             </button>
           </form>
@@ -138,7 +138,7 @@ export default function AdminLoginPage() {
         <div className="text-center mt-8">
           <p className="text-slate-400 text-sm">
             <a href="/" className="text-amber-500 hover:text-amber-400 font-medium">
-              Back to Website
+              Вернуться на сайт
             </a>
           </p>
         </div>
