@@ -108,7 +108,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update application status
-router.patch('/:id/status', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.patch('/:id/status', authenticate, authorize(['admin', 'hr']), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -134,7 +134,7 @@ router.patch('/:id/status', authenticate, authorize(['admin', 'editor']), async 
 });
 
 // Save internal note for application
-router.patch('/:id/note', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.patch('/:id/note', authenticate, authorize(['admin', 'hr']), async (req, res) => {
   const { id } = req.params;
   const { note } = req.body;
 
