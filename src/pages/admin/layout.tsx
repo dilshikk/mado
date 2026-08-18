@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api";
 import { canAccessSection, ROLE_META, type NavSectionKey, type UserRole } from "@/lib/roles.ts";
+import { AdminUserContext } from "@/pages/admin/_lib/admin-user-context.tsx";
 
 type NavItem = {
   label: string;
@@ -302,63 +303,65 @@ export default function AdminLayout() {
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex">{sidebar}</div>
+    <AdminUserContext.Provider value={currentUser}>
+      <div className="flex h-screen bg-background overflow-hidden">
+        {/* Desktop sidebar */}
+        <div className="hidden md:flex">{sidebar}</div>
 
-      {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="relative z-10">{sidebar}</div>
-        </div>
-      )}
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
-        <header className="flex items-center gap-4 px-4 md:px-6 py-3 border-b border-border bg-card">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="md:hidden p-2 rounded-lg hover:bg-muted"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-
-          <div className="flex-1 relative hidden sm:block max-w-sm">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              placeholder="Search..."
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+        {/* Mobile sidebar overlay */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-50 flex md:hidden">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setMobileOpen(false)}
             />
+            <div className="relative z-10">{sidebar}</div>
           </div>
+        )}
 
-          <div className="ml-auto flex items-center gap-2">
-            <button className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
+        {/* Main */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Topbar */}
+          <header className="flex items-center gap-4 px-4 md:px-6 py-3 border-b border-border bg-card">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-muted"
+            >
+              <Menu className="w-5 h-5" />
             </button>
-            <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted">
-              <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-xs font-bold text-primary-foreground">{currentUser.name[0]?.toUpperCase() ?? "?"}</span>
-              </div>
-              <span className="hidden sm:flex flex-col items-start leading-tight">
-                <span className="text-sm font-medium">{currentUser.name}</span>
-                <span className="text-[10px] text-muted-foreground">{ROLE_META[currentUser.role]?.name}</span>
-              </span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </button>
-          </div>
-        </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Outlet />
-        </main>
+            <div className="flex-1 relative hidden sm:block max-w-sm">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                placeholder="Search..."
+                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <button className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
+              </button>
+              <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary-foreground">{currentUser.name[0]?.toUpperCase() ?? "?"}</span>
+                </div>
+                <span className="hidden sm:flex flex-col items-start leading-tight">
+                  <span className="text-sm font-medium">{currentUser.name}</span>
+                  <span className="text-[10px] text-muted-foreground">{ROLE_META[currentUser.role]?.name}</span>
+                </span>
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              </button>
+            </div>
+          </header>
+
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </AdminUserContext.Provider>
   );
 }
