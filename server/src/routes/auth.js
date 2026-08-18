@@ -28,6 +28,47 @@ const avatarUpload = multer({
   },
 });
 
+/**
+ * Build the full avatar URL from a relative path stored in DB.
+ * Returns null if no avatar_url.
+ */
+function buildAvatarUrl(req, relativeUrl) {
+  if (!relativeUrl) return null;
+  if (/^https?:\/\//i.test(relativeUrl)) return relativeUrl;
+  const base = process.env.BASE_URL
+    ? process.env.BASE_URL.replace(/\/$/, '')
+    : `${req.protocol}://${req.get('host')}`;
+  return `${base}${relativeUrl.startsWith('/') ? '' : '/'}${relativeUrl}`;
+}
+
+/**
+ * Try to fetch a user with avatar_url. If the column doesn't exist yet
+ * (migration not run), fall back to a query without it.
+ */
+async function getUserById(req, id) {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, role, status, last_seen, created_at, avatar_url FROM users WHERE id = $1',
+      [id]
+    );
+    if (result.rows.length === 0) return null;
+    const user = result.rows[0];
+    user.avatar_url = buildAvatarUrl(req, user.avatar_url);
+    return user;
+  } catch (err) {
+    // Column avatar_url might not exist yet — fall back without it
+    if (err.code === '42703') {
+      const result = await pool.query(
+        'SELECT id, name, email, role, status, last_seen, created_at FROM users WHERE id = $1',
+        [id]
+      );
+      if (result.rows.length === 0) return null;
+      return { ...result.rows[0], avatar_url: null };
+    }
+    throw err;
+  }
+}
+
 // Login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -36,7 +77,10 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const result = await pool.query('SELECT id, name, email, password_hash, role, status FROM users WHERE email = $1', [email]);
+  const result = await pool.query(
+    'SELECT id, name, email, password_hash, role, status FROM users WHERE email = $1',
+    [email]
+  );
 
   if (result.rows.length === 0) {
     return res.status(401).json({ error: 'Invalid email or password' });
@@ -68,8 +112,8 @@ router.post('/login', async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role
-    }
+      role: user.role,
+    },
   });
 });
 
@@ -93,14 +137,14 @@ router.post('/register', authenticate, authorize(['admin']), async (req, res) =>
       [name, email, hashedPassword, role, 'active']
     );
 
-    const user = result.rows[0];
+    const newUser = result.rows[0];
 
     await pool.query(
       'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-      [req.user.id, 'create', 'user', user.id, `Created team member: ${user.email}`]
+      [req.user.id, 'create', 'user', newUser.id, `Created team member: ${newUser.email}`]
     );
 
-    res.status(201).json(user);
+    res.status(201).json(newUser);
   } catch (error) {
     if (error.code === '23505') {
       return res.status(400).json({ error: 'Email already exists' });
@@ -119,22 +163,10 @@ router.get('/me', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const result = await pool.query(
-      'SELECT id, name, email, role, status, last_seen, created_at, avatar_url FROM users WHERE id = $1',
-      [decoded.id]
-    );
+    const user = await getUserById(req, decoded.id);
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = result.rows[0];
-    // Build full avatar URL if relative path
-    if (user.avatar_url && !/^https?:\/\//i.test(user.avatar_url)) {
-      const base = process.env.BASE_URL
-        ? process.env.BASE_URL.replace(/\/$/, '')
-        : `${req.protocol}://${req.get('host')}`;
-      user.avatar_url = `${base}${user.avatar_url.startsWith('/') ? '' : '/'}${user.avatar_url}`;
     }
 
     res.json(user);
@@ -151,7 +183,6 @@ router.put('/me', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Name and email are required' });
   }
 
-  // Check email uniqueness (exclude current user)
   const emailCheck = await pool.query(
     'SELECT id FROM users WHERE email = $1 AND id != $2',
     [email, req.user.id]
@@ -185,22 +216,10 @@ router.put('/me', authenticate, async (req, res) => {
 
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-    [req.user.id, 'update', 'user', req.user.id, `Updated own profile`]
+    [req.user.id, 'update', 'user', req.user.id, 'Updated own profile']
   );
 
-  const updated = await pool.query(
-    'SELECT id, name, email, role, status, last_seen, created_at, avatar_url FROM users WHERE id = $1',
-    [req.user.id]
-  );
-
-  const user = updated.rows[0];
-  if (user.avatar_url && !/^https?:\/\//i.test(user.avatar_url)) {
-    const base = process.env.BASE_URL
-      ? process.env.BASE_URL.replace(/\/$/, '')
-      : `${req.protocol}://${req.get('host')}`;
-    user.avatar_url = `${base}${user.avatar_url.startsWith('/') ? '' : '/'}${user.avatar_url}`;
-  }
-
+  const user = await getUserById(req, req.user.id);
   res.json(user);
 });
 
@@ -211,23 +230,30 @@ router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (re
   }
 
   // Delete old avatar file if it was stored locally
-  const existing = await pool.query('SELECT avatar_url FROM users WHERE id = $1', [req.user.id]);
-  const oldUrl = existing.rows[0]?.avatar_url;
-  if (oldUrl && oldUrl.startsWith('/uploads/avatars/')) {
-    const oldPath = path.join(process.cwd(), oldUrl);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  try {
+    const existing = await pool.query('SELECT avatar_url FROM users WHERE id = $1', [req.user.id]);
+    const oldUrl = existing.rows[0]?.avatar_url;
+    if (oldUrl && oldUrl.startsWith('/uploads/avatars/')) {
+      const oldPath = path.join(process.cwd(), oldUrl);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+  } catch {
+    // avatar_url column might not exist yet — ignore
   }
 
   const filename = `avatar-${req.user.id}-${Date.now()}.jpg`;
   const filePath = path.join(avatarDir, filename);
   const relativeUrl = `/uploads/avatars/${filename}`;
 
-  // Crop and resize to 200×200 using sharp (cover fit = center crop)
   await sharp(req.file.buffer)
     .resize(200, 200, { fit: 'cover', position: 'center' })
     .jpeg({ quality: 85 })
     .toFile(filePath);
 
+  // Ensure column exists before updating
+  await pool.query(
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)'
+  );
   await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [relativeUrl, req.user.id]);
 
   await pool.query(
@@ -235,11 +261,7 @@ router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (re
     [req.user.id, 'update', 'user', req.user.id, 'Updated profile avatar']
   );
 
-  const base = process.env.BASE_URL
-    ? process.env.BASE_URL.replace(/\/$/, '')
-    : `${req.protocol}://${req.get('host')}`;
-  const fullUrl = `${base}${relativeUrl}`;
-
+  const fullUrl = buildAvatarUrl(req, relativeUrl);
   res.json({ avatar_url: fullUrl });
 });
 
