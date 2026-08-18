@@ -51,7 +51,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create promotion
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'marketing']), async (req, res) => {
   const { title, description, image_url, start_date, end_date, status = 'draft', pages = [] } = req.body;
 
   if (!title || !start_date || !end_date) {
@@ -81,7 +81,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update promotion
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'marketing']), async (req, res) => {
   const { id } = req.params;
   const { title, description, image_url, start_date, end_date, status, pages = [] } = req.body;
 
