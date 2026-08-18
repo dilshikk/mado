@@ -1,21 +1,41 @@
-import { useState } from "react";
-import { Eye, Clock, MessageSquare, Briefcase, UtensilsCrossed, Search, Filter } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Eye,
+  Clock,
+  MessageSquare,
+  Briefcase,
+  UtensilsCrossed,
+  Search,
+  Filter,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils.ts";
+import api from "@/lib/api.ts";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type RequestType = "catering" | "career" | "contact";
-type RequestStatus = "new" | "pending" | "in_progress" | "confirmed" | "completed" | "cancelled";
 
-type Request = {
+type UnifiedRequest = {
   id: string;
   type: RequestType;
   name: string;
   detail: string;
   phone: string;
-  status: RequestStatus;
+  email: string;
+  message: string;
+  status: string;
+  statusLabel: string;
+  statusColor: string;
+  createdAt: string;
   date: string;
-  href: string;
+  href?: string;
 };
+
+// ─── Meta / styling ─────────────────────────────────────────────────────────
 
 const TYPE_META: Record<RequestType, { label: string; icon: React.ElementType; color: string }> = {
   catering: { label: "Catering", icon: UtensilsCrossed, color: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400" },
@@ -23,32 +43,182 @@ const TYPE_META: Record<RequestType, { label: string; icon: React.ElementType; c
   contact: { label: "Contact", icon: MessageSquare, color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
 };
 
-const STATUS_META: Record<RequestStatus, { label: string; color: string }> = {
+const DEFAULT_STATUS_COLOR = "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+
+const CATERING_STATUS_META: Record<string, { label: string; color: string }> = {
   new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  pending: { label: "Pending", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  in_progress: { label: "In Progress", color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  in_progress: { label: "In Progress", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  contacted: { label: "Contacted", color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
   confirmed: { label: "Confirmed", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-  completed: { label: "Completed", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+  completed: { label: "Completed", color: DEFAULT_STATUS_COLOR },
   cancelled: { label: "Cancelled", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
-const ALL_REQUESTS: Request[] = [
-  { id: "124", type: "catering", name: "John Smith", detail: "Corporate event \u00b7 120 guests \u00b7 24 Aug", phone: "+998 90 123 45 67", status: "new", date: "16 Aug 06:30", href: "/admin/catering/requests" },
-  { id: "A01", type: "career", name: "Dilshod Shomuratov", detail: "Waiter \u00b7 Tashkent \u2014 Chilanzar", phone: "+998 90 123 45 67", status: "new", date: "16 Aug 06:10", href: "/admin/careers/applications" },
-  { id: "C01", type: "contact", name: "Maria Brown", detail: "General inquiry about group booking", phone: "+998 99 234 56 78", status: "pending", date: "15 Aug 14:20", href: "/admin/requests" },
-  { id: "123", type: "catering", name: "Sarah Jones", detail: "Wedding \u00b7 200 guests \u00b7 10 Sep", phone: "+998 93 456 78 90", status: "in_progress", date: "15 Aug 12:00", href: "/admin/catering/requests" },
-  { id: "A02", type: "career", name: "Kamola Yusupova", detail: "Barista \u00b7 Tashkent \u2014 Chilanzar", phone: "+998 93 456 78 90", status: "confirmed", date: "14 Aug 15:30", href: "/admin/careers/applications" },
-  { id: "122", type: "catering", name: "Alex Kim", detail: "Birthday \u00b7 50 guests \u00b7 5 Sep", phone: "+998 91 789 01 23", status: "confirmed", date: "14 Aug 09:15", href: "/admin/catering/requests" },
-  { id: "C02", type: "contact", name: "Rustam N.", detail: "Question about menu allergens", phone: "+998 97 111 22 33", status: "completed", date: "12 Aug 10:00", href: "/admin/requests" },
-  { id: "121", type: "catering", name: "Maria Brown", detail: "Workshop \u00b7 30 guests \u00b7 28 Aug", phone: "+998 99 234 56 78", status: "completed", date: "10 Aug 11:00", href: "/admin/catering/requests" },
-];
+const CAREER_STATUS_META: Record<string, { label: string; color: string }> = {
+  new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  reviewing: { label: "Reviewing", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  interview: { label: "Interview", color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  accepted: { label: "Accepted", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  rejected: { label: "Rejected", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+};
+
+const CONTACT_STATUS_META: Record<string, { label: string; color: string }> = {
+  new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  in_progress: { label: "In Progress", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  resolved: { label: "Resolved", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  closed: { label: "Closed", color: DEFAULT_STATUS_COLOR },
+  cancelled: { label: "Cancelled", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+};
+
+const CONTACT_STATUS_OPTIONS = Object.keys(CONTACT_STATUS_META);
+
+function humanizeStatus(status: string): string {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function getStatusMeta(type: RequestType, status: string): { label: string; color: string } {
+  const map = type === "catering" ? CATERING_STATUS_META : type === "career" ? CAREER_STATUS_META : CONTACT_STATUS_META;
+  return map[status] ?? { label: humanizeStatus(status), color: DEFAULT_STATUS_COLOR };
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+// ─── Raw → unified mapping ──────────────────────────────────────────────────
+
+function mapContactRequest(item: Record<string, unknown>): UnifiedRequest {
+  const status = String(item.status ?? "new");
+  const meta = getStatusMeta("contact", status);
+  const createdAt = String(item.created_at ?? new Date().toISOString());
+  return {
+    id: String(item.id ?? ""),
+    type: "contact",
+    name: String(item.name ?? "Unknown"),
+    detail: String(item.message ?? "No message"),
+    phone: String(item.phone ?? "N/A"),
+    email: String(item.email ?? "N/A"),
+    message: String(item.message ?? ""),
+    status,
+    statusLabel: meta.label,
+    statusColor: meta.color,
+    createdAt,
+    date: formatDate(createdAt),
+  };
+}
+
+function mapCateringRequest(item: Record<string, unknown>): UnifiedRequest {
+  const status = String(item.status ?? "new");
+  const meta = getStatusMeta("catering", status);
+  const createdAt = String(item.created_at ?? new Date().toISOString());
+  const eventType = String(item.event_type ?? "Event");
+  const guestCount = String(item.guest_count ?? "?");
+  const eventDate = String(item.event_date ?? "");
+  return {
+    id: String(item.id ?? ""),
+    type: "catering",
+    name: String(item.name ?? "Unknown"),
+    detail: `${eventType} · ${guestCount} guests${eventDate ? ` · ${eventDate}` : ""}`,
+    phone: String(item.phone ?? "N/A"),
+    email: String(item.email ?? "N/A"),
+    message: String(item.message ?? ""),
+    status,
+    statusLabel: meta.label,
+    statusColor: meta.color,
+    createdAt,
+    date: formatDate(createdAt),
+    href: "/admin/catering/requests",
+  };
+}
+
+function mapApplication(item: Record<string, unknown>): UnifiedRequest {
+  const status = String(item.status ?? "new");
+  const meta = getStatusMeta("career", status);
+  const createdAt = String(item.created_at ?? new Date().toISOString());
+  const position = String(item.position_ru || item.position || "General position");
+  const locationName = String(item.location_name_ru || item.location_name || item.branch || "—");
+  return {
+    id: String(item.id ?? ""),
+    type: "career",
+    name: String(item.name ?? "Unknown"),
+    detail: `${position} · ${locationName}`,
+    phone: String(item.phone ?? "N/A"),
+    email: String(item.email ?? "N/A"),
+    message: String(item.message ?? ""),
+    status,
+    statusLabel: meta.label,
+    statusColor: meta.color,
+    createdAt,
+    date: formatDate(createdAt),
+    href: "/admin/careers/applications",
+  };
+}
+
+// ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function RequestsPage() {
+  const [requests, setRequests] = useState<UnifiedRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | RequestType>("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [viewing, setViewing] = useState<UnifiedRequest | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const filtered = ALL_REQUESTS.filter((r) => {
+  const loadRequests = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [contactRaw, cateringRaw, applicationsRaw] = await Promise.all([
+        api.getRequests({}),
+        api.getCateringRequests(),
+        api.getApplications({}),
+      ]);
+
+      const contactItems = Array.isArray(contactRaw)
+        ? (contactRaw as Record<string, unknown>[]).map(mapContactRequest)
+        : [];
+      const cateringItems = Array.isArray(cateringRaw)
+        ? (cateringRaw as Record<string, unknown>[]).map(mapCateringRequest)
+        : [];
+      const applicationItems = Array.isArray(applicationsRaw)
+        ? (applicationsRaw as Record<string, unknown>[]).map(mapApplication)
+        : [];
+
+      const combined = [...contactItems, ...cateringItems, ...applicationItems].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setRequests(combined);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load requests";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRequests();
+  }, [loadRequests]);
+
+  const filtered = requests.filter((r) => {
     const matchType = typeFilter === "all" || r.type === typeFilter;
     const matchStatus = statusFilter === "all" || r.status === statusFilter;
     const q = search.toLowerCase();
@@ -56,23 +226,47 @@ export default function RequestsPage() {
     return matchType && matchStatus && matchSearch;
   });
 
-  const newCount = ALL_REQUESTS.filter((r) => r.status === "new").length;
+  const newCount = requests.filter((r) => r.status === "new").length;
 
-  // Stats per type
   const typeCounts = (["catering", "career", "contact"] as RequestType[]).map((t) => ({
     type: t,
-    total: ALL_REQUESTS.filter((r) => r.type === t).length,
-    new: ALL_REQUESTS.filter((r) => r.type === t && r.status === "new").length,
+    total: requests.filter((r) => r.type === t).length,
+    new: requests.filter((r) => r.type === t && r.status === "new").length,
   }));
+
+  const statusOptions = Array.from(new Set(requests.map((r) => r.status))).sort();
+
+  const updateContactStatus = async (id: string, status: string) => {
+    try {
+      setUpdatingStatus(true);
+      await api.updateRequestStatus(id, status);
+      const meta = getStatusMeta("contact", status);
+      setRequests((prev) =>
+        prev.map((r) => (r.id === id && r.type === "contact" ? { ...r, status, statusLabel: meta.label, statusColor: meta.color } : r))
+      );
+      setViewing((v) => (v && v.id === id ? { ...v, status, statusLabel: meta.label, statusColor: meta.color } : v));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   return (
     <div className="space-y-5 max-w-4xl">
       <div>
         <h1 className="text-2xl font-serif font-bold">All Requests</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Unified inbox \u00b7 {newCount} new requests
+          {loading ? "Loading…" : `Unified inbox · ${newCount} new requests`}
         </p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 p-3 text-sm text-red-700 dark:text-red-400">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Type stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -94,8 +288,8 @@ export default function RequestsPage() {
                 </div>
                 <span className="text-sm font-semibold">{meta.label}</span>
               </div>
-              <p className="text-2xl font-bold">{total}</p>
-              {n > 0 && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{n} new</p>}
+              <p className="text-2xl font-bold">{loading ? "–" : total}</p>
+              {!loading && n > 0 && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{n} new</p>}
             </button>
           );
         })}
@@ -116,12 +310,14 @@ export default function RequestsPage() {
           <Filter className="w-4 h-4 text-muted-foreground" />
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "all" | RequestStatus)}
+            onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none"
           >
             <option value="all">All statuses</option>
-            {(Object.keys(STATUS_META) as RequestStatus[]).map((s) => (
-              <option key={s} value={s}>{STATUS_META[s].label}</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {humanizeStatus(s)}
+              </option>
             ))}
           </select>
         </div>
@@ -129,46 +325,135 @@ export default function RequestsPage() {
 
       {/* List */}
       <div className="space-y-2">
-        {filtered.map((req) => {
-          const typeMeta = TYPE_META[req.type];
-          const Icon = typeMeta.icon;
-          return (
-            <div key={req.id} className="bg-card border border-border rounded-xl p-4 flex items-start justify-between gap-4 hover:border-accent/50 transition-colors">
-              <div className="flex items-start gap-4 min-w-0">
-                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", typeMeta.color)}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground font-mono">#{req.id}</span>
-                    <span className="text-xs font-semibold text-muted-foreground">{typeMeta.label}</span>
-                    <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", STATUS_META[req.status].color)}>
-                      {STATUS_META[req.status].label}
-                    </span>
-                  </div>
-                  <p className="font-semibold text-foreground mt-0.5">{req.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{req.detail}</p>
-                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" /> {req.date}
-                  </div>
-                </div>
-              </div>
-              <Link
-                to={req.href}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+        {loading &&
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-card border border-border rounded-xl p-4 h-24 animate-pulse" />
+          ))}
+
+        {!loading &&
+          filtered.map((req) => {
+            const typeMeta = TYPE_META[req.type];
+            const Icon = typeMeta.icon;
+            return (
+              <div
+                key={`${req.type}-${req.id}`}
+                className="bg-card border border-border rounded-xl p-4 flex items-start justify-between gap-4 hover:border-accent/50 transition-colors"
               >
-                <Eye className="w-3.5 h-3.5" /> View
-              </Link>
-            </div>
-          );
-        })}
-        {filtered.length === 0 && (
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", typeMeta.color)}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground font-mono">#{req.id}</span>
+                      <span className="text-xs font-semibold text-muted-foreground">{typeMeta.label}</span>
+                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", req.statusColor)}>
+                        {req.statusLabel}
+                      </span>
+                    </div>
+                    <p className="font-semibold text-foreground mt-0.5">{req.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{req.detail}</p>
+                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" /> {req.date}
+                    </div>
+                  </div>
+                </div>
+                {req.type === "contact" ? (
+                  <button
+                    onClick={() => setViewing(req)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View
+                  </button>
+                ) : (
+                  <Link
+                    to={req.href ?? "/admin/requests"}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p className="text-sm">No requests match your filters</p>
           </div>
         )}
       </div>
+
+      {/* Contact detail modal */}
+      {viewing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setViewing(null)} />
+          <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4">
+              <div>
+                <h2 className="font-serif font-bold">{viewing.name}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Request #{viewing.id}</p>
+              </div>
+              <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", viewing.statusColor)}>
+                {viewing.statusLabel}
+              </span>
+            </div>
+            <div className="p-6 space-y-5">
+              <section>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Contact</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoField label="Phone" value={viewing.phone} />
+                  <InfoField label="Email" value={viewing.email} />
+                  <InfoField label="Received" value={viewing.date} />
+                </div>
+              </section>
+              {viewing.message && (
+                <section>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Message</p>
+                  <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">{viewing.message}</p>
+                </section>
+              )}
+              <section>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Update Status</p>
+                <div className="flex flex-wrap gap-2">
+                  {CONTACT_STATUS_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      disabled={updatingStatus}
+                      onClick={() => void updateContactStatus(viewing.id, s)}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50",
+                        viewing.status === s ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"
+                      )}
+                    >
+                      {CONTACT_STATUS_META[s].label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </div>
+            <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
+              <button
+                onClick={() => setViewing(null)}
+                className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2"
+              >
+                {updatingStatus && <Loader2 className="w-4 h-4 animate-spin" />}
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InfoField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+      <p className="text-sm font-medium text-foreground">{value}</p>
     </div>
   );
 }
