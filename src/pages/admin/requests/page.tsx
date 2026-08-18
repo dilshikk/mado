@@ -38,36 +38,36 @@ type UnifiedRequest = {
 // ─── Meta / styling ─────────────────────────────────────────────────────────
 
 const TYPE_META: Record<RequestType, { label: string; icon: React.ElementType; color: string }> = {
-  catering: { label: "Catering", icon: UtensilsCrossed, color: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400" },
-  career: { label: "Career", icon: Briefcase, color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
-  contact: { label: "Contact", icon: MessageSquare, color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  catering: { label: "Кейтеринг", icon: UtensilsCrossed, color: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400" },
+  career:   { label: "Вакансия",  icon: Briefcase,       color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  contact:  { label: "Обращение", icon: MessageSquare,   color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
 };
 
 const DEFAULT_STATUS_COLOR = "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
 
 const CATERING_STATUS_META: Record<string, { label: string; color: string }> = {
-  new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  in_progress: { label: "In Progress", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  contacted: { label: "Contacted", color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
-  confirmed: { label: "Confirmed", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-  completed: { label: "Completed", color: DEFAULT_STATUS_COLOR },
-  cancelled: { label: "Cancelled", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+  new:         { label: "Новая",        color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  in_progress: { label: "В работе",     color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  contacted:   { label: "Связались",    color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  confirmed:   { label: "Подтверждена", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  completed:   { label: "Завершена",    color: DEFAULT_STATUS_COLOR },
+  cancelled:   { label: "Отменена",     color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
 const CAREER_STATUS_META: Record<string, { label: string; color: string }> = {
-  new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  reviewing: { label: "Reviewing", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  interview: { label: "Interview", color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
-  accepted: { label: "Accepted", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-  rejected: { label: "Rejected", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+  new:       { label: "Новый",           color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  reviewing: { label: "Рассматривается", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  interview: { label: "Собеседование",   color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  accepted:  { label: "Принят",          color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  rejected:  { label: "Отклонён",        color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
 const CONTACT_STATUS_META: Record<string, { label: string; color: string }> = {
-  new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  in_progress: { label: "In Progress", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  resolved: { label: "Resolved", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-  closed: { label: "Closed", color: DEFAULT_STATUS_COLOR },
-  cancelled: { label: "Cancelled", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+  new:         { label: "Новое",    color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  in_progress: { label: "В работе", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  resolved:    { label: "Решено",   color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  closed:      { label: "Закрыто",  color: DEFAULT_STATUS_COLOR },
+  cancelled:   { label: "Отменено", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
 const CONTACT_STATUS_OPTIONS = Object.keys(CONTACT_STATUS_META);
@@ -108,7 +108,7 @@ function mapContactRequest(item: Record<string, unknown>): UnifiedRequest {
     id: String(item.id ?? ""),
     type: "contact",
     name: String(item.name ?? "Unknown"),
-    detail: String(item.message ?? "No message"),
+    detail: String(item.message ?? "Нет сообщения"),
     phone: String(item.phone ?? "N/A"),
     email: String(item.email ?? "N/A"),
     message: String(item.message ?? ""),
@@ -124,14 +124,14 @@ function mapCateringRequest(item: Record<string, unknown>): UnifiedRequest {
   const status = String(item.status ?? "new");
   const meta = getStatusMeta("catering", status);
   const createdAt = String(item.created_at ?? new Date().toISOString());
-  const eventType = String(item.event_type ?? "Event");
+  const eventType = String(item.event_type ?? "Мероприятие");
   const guestCount = String(item.guest_count ?? "?");
   const eventDate = String(item.event_date ?? "");
   return {
     id: String(item.id ?? ""),
     type: "catering",
     name: String(item.name ?? "Unknown"),
-    detail: `${eventType} · ${guestCount} guests${eventDate ? ` · ${eventDate}` : ""}`,
+    detail: `${eventType} · ${guestCount} гостей${eventDate ? ` · ${eventDate}` : ""}`,
     phone: String(item.phone ?? "N/A"),
     email: String(item.email ?? "N/A"),
     message: String(item.message ?? ""),
@@ -148,7 +148,7 @@ function mapApplication(item: Record<string, unknown>): UnifiedRequest {
   const status = String(item.status ?? "new");
   const meta = getStatusMeta("career", status);
   const createdAt = String(item.created_at ?? new Date().toISOString());
-  const position = String(item.position_ru || item.position || "General position");
+  const position = String(item.position_ru || item.position || "Общая должность");
   const locationName = String(item.location_name_ru || item.location_name || item.branch || "—");
   return {
     id: String(item.id ?? ""),
@@ -206,7 +206,7 @@ export default function RequestsPage() {
 
       setRequests(combined);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load requests";
+      const message = err instanceof Error ? err.message : "Не удалось загрузить заявки";
       setError(message);
       toast.error(message);
     } finally {
@@ -246,7 +246,7 @@ export default function RequestsPage() {
       );
       setViewing((v) => (v && v.id === id ? { ...v, status, statusLabel: meta.label, statusColor: meta.color } : v));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update status");
+      toast.error(err instanceof Error ? err.message : "Не удалось обновить статус");
     } finally {
       setUpdatingStatus(false);
     }
@@ -255,9 +255,9 @@ export default function RequestsPage() {
   return (
     <div className="space-y-5 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-serif font-bold">All Requests</h1>
+        <h1 className="text-2xl font-serif font-bold">Все заявки</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {loading ? "Loading…" : `Unified inbox · ${newCount} new requests`}
+          {loading ? "Загрузка…" : `Единый входящий · ${newCount} новых заявок`}
         </p>
       </div>
 
@@ -289,7 +289,7 @@ export default function RequestsPage() {
                 <span className="text-sm font-semibold">{meta.label}</span>
               </div>
               <p className="text-2xl font-bold">{loading ? "–" : total}</p>
-              {!loading && n > 0 && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{n} new</p>}
+              {!loading && n > 0 && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{n} новых</p>}
             </button>
           );
         })}
@@ -302,7 +302,7 @@ export default function RequestsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search requests..."
+            placeholder="Поиск заявок..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -313,7 +313,7 @@ export default function RequestsPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none"
           >
-            <option value="all">All statuses</option>
+            <option value="all">Все статусы</option>
             {statusOptions.map((s) => (
               <option key={s} value={s}>
                 {humanizeStatus(s)}
@@ -363,14 +363,14 @@ export default function RequestsPage() {
                     onClick={() => setViewing(req)}
                     className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
                   >
-                    <Eye className="w-3.5 h-3.5" /> View
+                    <Eye className="w-3.5 h-3.5" /> Просмотреть
                   </button>
                 ) : (
                   <Link
                     to={req.href ?? "/admin/requests"}
                     className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
                   >
-                    <Eye className="w-3.5 h-3.5" /> View
+                    <Eye className="w-3.5 h-3.5" /> Просмотреть
                   </Link>
                 )}
               </div>
@@ -380,7 +380,7 @@ export default function RequestsPage() {
         {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">No requests match your filters</p>
+            <p className="text-sm">Заявки не найдены</p>
           </div>
         )}
       </div>
@@ -393,7 +393,7 @@ export default function RequestsPage() {
             <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4">
               <div>
                 <h2 className="font-serif font-bold">{viewing.name}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Request #{viewing.id}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Заявка #{viewing.id}</p>
               </div>
               <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", viewing.statusColor)}>
                 {viewing.statusLabel}
@@ -401,21 +401,21 @@ export default function RequestsPage() {
             </div>
             <div className="p-6 space-y-5">
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Contact</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Контакт</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <InfoField label="Phone" value={viewing.phone} />
-                  <InfoField label="Email" value={viewing.email} />
-                  <InfoField label="Received" value={viewing.date} />
+                  <InfoField label="Телефон"  value={viewing.phone} />
+                  <InfoField label="Email"    value={viewing.email} />
+                  <InfoField label="Получено" value={viewing.date} />
                 </div>
               </section>
               {viewing.message && (
                 <section>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Message</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Сообщение</p>
                   <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">{viewing.message}</p>
                 </section>
               )}
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Update Status</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Изменить статус</p>
                 <div className="flex flex-wrap gap-2">
                   {CONTACT_STATUS_OPTIONS.map((s) => (
                     <button
@@ -439,7 +439,7 @@ export default function RequestsPage() {
                 className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2"
               >
                 {updatingStatus && <Loader2 className="w-4 h-4 animate-spin" />}
-                Close
+                Закрыть
               </button>
             </div>
           </div>
