@@ -22,6 +22,7 @@ import usersRoutes from './routes/users.js';
 import activityRoutes from './routes/activity.js';
 import pagesRoutes from './routes/pages.js';
 import mediaRoutes from './routes/media.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/pages', pagesRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
