@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
-import { User, Mail, Lock, Shield, Calendar, Save, Eye, EyeOff, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { User, Mail, Lock, Shield, Calendar, Save, Eye, EyeOff, CheckCircle2, AlertTriangle, Camera, Loader2 } from "lucide-react";
 import api from "@/lib/api.ts";
 import { ROLE_META } from "@/lib/roles.ts";
+import { AdminUserContext } from "@/pages/admin/_lib/admin-user-context.tsx";
+import { useContext } from "react";
 
 type UserProfile = {
   id: number;
@@ -11,12 +13,53 @@ type UserProfile = {
   status: string;
   last_seen: string | null;
   created_at: string;
+  avatar_url?: string | null;
 };
+
+// Helper: render avatar circle (image or initial letter)
+function AvatarCircle({
+  src,
+  name,
+  size = "lg",
+}: {
+  src?: string | null;
+  name: string;
+  size?: "sm" | "md" | "lg" | "xl";
+}) {
+  const sizeClass = {
+    sm: "w-7 h-7 text-xs",
+    md: "w-10 h-10 text-sm",
+    lg: "w-16 h-16 text-2xl",
+    xl: "w-20 h-20 text-3xl",
+  }[size];
+
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        className={`${sizeClass} rounded-full object-cover shrink-0`}
+      />
+    );
+  }
+  return (
+    <div className={`${sizeClass} rounded-full bg-primary flex items-center justify-center shrink-0`}>
+      <span className="font-bold text-primary-foreground">
+        {name[0]?.toUpperCase() ?? "?"}
+      </span>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Access layout context to refresh avatar in navbar
+  const ctx = useContext(AdminUserContext);
 
   // Form state
   const [name, setName] = useState("");
@@ -46,6 +89,32 @@ export default function ProfilePage() {
   };
 
   useEffect(() => { void load(); }, []);
+
+  // Handle avatar file selection — auto-upload immediately (no save button needed)
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAvatarUploading(true);
+    setErrorMsg(null);
+    try {
+      const result = await api.uploadAvatar(file);
+      // Update local profile state
+      setProfile((prev) => prev ? { ...prev, avatar_url: result.avatar_url } : prev);
+      // Update navbar context if available
+      if (ctx) {
+        (ctx as { avatar_url?: string }).avatar_url = result.avatar_url;
+      }
+      setSuccessMsg("Profile photo updated!");
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to upload photo");
+    } finally {
+      setAvatarUploading(false);
+      // Reset input so the same file can be re-uploaded if needed
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,14 +186,48 @@ export default function ProfilePage() {
       {/* Profile card info */}
       {profile && (
         <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-5">
-          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shrink-0">
-            <span className="text-2xl font-bold text-primary-foreground">
-              {profile.name[0]?.toUpperCase() ?? "?"}
-            </span>
+          {/* Avatar with upload overlay */}
+          <div className="relative shrink-0 group">
+            <AvatarCircle src={profile.avatar_url} name={profile.name} size="xl" />
+
+            {/* Overlay button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarUploading}
+              className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
+              title="Change photo"
+            >
+              {avatarUploading
+                ? <Loader2 className="w-6 h-6 text-white animate-spin" />
+                : <Camera className="w-6 h-6 text-white" />
+              }
+            </button>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => void handleAvatarChange(e)}
+            />
           </div>
+
           <div className="flex-1 min-w-0">
             <p className="text-lg font-semibold">{profile.name}</p>
             <p className="text-sm text-muted-foreground">{profile.email}</p>
+
+            {/* Upload hint */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarUploading}
+              className="mt-1.5 text-xs text-primary hover:underline cursor-pointer disabled:opacity-50"
+            >
+              {avatarUploading ? "Uploading..." : profile.avatar_url ? "Change photo" : "Upload photo"}
+            </button>
+
             <div className="flex flex-wrap gap-3 mt-2">
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Shield className="w-3.5 h-3.5" />
@@ -140,7 +243,7 @@ export default function ProfilePage() {
               </span>
             </div>
           </div>
-          <div className={`px-2.5 py-1 rounded-full text-xs font-semibold ${profile.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-red-100 text-red-700'}`}>
+          <div className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${profile.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-red-100 text-red-700'}`}>
             {profile.status}
           </div>
         </div>
