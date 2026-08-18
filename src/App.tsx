@@ -29,6 +29,7 @@ import RequestsPage from "./pages/admin/requests/page.tsx";
 import PagesPage from "./pages/admin/pages/page.tsx";
 import UsersPage from "./pages/admin/users/page.tsx";
 import ActivityPage from "./pages/admin/activity/page.tsx";
+import ProfilePage from "./pages/admin/profile/page.tsx";
 import RoleGuard from "./pages/admin/_components/role-guard.tsx";
 
 export default function App() {
@@ -58,8 +59,11 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            {/* Dashboard: accessible to all authenticated roles — no guard needed */}
+            {/* Dashboard: accessible to all authenticated roles */}
             <Route index element={<AdminDashboard />} />
+
+            {/* Profile: accessible to all authenticated roles */}
+            <Route path="profile" element={<ProfilePage />} />
 
             {/* Content */}
             <Route
