@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, Clock, Search, FileText, AlertCircle } from "lucide-react";
+import { Eye, Clock, Search, FileText, AlertCircle, MapPin } from "lucide-react";
 import api from "@/lib/api.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -11,6 +11,7 @@ type Application = {
   position: string;
   position_ru: string;
   branch: string;
+  locationName: string;
   phone: string;
   email: string;
   experience: string;
@@ -49,7 +50,11 @@ export default function ApplicationsPage() {
             name: String(item.name ?? "Unknown"),
             position: String(item.position_ru || item.position || "General position"),
             position_ru: String(item.position_ru ?? ""),
-            branch: String(item.branch ?? "All branches"),
+            branch: String(item.branch ?? ""),
+            // Prefer location from DB; fallback to vacancy branch field
+            locationName: String(
+              item.location_name_ru || item.location_name || item.branch || "—"
+            ),
             phone: String(item.phone ?? "N/A"),
             email: String(item.email ?? "N/A"),
             experience: String(item.experience ?? "Not provided"),
@@ -78,15 +83,17 @@ export default function ApplicationsPage() {
   const filtered = apps.filter((a) => {
     const matchFilter = filter === "all" || a.status === filter;
     const q = search.toLowerCase();
-    const matchSearch = a.name.toLowerCase().includes(q) || a.position.toLowerCase().includes(q);
+    const matchSearch =
+      a.name.toLowerCase().includes(q) ||
+      a.position.toLowerCase().includes(q) ||
+      a.locationName.toLowerCase().includes(q);
     return matchFilter && matchSearch;
   });
 
   const updateStatus = async (id: string, status: AppStatus) => {
     try {
       await api.updateApplicationStatus(id, status);
-      // Optimistic update
-      setApps((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+      setApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
       if (viewing?.id === id) setViewing((v) => (v ? { ...v, status } : v));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
@@ -98,7 +105,7 @@ export default function ApplicationsPage() {
     setNoteSaving(true);
     try {
       await api.updateApplicationNote(viewing.id, note);
-      setApps((prev) => prev.map((a) => a.id === viewing.id ? { ...a, note } : a));
+      setApps((prev) => prev.map((a) => (a.id === viewing.id ? { ...a, note } : a)));
       setViewing((v) => (v ? { ...v, note } : v));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save note");
@@ -122,7 +129,8 @@ export default function ApplicationsPage() {
       <div>
         <h1 className="text-2xl font-serif font-bold">Applications</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {apps.filter((a) => a.status === "new").length} new · {apps.filter((a) => a.status === "interview").length} in interview
+          {apps.filter((a) => a.status === "new").length} new ·{" "}
+          {apps.filter((a) => a.status === "interview").length} in interview
         </p>
       </div>
 
@@ -133,6 +141,7 @@ export default function ApplicationsPage() {
         </div>
       )}
 
+      {/* Status count cards */}
       <div className="grid grid-cols-5 gap-2">
         {counts.map(({ status, count }) => (
           <button
@@ -140,22 +149,27 @@ export default function ApplicationsPage() {
             onClick={() => setFilter(status)}
             className={cn(
               "rounded-xl p-3 text-center border transition-all",
-              filter === status ? "border-primary bg-primary/5" : "border-border bg-card hover:border-accent/50"
+              filter === status
+                ? "border-primary bg-primary/5"
+                : "border-border bg-card hover:border-accent/50"
             )}
           >
             <p className="text-xl font-bold">{count}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{STATUS_META[status].label}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {STATUS_META[status].label}
+            </p>
           </button>
         ))}
       </div>
 
+      {/* Search + filter tabs */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or position..."
+            placeholder="Search by name, position or restaurant..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -166,7 +180,9 @@ export default function ApplicationsPage() {
               onClick={() => setFilter(s)}
               className={cn(
                 "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                filter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                filter === s
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
               {s === "all" ? "All" : STATUS_META[s as AppStatus].label}
@@ -175,6 +191,7 @@ export default function ApplicationsPage() {
         </div>
       </div>
 
+      {/* List */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="divide-y divide-border">
           {loading
@@ -188,15 +205,25 @@ export default function ApplicationsPage() {
                 </div>
               ))
             : filtered.map((app) => (
-                <div key={app.id} className="flex items-center justify-between px-4 py-4 hover:bg-muted/30 group">
+                <div
+                  key={app.id}
+                  className="flex items-center justify-between px-4 py-4 hover:bg-muted/30 group"
+                >
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary-foreground">{app.name[0]}</span>
+                      <span className="text-sm font-bold text-primary-foreground">
+                        {app.name[0]}
+                      </span>
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-foreground">{app.name}</p>
-                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", STATUS_META[app.status].color)}>
+                        <span
+                          className={cn(
+                            "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                            STATUS_META[app.status].color
+                          )}
+                        >
                           {STATUS_META[app.status].label}
                         </span>
                         {app.note && (
@@ -207,7 +234,9 @@ export default function ApplicationsPage() {
                       </div>
                       <div className="flex gap-3 mt-0.5 flex-wrap">
                         <span className="text-xs text-muted-foreground">{app.position}</span>
-                        <span className="text-xs text-muted-foreground">{app.branch}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {app.locationName}
+                        </span>
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="w-3 h-3" /> {app.date}
                         </span>
@@ -239,30 +268,46 @@ export default function ApplicationsPage() {
             <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4">
               <div>
                 <h2 className="font-serif font-bold">{viewing.name}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{viewing.position} · {viewing.branch}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {viewing.position} · {viewing.locationName}
+                </p>
               </div>
-              <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", STATUS_META[viewing.status].color)}>
+              <span
+                className={cn(
+                  "text-xs font-semibold px-2 py-0.5 rounded-full",
+                  STATUS_META[viewing.status].color
+                )}
+              >
                 {STATUS_META[viewing.status].label}
               </span>
             </div>
             <div className="p-6 space-y-5">
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Contact</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Contact
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <InfoField label="Phone" value={viewing.phone} />
                   <InfoField label="Email" value={viewing.email} />
                   <InfoField label="Applied" value={viewing.date} />
                   <InfoField label="Experience" value={viewing.experience} />
+                  <InfoField label="Restaurant" value={viewing.locationName} />
                 </div>
               </section>
               {viewing.message && (
                 <section>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Cover Message</p>
-                  <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">{viewing.message}</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Cover Message
+                  </p>
+                  <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">
+                    {viewing.message}
+                  </p>
                 </section>
               )}
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Internal Note</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Internal Note
+                </p>
                 <textarea
                   rows={3}
                   value={note}
@@ -271,11 +316,15 @@ export default function ApplicationsPage() {
                   className="w-full px-3 py-2.5 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
                 {note !== (viewing.note ?? "") && (
-                  <p className="text-xs text-muted-foreground mt-1">Unsaved changes — click Save & Close to persist</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Unsaved changes — click Save & Close to persist
+                  </p>
                 )}
               </section>
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Update Status</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Update Status
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {(Object.keys(STATUS_META) as AppStatus[]).map((s) => (
                     <button
@@ -295,11 +344,17 @@ export default function ApplicationsPage() {
               </section>
             </div>
             <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
-              <button onClick={() => setViewing(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">
+              <button
+                onClick={() => setViewing(null)}
+                className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg"
+              >
                 Close
               </button>
               <button
-                onClick={async () => { await saveNote(); setViewing(null); }}
+                onClick={async () => {
+                  await saveNote();
+                  setViewing(null);
+                }}
                 disabled={noteSaving}
                 className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-60"
               >
