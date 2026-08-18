@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, Clock, Search, FileText } from "lucide-react";
+import { Eye, Clock, Search, FileText, AlertCircle } from "lucide-react";
 import api from "@/lib/api.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -9,11 +9,13 @@ type Application = {
   id: string;
   name: string;
   position: string;
+  position_ru: string;
   branch: string;
   phone: string;
   email: string;
   experience: string;
   message: string;
+  note: string;
   status: AppStatus;
   date: string;
 };
@@ -32,6 +34,7 @@ export default function ApplicationsPage() {
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<Application | null>(null);
   const [note, setNote] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,17 +44,19 @@ export default function ApplicationsPage() {
       setError(null);
       const data = await api.getApplications({});
       const mapped = Array.isArray(data)
-        ? data.map((item: any) => ({
-            id: String(item.id),
-            name: item.name || "Unknown",
-            position: item.position || "General position",
-            branch: item.branch || "All branches",
-            phone: item.phone || "N/A",
-            email: item.email || "N/A",
-            experience: item.experience || "Not provided",
-            message: item.message || "",
-            status: (item.status || "new") as AppStatus,
-            date: new Date(item.created_at || Date.now()).toLocaleDateString("en-GB", {
+        ? data.map((item: Record<string, unknown>) => ({
+            id: String(item.id ?? ""),
+            name: String(item.name ?? "Unknown"),
+            position: String(item.position_ru || item.position || "General position"),
+            position_ru: String(item.position_ru ?? ""),
+            branch: String(item.branch ?? "All branches"),
+            phone: String(item.phone ?? "N/A"),
+            email: String(item.email ?? "N/A"),
+            experience: String(item.experience ?? "Not provided"),
+            message: String(item.message ?? ""),
+            note: String(item.note ?? ""),
+            status: (item.status ?? "new") as AppStatus,
+            date: new Date(String(item.created_at ?? Date.now())).toLocaleDateString("en-GB", {
               day: "2-digit",
               month: "short",
               year: "numeric",
@@ -80,13 +85,31 @@ export default function ApplicationsPage() {
   const updateStatus = async (id: string, status: AppStatus) => {
     try {
       await api.updateApplicationStatus(id, status);
-      await loadApplications();
-      if (viewing?.id === id) {
-        setViewing((v) => (v ? { ...v, status } : v));
-      }
+      // Optimistic update
+      setApps((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+      if (viewing?.id === id) setViewing((v) => (v ? { ...v, status } : v));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
     }
+  };
+
+  const saveNote = async () => {
+    if (!viewing) return;
+    setNoteSaving(true);
+    try {
+      await api.updateApplicationNote(viewing.id, note);
+      setApps((prev) => prev.map((a) => a.id === viewing.id ? { ...a, note } : a));
+      setViewing((v) => (v ? { ...v, note } : v));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save note");
+    } finally {
+      setNoteSaving(false);
+    }
+  };
+
+  const openViewing = (app: Application) => {
+    setViewing(app);
+    setNote(app.note ?? "");
   };
 
   const counts = (Object.keys(STATUS_META) as AppStatus[]).map((s) => ({
@@ -104,7 +127,8 @@ export default function ApplicationsPage() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 p-3 text-sm text-red-700 dark:text-red-400">
+          <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
         </div>
       )}
@@ -153,36 +177,51 @@ export default function ApplicationsPage() {
 
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="divide-y divide-border">
-          {filtered.map((app) => (
-            <div key={app.id} className="flex items-center justify-between px-4 py-4 hover:bg-muted/30 group">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0">
-                  <span className="text-sm font-bold text-primary-foreground">{app.name[0]}</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-foreground">{app.name}</p>
-                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", STATUS_META[app.status].color)}>
-                      {STATUS_META[app.status].label}
-                    </span>
-                  </div>
-                  <div className="flex gap-3 mt-0.5 flex-wrap">
-                    <span className="text-xs text-muted-foreground">{app.position}</span>
-                    <span className="text-xs text-muted-foreground">{app.branch}</span>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {app.date}
-                    </span>
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-4">
+                  <div className="w-9 h-9 rounded-full bg-muted animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+                    <div className="h-2 w-48 bg-muted animate-pulse rounded" />
                   </div>
                 </div>
-              </div>
-              <button
-                onClick={() => { setViewing(app); setNote(""); }}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Eye className="w-3 h-3" /> Review
-              </button>
-            </div>
-          ))}
+              ))
+            : filtered.map((app) => (
+                <div key={app.id} className="flex items-center justify-between px-4 py-4 hover:bg-muted/30 group">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0">
+                      <span className="text-sm font-bold text-primary-foreground">{app.name[0]}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-foreground">{app.name}</p>
+                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", STATUS_META[app.status].color)}>
+                          {STATUS_META[app.status].label}
+                        </span>
+                        {app.note && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-medium">
+                            has note
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-3 mt-0.5 flex-wrap">
+                        <span className="text-xs text-muted-foreground">{app.position}</span>
+                        <span className="text-xs text-muted-foreground">{app.branch}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {app.date}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => openViewing(app)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Eye className="w-3 h-3" /> Review
+                  </button>
+                </div>
+              ))}
         </div>
         {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
@@ -192,6 +231,7 @@ export default function ApplicationsPage() {
         )}
       </div>
 
+      {/* Detail modal */}
       {viewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setViewing(null)} />
@@ -215,19 +255,24 @@ export default function ApplicationsPage() {
                   <InfoField label="Experience" value={viewing.experience} />
                 </div>
               </section>
-              <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Cover Message</p>
-                <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">{viewing.message}</p>
-              </section>
+              {viewing.message && (
+                <section>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Cover Message</p>
+                  <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">{viewing.message}</p>
+                </section>
+              )}
               <section>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Internal Note</p>
                 <textarea
                   rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add notes about this candidate..."
+                  placeholder="Add HR notes about this candidate..."
                   className="w-full px-3 py-2.5 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
+                {note !== (viewing.note ?? "") && (
+                  <p className="text-xs text-muted-foreground mt-1">Unsaved changes — click Save & Close to persist</p>
+                )}
               </section>
               <section>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Update Status</p>
@@ -250,8 +295,16 @@ export default function ApplicationsPage() {
               </section>
             </div>
             <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
-              <button onClick={() => setViewing(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Close</button>
-              <button onClick={() => setViewing(null)} className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg">Save & Close</button>
+              <button onClick={() => setViewing(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">
+                Close
+              </button>
+              <button
+                onClick={async () => { await saveNote(); setViewing(null); }}
+                disabled={noteSaving}
+                className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-60"
+              >
+                {noteSaving ? "Saving…" : "Save & Close"}
+              </button>
             </div>
           </div>
         </div>
@@ -268,4 +321,3 @@ function InfoField({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
