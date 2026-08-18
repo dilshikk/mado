@@ -3,7 +3,6 @@ import { Shield, Edit2, Plus, KeyRound, Trash2, AlertCircle, Loader2, X } from "
 import { toast } from "sonner";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
-import { useAuth } from "@/hooks/use-auth.ts";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -74,8 +73,8 @@ function mapUser(item: Record<string, unknown>): TeamMember {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<TeamMember[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,8 +87,9 @@ export default function UsersPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getUsers();
+      const [data, me] = await Promise.all([api.getUsers(), api.getMe()]);
       setUsers(Array.isArray(data) ? (data as Record<string, unknown>[]).map(mapUser) : []);
+      setCurrentUserEmail(String((me as Record<string, unknown>).email ?? ""));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load team members";
       setError(message);
@@ -102,9 +102,6 @@ export default function UsersPage() {
   useEffect(() => {
     void loadUsers();
   }, []);
-
-  // The currently signed-in user's platform id (from JWT `sub`/id), used to prevent self-deletion.
-  const currentUserEmail = currentUser?.profile.email;
 
   return (
     <div className="space-y-6 max-w-4xl">
