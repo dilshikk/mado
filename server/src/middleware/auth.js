@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+export const VALID_ROLES = ['admin', 'hr', 'marketing', 'content_manager', 'restaurant_manager'];
+
 export const authenticate = (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
