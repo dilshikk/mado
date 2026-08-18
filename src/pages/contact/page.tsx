@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import {
   MapPin,
   ArrowRight,
   Send,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/form.tsx";
 import Navbar from "../_components/navbar.tsx";
 import Footer from "../_components/footer.tsx";
+import api from "@/lib/api.ts";
 
 // ─── Contact details ───────────────────────────────────────────────────────
 const CONTACT_ITEMS = [
@@ -79,6 +82,8 @@ const selectCls =
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Contact() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
@@ -90,11 +95,30 @@ export default function Contact() {
     },
   });
 
-  const onSubmit = (values: ContactFormValues) => {
-    toast.success("Сообщение отправлено!", {
-      description: `Спасибо, ${values.fullName}! Мы свяжемся с вами в ближайшее время.`,
-    });
-    form.reset();
+  const onSubmit = async (values: ContactFormValues) => {
+    setIsSubmitting(true);
+    try {
+      await api.createRequest({
+        type: "contact",
+        name: values.fullName,
+        phone: values.phone,
+        email: values.email,
+        message: `[${values.subject}] ${values.message}`,
+      });
+      toast.success("Сообщение отправлено!", {
+        description: `Спасибо, ${values.fullName}! Мы свяжемся с вами в ближайшее время.`,
+      });
+      form.reset();
+    } catch (error) {
+      toast.error("Не удалось отправить сообщение", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "Пожалуйста, попробуйте ещё раз или свяжитесь с нами по телефону.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -231,7 +255,7 @@ export default function Contact() {
                       <FormItem>
                         <FormLabel>Полное имя</FormLabel>
                         <FormControl>
-                          <Input placeholder="Иван Иванов" {...field} />
+                          <Input placeholder="Иван Иванов" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -244,7 +268,7 @@ export default function Contact() {
                       <FormItem>
                         <FormLabel>Номер телефона</FormLabel>
                         <FormControl>
-                          <Input placeholder="+998 90 000 00 00" {...field} />
+                          <Input placeholder="+998 90 000 00 00" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -257,7 +281,7 @@ export default function Contact() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="example@gmail.com" {...field} />
+                          <Input placeholder="example@gmail.com" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -270,7 +294,7 @@ export default function Contact() {
                       <FormItem>
                         <FormLabel>Тема обращения</FormLabel>
                         <FormControl>
-                          <select className={selectCls} {...field}>
+                          <select className={selectCls} {...field} disabled={isSubmitting}>
                             <option value="">Выберите тему</option>
                             {SUBJECTS.map((s) => (
                               <option key={s} value={s}>
@@ -294,6 +318,7 @@ export default function Contact() {
                             rows={5}
                             placeholder="Как мы можем вам помочь?"
                             {...field}
+                            disabled={isSubmitting}
                           />
                         </FormControl>
                         <FormMessage />
@@ -303,9 +328,18 @@ export default function Contact() {
                   <Button
                     type="submit"
                     size="lg"
+                    disabled={isSubmitting}
                     className="cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 sm:col-span-2"
                   >
-                    Отправить сообщение <Send className="size-4" />
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" /> Отправка...
+                      </>
+                    ) : (
+                      <>
+                        Отправить сообщение <Send className="size-4" />
+                      </>
+                    )}
                   </Button>
                 </form>
               </Form>
