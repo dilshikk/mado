@@ -36,7 +36,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create FAQ item
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { question_ru, answer_ru, category } = req.body;
 
   if (!question_ru || !answer_ru || !category) {
@@ -53,7 +53,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update FAQ item
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const { question_ru, question_uz, question_en, question_tr, answer_ru, answer_uz, answer_en, answer_tr, category } = req.body;
 
