@@ -18,6 +18,9 @@ const initDb = async () => {
       )
     `);
 
+    // Safe migration: avatar_url column
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)`);
+
     // Settings table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
