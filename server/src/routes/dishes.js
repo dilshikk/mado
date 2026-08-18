@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create dish
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const {
     category_id,
     name_ru, name_uz, name_en, name_tr,
@@ -104,7 +104,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update dish
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const {
     name_ru, name_uz, name_en, name_tr,
@@ -156,7 +156,7 @@ router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res
 });
 
 // Delete dish
-router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.delete('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query('DELETE FROM dishes WHERE id = $1 RETURNING id, name_ru', [id]);
@@ -175,7 +175,7 @@ router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, 
 });
 
 // Bulk update status
-router.put('/bulk/status', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { ids, status } = req.body;
 
   if (!ids || !Array.isArray(ids) || !status) {
