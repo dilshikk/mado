@@ -26,22 +26,22 @@ type CateringRequest = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<RequestStatus, { label: string; color: string }> = {
-  new:         { label: "New",         color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  in_progress: { label: "In Progress", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  contacted:   { label: "Contacted",   color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
-  confirmed:   { label: "Confirmed",   color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-  completed:   { label: "Completed",   color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
-  cancelled:   { label: "Cancelled",   color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+  new:         { label: "Новая",        color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  in_progress: { label: "В работе",     color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  contacted:   { label: "Связались",    color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  confirmed:   { label: "Подтверждена", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  completed:   { label: "Завершена",    color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+  cancelled:   { label: "Отменена",     color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
 const FILTERS: { label: string; value: "all" | RequestStatus }[] = [
-  { label: "All",         value: "all" },
-  { label: "New",         value: "new" },
-  { label: "In Progress", value: "in_progress" },
-  { label: "Contacted",   value: "contacted" },
-  { label: "Confirmed",   value: "confirmed" },
-  { label: "Completed",   value: "completed" },
-  { label: "Cancelled",   value: "cancelled" },
+  { label: "Все",          value: "all" },
+  { label: "Новая",        value: "new" },
+  { label: "В работе",     value: "in_progress" },
+  { label: "Связались",    value: "contacted" },
+  { label: "Подтверждена", value: "confirmed" },
+  { label: "Завершена",    value: "completed" },
+  { label: "Отменена",     value: "cancelled" },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export default function CateringRequestsPage() {
       const data: CateringRequest[] = await api.getCateringRequests();
       setRequests(data);
     } catch {
-      toast.error("Failed to load catering requests");
+      toast.error("Не удалось загрузить заявки кейтеринга");
     } finally {
       setLoading(false);
     }
@@ -70,12 +70,10 @@ export default function CateringRequestsPage() {
 
   useEffect(() => { void loadRequests(); }, [loadRequests]);
 
-  // Sync note textarea when modal opens
   useEffect(() => {
     if (viewing) setNote(viewing.note ?? "");
   }, [viewing?.id]);
 
-  // ─── Filtered list ──────────────────────────────────────────────────────────
   const filtered = requests.filter((r) => {
     const matchFilter = filter === "all" || r.status === filter;
     const q = search.toLowerCase();
@@ -86,7 +84,6 @@ export default function CateringRequestsPage() {
     return matchFilter && matchSearch;
   });
 
-  // ─── Status update ──────────────────────────────────────────────────────────
   const updateStatus = async (id: number, status: RequestStatus) => {
     try {
       setUpdatingStatus(true);
@@ -94,13 +91,12 @@ export default function CateringRequestsPage() {
       setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
       if (viewing?.id === id) setViewing((v) => v ? { ...v, status } : v);
     } catch {
-      toast.error("Failed to update status");
+      toast.error("Не удалось обновить статус");
     } finally {
       setUpdatingStatus(false);
     }
   };
 
-  // ─── Save note ──────────────────────────────────────────────────────────────
   const saveNote = async () => {
     if (!viewing) return;
     try {
@@ -111,9 +107,9 @@ export default function CateringRequestsPage() {
       });
       setRequests((prev) => prev.map((r) => r.id === viewing.id ? { ...r, note } : r));
       setViewing((v) => v ? { ...v, note } : v);
-      toast.success("Note saved");
+      toast.success("Заметка сохранена");
     } catch {
-      toast.error("Failed to save note");
+      toast.error("Не удалось сохранить заметку");
     } finally {
       setSavingNote(false);
     }
@@ -124,10 +120,9 @@ export default function CateringRequestsPage() {
     setViewing(null);
   };
 
-  // ─── CSV export ─────────────────────────────────────────────────────────────
   const handleExport = () => {
     if (filtered.length === 0) return;
-    const header = ["ID", "Name", "Phone", "Email", "Event", "Date", "Guests", "Budget", "Status", "Note"];
+    const header = ["ID", "Имя", "Телефон", "Email", "Мероприятие", "Дата", "Гостей", "Бюджет", "Статус", "Заметка"];
     const rows = filtered.map((r) => [
       String(r.id), r.name, r.phone, r.email, r.event_type,
       r.event_date, String(r.guest_count), r.budget ?? "",
@@ -145,7 +140,6 @@ export default function CateringRequestsPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ─── Stat counts ────────────────────────────────────────────────────────────
   const counts = (FILTERS.slice(1) as { label: string; value: RequestStatus }[]).map((f) => ({
     ...f,
     count: requests.filter((r) => r.status === f.value).length,
@@ -165,18 +159,18 @@ export default function CateringRequestsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-serif font-bold">Catering Requests</h1>
+          <h1 className="text-2xl font-serif font-bold">Заявки кейтеринга</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {loading
-              ? "Loading…"
-              : `${requests.filter((r) => r.status === "new").length} new · ${requests.filter((r) => r.status === "confirmed").length} confirmed`}
+              ? "Загрузка…"
+              : `${requests.filter((r) => r.status === "new").length} новых · ${requests.filter((r) => r.status === "confirmed").length} подтверждённых`}
           </p>
         </div>
         <button
           onClick={handleExport}
           className="flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted"
         >
-          <Download className="w-4 h-4" /> Export
+          <Download className="w-4 h-4" /> Экспорт
         </button>
       </div>
 
@@ -206,7 +200,7 @@ export default function CateringRequestsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, event..."
+            placeholder="Поиск по имени, мероприятию..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -226,7 +220,6 @@ export default function CateringRequestsPage() {
         </div>
       </div>
 
-      {/* Loading skeleton */}
       {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -235,7 +228,6 @@ export default function CateringRequestsPage() {
         </div>
       )}
 
-      {/* Request list */}
       {!loading && (
         <div className="space-y-3">
           {filtered.map((req) => (
@@ -254,7 +246,7 @@ export default function CateringRequestsPage() {
                 <p className="font-semibold text-foreground">{req.name}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
                   <span>{req.phone}</span>
-                  <span>{req.event_date} · {req.guest_count} guests</span>
+                  <span>{req.event_date} · {req.guest_count} гостей</span>
                   {req.budget && <span>{req.budget}</span>}
                 </div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -265,13 +257,13 @@ export default function CateringRequestsPage() {
                 onClick={() => setViewing(req)}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
-                <Eye className="w-3.5 h-3.5" /> Open
+                <Eye className="w-3.5 h-3.5" /> Открыть
               </button>
             </div>
           ))}
           {filtered.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
-              <p className="text-sm">No requests match your filters</p>
+              <p className="text-sm">Заявки не найдены</p>
             </div>
           )}
         </div>
@@ -283,10 +275,9 @@ export default function CateringRequestsPage() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setViewing(null)} />
           <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto">
 
-            {/* Modal header */}
             <div className="sticky top-0 bg-card px-6 py-4 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="font-serif font-bold">Request #{viewing.id}</h2>
+                <h2 className="font-serif font-bold">Заявка #{viewing.id}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">{viewing.event_type} · {formatDate(viewing.created_at)}</p>
               </div>
               <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", STATUS_META[viewing.status].color)}>
@@ -295,44 +286,40 @@ export default function CateringRequestsPage() {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Contact info */}
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Contact</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Контакт</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <InfoField label="Name"      value={viewing.name} />
-                  <InfoField label="Phone"     value={viewing.phone} />
-                  <InfoField label="Email"     value={viewing.email} />
-                  <InfoField label="Submitted" value={formatDate(viewing.created_at)} />
+                  <InfoField label="Имя"      value={viewing.name} />
+                  <InfoField label="Телефон"  value={viewing.phone} />
+                  <InfoField label="Email"    value={viewing.email} />
+                  <InfoField label="Подано"   value={formatDate(viewing.created_at)} />
                 </div>
               </section>
 
-              {/* Event details */}
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Event Details</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Детали мероприятия</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <InfoField label="Event Type" value={viewing.event_type} />
-                  <InfoField label="Date"        value={viewing.event_date} />
-                  <InfoField label="Guests"      value={String(viewing.guest_count)} />
-                  <InfoField label="Budget"      value={viewing.budget ?? "—"} />
+                  <InfoField label="Тип мероприятия" value={viewing.event_type} />
+                  <InfoField label="Дата"             value={viewing.event_date} />
+                  <InfoField label="Гостей"           value={String(viewing.guest_count)} />
+                  <InfoField label="Бюджет"           value={viewing.budget ?? "—"} />
                 </div>
               </section>
 
-              {/* Message */}
               {viewing.message && (
                 <section>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Message</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Сообщение</p>
                   <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">{viewing.message}</p>
                 </section>
               )}
 
-              {/* Internal note */}
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Internal Note</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Внутренняя заметка</p>
                 <textarea
                   rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add a note for your team..."
+                  placeholder="Заметка для команды..."
                   className="w-full px-3 py-2.5 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
                 <button
@@ -341,13 +328,12 @@ export default function CateringRequestsPage() {
                   className="mt-2 px-4 py-1.5 text-xs font-medium bg-muted text-muted-foreground rounded-lg disabled:opacity-40 hover:bg-muted/80 flex items-center gap-1.5"
                 >
                   {savingNote && <Loader2 className="w-3 h-3 animate-spin" />}
-                  {savingNote ? "Saving…" : "Save note"}
+                  {savingNote ? "Сохранение…" : "Сохранить заметку"}
                 </button>
               </section>
 
-              {/* Status workflow */}
               <section>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Update Status</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Изменить статус</p>
                 <div className="flex flex-wrap gap-2">
                   {(Object.keys(STATUS_META) as RequestStatus[]).map((s) => (
                     <button
@@ -368,13 +354,12 @@ export default function CateringRequestsPage() {
               </section>
             </div>
 
-            {/* Footer */}
             <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex gap-3">
               <button
                 onClick={() => setViewing(null)}
                 className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg"
               >
-                Close
+                Закрыть
               </button>
               <button
                 onClick={saveNoteAndClose}
@@ -382,7 +367,7 @@ export default function CateringRequestsPage() {
                 className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2 disabled:opacity-70"
               >
                 {savingNote && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save & Close
+                Сохранить и закрыть
               </button>
             </div>
           </div>
