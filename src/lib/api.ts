@@ -12,6 +12,22 @@ interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
 
+/** Safely parse JSON from a Response. Returns null if body is empty or not JSON. */
+async function safeJson(response: Response): Promise<unknown> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    // Not JSON — return a generic error object so callers can read .error
+    return { error: `Server error (${response.status})` };
+  }
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { error: `Invalid JSON response (${response.status})` };
+  }
+}
+
 class ApiClient {
   token: string | null;
 
@@ -54,21 +70,26 @@ class ApiClient {
     try {
       const response = await fetch(url, { ...options, headers });
 
+      // Handle 401: clear token and redirect — must return to stop further processing
       if (response.status === 401) {
         this.clearToken();
         window.location.href = '/admin/login';
+        throw new Error('Unauthorized');
       }
 
-      const data: unknown = await response.json();
+      const data = await safeJson(response);
 
       if (!response.ok) {
         const errData = data as { error?: string };
-        throw new Error(errData.error ?? 'API Error');
+        throw new Error(errData?.error ?? `Request failed (${response.status})`);
       }
 
       return data;
     } catch (error) {
-      console.error('API Request Error:', error);
+      // Don't log the "Unauthorized" throw we did ourselves
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        console.error('API Request Error:', error);
+      }
       throw error;
     }
   }
@@ -80,15 +101,17 @@ class ApiClient {
 
     const response = await fetch(url, { method: 'POST', headers, body: formData });
 
+    // Handle 401: clear token and redirect — must return to stop further processing
     if (response.status === 401) {
       this.clearToken();
       window.location.href = '/admin/login';
+      throw new Error('Unauthorized');
     }
 
-    const data: unknown = await response.json();
+    const data = await safeJson(response);
     if (!response.ok) {
       const errData = data as { error?: string };
-      throw new Error(errData.error ?? 'Upload failed');
+      throw new Error(errData?.error ?? `Upload failed (${response.status})`);
     }
     return data;
   }
