@@ -66,7 +66,7 @@ router.post('/requests', async (req, res) => {
 });
 
 // Update catering request status
-router.patch('/requests/:id/status', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.patch('/requests/:id/status', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -93,7 +93,7 @@ router.patch('/requests/:id/status', authenticate, authorize(['admin', 'editor']
 });
 
 // Update internal note for a catering request
-router.patch('/requests/:id/note', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.patch('/requests/:id/note', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { id } = req.params;
   const { note } = req.body;
 
@@ -133,7 +133,7 @@ router.get('/content', async (req, res) => {
 });
 
 // Update catering page content
-router.put('/content', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/content', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { lang, content } = req.body;
 
   if (!lang || !content) {
