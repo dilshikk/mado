@@ -44,7 +44,7 @@ const getDishDisplayName = (dish: Dish) => {
     (value) => typeof value === "string" && value.trim() !== ""
   );
 
-  return name?.trim() || "No translations yet";
+  return name?.trim() || "Нет перевода";
 };
 
 const getDishTranslationPreview = (dish: Dish) => {
@@ -52,7 +52,7 @@ const getDishTranslationPreview = (dish: Dish) => {
     (value): value is string => typeof value === "string" && value.trim() !== ""
   );
 
-  return values.length > 0 ? values.slice(0, 3).join(" • ") : "No translations yet";
+  return values.length > 0 ? values.slice(0, 3).join(" • ") : "Нет перевода";
 };
 
 export default function DishesPage() {
@@ -64,15 +64,14 @@ export default function DishesPage() {
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | DishStatus>("all");
   const [selected, setSelected] = useState<Set<string | number>>(new Set());
-  
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
-  
+
   const [showBulkStatus, setShowBulkStatus] = useState(false);
 
-  // Load categories
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -80,14 +79,13 @@ export default function DishesPage() {
         const cats = Array.isArray(data) ? data : [];
         setCategories(cats && cats.length > 0 ? cats : []);
       } catch (err) {
-        console.error('Failed to load categories:', err);
+        console.error("Failed to load categories:", err);
         setCategories([]);
       }
     };
     loadCategories();
   }, []);
 
-  // Load dishes
   const loadDishes = async () => {
     try {
       setLoading(true);
@@ -95,7 +93,7 @@ export default function DishesPage() {
       const data = await api.getDishes();
       setDishes(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dishes');
+      setError(err instanceof Error ? err.message : "Не удалось загрузить блюда");
     } finally {
       setLoading(false);
     }
@@ -105,7 +103,6 @@ export default function DishesPage() {
     loadDishes();
   }, []);
 
-  // Filter dishes
   const filtered = useMemo(() => {
     return dishes.filter((dish) => {
       const q = search.toLowerCase();
@@ -123,10 +120,9 @@ export default function DishesPage() {
     });
   }, [dishes, search, categoryFilter, statusFilter]);
 
-  // Handle add/edit
-  const handleSubmit = async (formData: any) => {
+  const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
-      setSavingId(editingId || 'new');
+      setSavingId(editingId || "new");
       const dataToSend = {
         ...formData,
         price: String(formData.price),
@@ -140,37 +136,35 @@ export default function DishesPage() {
       setShowForm(false);
       setEditingId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      setError(err instanceof Error ? err.message : "Не удалось сохранить");
     } finally {
       setSavingId(null);
     }
   };
 
-  // Handle delete
   const handleDelete = async (id: string | number) => {
-    if (!confirm('Удалить это блюдо?')) return;
+    if (!confirm("Удалить это блюдо?")) return;
     try {
       setDeletingId(id);
       await api.deleteDish(id);
       await loadDishes();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete');
+      setError(err instanceof Error ? err.message : "Не удалось удалить");
     } finally {
       setDeletingId(null);
     }
   };
 
-  // Handle bulk status update
   const handleBulkStatusUpdate = async (newStatus: DishStatus) => {
     if (selected.size === 0) return;
     try {
-      setSavingId('bulk');
+      setSavingId("bulk");
       await api.bulkUpdateDishStatus(Array.from(selected), newStatus);
       await loadDishes();
       setSelected(new Set());
       setShowBulkStatus(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update');
+      setError(err instanceof Error ? err.message : "Не удалось обновить");
     } finally {
       setSavingId(null);
     }
@@ -187,7 +181,7 @@ export default function DishesPage() {
     if (selected.size === filtered.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map(d => d.id)));
+      setSelected(new Set(filtered.map((d) => d.id)));
     }
   };
 
@@ -204,16 +198,16 @@ export default function DishesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Menu Dishes</h1>
-          <p className="text-gray-500">{filtered.length} dishes</p>
+          <h1 className="text-3xl font-bold">Блюда меню</h1>
+          <p className="text-gray-500">{filtered.length} блюд</p>
         </div>
         <button
           onClick={() => { setEditingId(null); setShowForm(true); }}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-          disabled={savingId === 'new'}
+          disabled={savingId === "new"}
         >
           <Plus className="w-4 h-4" />
-          Add Dish
+          Добавить блюдо
         </button>
       </div>
 
@@ -224,10 +218,7 @@ export default function DishesPage() {
           <div className="flex-1">
             <p className="text-red-800">{error}</p>
           </div>
-          <button
-            onClick={() => setError(null)}
-            className="text-red-600 hover:text-red-800"
-          >
+          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -248,21 +239,21 @@ export default function DishesPage() {
 
         <select
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+          onChange={(e) => setCategoryFilter(e.target.value === "all" ? "all" : parseInt(e.target.value))}
           className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
-          <option value="all">All categories</option>
-          {categories.map(cat => (
+          <option value="all">Все категории</option>
+          {categories.map((cat) => (
             <option key={cat.id} value={cat.id}>{cat.label}</option>
           ))}
         </select>
 
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | DishStatus)}
           className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
-          <option value="all">All statuses</option>
+          <option value="all">Все статусы</option>
           <option value="published">Опубликовано</option>
           <option value="draft">Черновик</option>
           <option value="hidden">Скрыто</option>
@@ -279,15 +270,15 @@ export default function DishesPage() {
             onChange={toggleAll}
             className="w-4 h-4"
           />
-          <span className="text-sm">{selected.size} selected</span>
+          <span className="text-sm">{selected.size} выбрано</span>
           <div className="flex-1" />
           <div className="relative">
             <button
               onClick={() => setShowBulkStatus(!showBulkStatus)}
               className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              disabled={savingId === 'bulk'}
+              disabled={savingId === "bulk"}
             >
-              {savingId === 'bulk' ? '⏳ Updating...' : 'Change status'}
+              {savingId === "bulk" ? "Обновление..." : "Изменить статус"}
             </button>
             {showBulkStatus && (
               <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-10">
@@ -309,7 +300,7 @@ export default function DishesPage() {
       {/* Dishes table */}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">No dishes found</p>
+          <p className="text-gray-500">Блюда не найдены</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -328,10 +319,10 @@ export default function DishesPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium truncate">{getDishDisplayName(dish)}</p>
-                  {dish.is_new && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">🆕 New</span>}
-                  {dish.is_signature && <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">⭐ Signature</span>}
-                  {dish.is_vegetarian && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">🥗 Veg</span>}
-                  {dish.is_spicy && <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌶️ Spicy</span>}
+                  {dish.is_new && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">🆕 Новое</span>}
+                  {dish.is_signature && <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">⭐ Фирм.</span>}
+                  {dish.is_vegetarian && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">🥗 Вег</span>}
+                  {dish.is_spicy && <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌶️ Остр</span>}
                 </div>
                 <p className="text-xs text-gray-500 truncate">
                   {getDishTranslationPreview(dish)}
@@ -380,9 +371,9 @@ export default function DishesPage() {
             <DishForm
               onClose={() => setShowForm(false)}
               onSubmit={handleSubmit}
-              initialData={editingId ? dishes.find(d => d.id === editingId) ? {
-                ...dishes.find(d => d.id === editingId)!,
-                price: String(dishes.find(d => d.id === editingId)!.price),
+              initialData={editingId ? dishes.find((d) => d.id === editingId) ? {
+                ...dishes.find((d) => d.id === editingId)!,
+                price: String(dishes.find((d) => d.id === editingId)!.price),
               } : undefined : undefined}
               categories={categories}
               loading={savingId !== null}
