@@ -70,7 +70,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create vacancy
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'hr']), async (req, res) => {
   const {
     position, position_ru, position_uz, position_en, position_tr,
     department, branch, employment_type, salary, status = 'published',
@@ -106,7 +106,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update vacancy
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'hr']), async (req, res) => {
   const { id } = req.params;
   const {
     position, position_ru, position_uz, position_en, position_tr,
