@@ -38,9 +38,9 @@ type Location = {
 };
 
 const STATUS_META: Record<VacancyStatus, { label: string; color: string }> = {
-  published: { label: "Published", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-  draft: { label: "Draft", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  closed: { label: "Closed", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+  published: { label: "Опубликована", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+  draft: { label: "Черновик", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
+  closed: { label: "Закрыта", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
 };
 
 const LANG_TABS = [
@@ -122,7 +122,7 @@ export default function VacanciesPage() {
         status: String(l.status ?? "open"),
       })));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить данные");
     } finally {
       setLoading(false);
     }
@@ -134,7 +134,6 @@ export default function VacanciesPage() {
 
   const openAdd = () => {
     const empty = emptyVacancy();
-    // Default branch to first open location name if available
     const firstOpen = locations.find((l) => l.status === "open");
     if (firstOpen) {
       empty.branch = firstOpen.name_ru || firstOpen.name;
@@ -177,19 +176,19 @@ export default function VacanciesPage() {
       await load();
       setModalMode(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save vacancy");
+      setError(err instanceof Error ? err.message : "Не удалось сохранить вакансию");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this vacancy? All applications will also be removed.")) return;
+    if (!confirm("Удалить вакансию? Все отклики также будут удалены.")) return;
     try {
       await api.deleteVacancy(id);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete vacancy");
+      setError(err instanceof Error ? err.message : "Не удалось удалить вакансию");
     }
   };
 
@@ -200,16 +199,16 @@ export default function VacanciesPage() {
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-serif font-bold">Vacancies</h1>
+          <h1 className="text-2xl font-serif font-bold">Вакансии</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {publishedCount} active · {totalApps} total applications
+            {publishedCount} активных · {totalApps} всего откликов
           </p>
         </div>
         <button
           onClick={openAdd}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
         >
-          <Plus className="w-4 h-4" /> Add Vacancy
+          <Plus className="w-4 h-4" /> Добавить вакансию
         </button>
       </div>
 
@@ -231,7 +230,7 @@ export default function VacanciesPage() {
               statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
             )}
           >
-            {s === "all" ? "All" : STATUS_META[s].label}
+            {s === "all" ? "Все" : STATUS_META[s].label}
             <span className="ml-1.5 text-xs opacity-70">
               {s === "all" ? vacancies.length : vacancies.filter((v) => v.status === s).length}
             </span>
@@ -264,7 +263,6 @@ export default function VacanciesPage() {
                     <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", STATUS_META[vac.status].color)}>
                       {STATUS_META[vac.status].label}
                     </span>
-                    {/* Language fill indicator */}
                     <span className={cn(
                       "flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border",
                       filled === 4
@@ -274,7 +272,7 @@ export default function VacanciesPage() {
                         : "border-border text-muted-foreground"
                     )}>
                       <Globe className="w-3 h-3" />
-                      {filled}/4 langs
+                      {filled}/4 языков
                     </span>
                   </div>
                   <div className="flex gap-3 mt-0.5 flex-wrap">
@@ -282,7 +280,7 @@ export default function VacanciesPage() {
                       <MapPin className="w-3 h-3" /> {vac.branch || "—"}
                     </span>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Users className="w-3 h-3" /> {vac.applicationCount} applicants
+                      <Users className="w-3 h-3" /> {vac.applicationCount} откликов
                     </span>
                     <span className="text-xs text-muted-foreground">{vac.employment_type}</span>
                     {vac.salary && <span className="text-xs text-muted-foreground">{vac.salary}</span>}
@@ -293,21 +291,21 @@ export default function VacanciesPage() {
                 <button
                   onClick={() => openView(vac)}
                   className="p-2 rounded-lg border border-border hover:bg-muted text-muted-foreground text-xs"
-                  title="View"
+                  title="Просмотр"
                 >
                   <Users className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => openEdit(vac)}
                   className="p-2 rounded-lg border border-border hover:bg-muted text-muted-foreground"
-                  title="Edit"
+                  title="Редактировать"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(vac.id)}
                   className="p-2 rounded-lg border border-red-200 hover:bg-red-50 text-red-500 dark:border-red-900 dark:hover:bg-red-950"
-                  title="Delete"
+                  title="Удалить"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -318,12 +316,11 @@ export default function VacanciesPage() {
         {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">No vacancies</p>
+            <p className="text-sm">Нет вакансий</p>
           </div>
         )}
       </div>
 
-      {/* Form modal (add / edit) */}
       {(modalMode === "add" || modalMode === "edit") && target && (
         <VacancyFormModal
           vacancy={target}
@@ -336,7 +333,6 @@ export default function VacanciesPage() {
         />
       )}
 
-      {/* View modal */}
       {modalMode === "view" && target && (
         <VacancyViewModal
           vacancy={target}
@@ -370,26 +366,24 @@ function VacancyFormModal({
   const inputCls = "w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring";
   const textareaCls = `${inputCls} resize-none`;
 
-  // Branch options: locations from DB + "All branches" fallback
   const branchOptions = locations.length > 0
     ? [
         ...locations.map((l) => ({
           value: l.name_ru || l.name,
           label: `${l.name_ru || l.name}${(l.district_ru || l.district) ? ` — ${l.district_ru || l.district}` : ""}`,
         })),
-        { value: "All branches", label: "All branches" },
+        { value: "Все филиалы", label: "Все филиалы" },
       ]
-    : [{ value: "All branches", label: "All branches" }];
+    : [{ value: "Все филиалы", label: "Все филиалы" }];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
 
-        {/* Header */}
         <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4">
           <h2 className="font-serif font-bold text-lg">
-            {mode === "add" ? "Add Vacancy" : "Edit Vacancy"}
+            {mode === "add" ? "Добавить вакансию" : "Редактировать вакансию"}
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted">
             <X className="w-5 h-5" />
@@ -401,9 +395,8 @@ function VacancyFormModal({
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-accent" />
-              <span className="text-sm font-semibold">Position name by language</span>
+              <span className="text-sm font-semibold">Название должности по языкам</span>
             </div>
-            {/* Lang tabs */}
             <div className="flex gap-1 mb-3 border border-border rounded-lg p-1 w-fit">
               {LANG_TABS.map(({ key, label, flag, name }) => (
                 <button
@@ -422,12 +415,12 @@ function VacancyFormModal({
             {LANG_TABS.map(({ key, name, flag }) => (
               <div key={key} className={activeLang === key ? "block" : "hidden"}>
                 <label className="text-sm font-medium mb-1.5 block">
-                  {flag} Position name in {name}
+                  {flag} Название на {name}
                 </label>
                 <input
                   value={String(vacancy[`position_${key}` as keyof Vacancy] ?? "")}
                   onChange={(e) => set(`position_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
-                  placeholder={`E.g. Waiter, Cashier...`}
+                  placeholder={`Например, Официант, Кассир...`}
                   className={inputCls}
                 />
               </div>
@@ -436,42 +429,42 @@ function VacancyFormModal({
 
           {/* ── Section: Basic info ── */}
           <section>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Basic Info</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Основная информация</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Department</label>
+                <label className="text-sm font-medium mb-1.5 block">Отдел</label>
                 <select value={vacancy.department} onChange={(e) => set("department", e.target.value)} className={inputCls}>
                   {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Branch / Restaurant</label>
+                <label className="text-sm font-medium mb-1.5 block">Филиал / Ресторан</label>
                 <select
                   value={vacancy.branch}
                   onChange={(e) => set("branch", e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">— Select restaurant —</option>
+                  <option value="">— Выберите ресторан —</option>
                   {branchOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
                 {locations.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">No restaurants in DB — add them in Locations first</p>
+                  <p className="text-xs text-muted-foreground mt-1">Нет ресторанов в БД — добавьте в разделе Филиалы</p>
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Employment Type</label>
+                <label className="text-sm font-medium mb-1.5 block">Тип занятости</label>
                 <select value={vacancy.employment_type} onChange={(e) => set("employment_type", e.target.value)} className={inputCls}>
                   {TYPES.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Salary</label>
+                <label className="text-sm font-medium mb-1.5 block">Зарплата</label>
                 <input
                   value={vacancy.salary}
                   onChange={(e) => set("salary", e.target.value)}
-                  placeholder="e.g. 4,000,000 UZS"
+                  placeholder="например, 4 000 000 сум"
                   className={inputCls}
                 />
               </div>
@@ -482,7 +475,7 @@ function VacancyFormModal({
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-accent" />
-              <span className="text-sm font-semibold">Description & Requirements by language</span>
+              <span className="text-sm font-semibold">Описание и требования по языкам</span>
             </div>
 
             <div className="flex gap-1 mb-3 border border-border rounded-lg p-1 w-fit">
@@ -504,22 +497,22 @@ function VacancyFormModal({
             {LANG_TABS.map(({ key, name }) => (
               <div key={key} className={cn("space-y-3", activeLang === key ? "block" : "hidden")}>
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">Description — {name}</label>
+                  <label className="text-sm font-medium mb-1.5 block">Описание — {name}</label>
                   <textarea
                     rows={3}
                     value={String(vacancy[`description_${key}` as keyof Vacancy] ?? "")}
                     onChange={(e) => set(`description_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
-                    placeholder={`Role description in ${name}...`}
+                    placeholder={`Описание роли на ${name}...`}
                     className={textareaCls}
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">Requirements — {name}</label>
+                  <label className="text-sm font-medium mb-1.5 block">Требования — {name}</label>
                   <textarea
                     rows={3}
                     value={String(vacancy[`requirements_${key}` as keyof Vacancy] ?? "")}
                     onChange={(e) => set(`requirements_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
-                    placeholder={`• Requirement 1\n• Requirement 2`}
+                    placeholder={`• Требование 1\n• Требование 2`}
                     className={textareaCls}
                   />
                 </div>
@@ -529,7 +522,7 @@ function VacancyFormModal({
 
           {/* ── Status ── */}
           <section>
-            <label className="text-sm font-medium mb-2 block">Status</label>
+            <label className="text-sm font-medium mb-2 block">Статус</label>
             <div className="flex gap-2">
               {(["published", "draft", "closed"] as VacancyStatus[]).map((s) => (
                 <label key={s} className={cn(
@@ -545,17 +538,16 @@ function VacancyFormModal({
           </section>
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">
-            Cancel
+            Отмена
           </button>
           <button
             onClick={onSave}
             disabled={saving}
             className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Vacancy"}
+            <Save className="w-4 h-4" /> {saving ? "Сохранение…" : "Сохранить вакансию"}
           </button>
         </div>
       </div>
@@ -588,18 +580,17 @@ function VacancyViewModal({
         <div className="p-6 space-y-4">
           <div className="flex flex-wrap gap-3 text-sm">
             <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /> {vacancy.branch || "—"}</span>
-            <span className="flex items-center gap-1 text-muted-foreground"><Users className="w-3.5 h-3.5" /> {vacancy.applicationCount} applicants</span>
+            <span className="flex items-center gap-1 text-muted-foreground"><Users className="w-3.5 h-3.5" /> {vacancy.applicationCount} откликов</span>
           </div>
           {vacancy.salary && (
             <div className="bg-muted/50 rounded-xl px-4 py-3">
-              <p className="text-xs text-muted-foreground">Salary</p>
+              <p className="text-xs text-muted-foreground">Зарплата</p>
               <p className="text-sm font-semibold mt-0.5">{vacancy.salary}</p>
             </div>
           )}
 
-          {/* Position names all languages */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Position names</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Названия должности</p>
             <div className="grid grid-cols-2 gap-2">
               {LANG_TABS.map(({ key, flag, label }) => {
                 const val = String(vacancy[`position_${key}` as keyof Vacancy] ?? "");
@@ -613,9 +604,8 @@ function VacancyViewModal({
             </div>
           </div>
 
-          {/* Lang tabs for description */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Content</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Контент</p>
             <div className="flex gap-1 mb-3 border border-border rounded-lg p-1 w-fit">
               {LANG_TABS.map(({ key, label, flag }) => (
                 <button key={key} onClick={() => setActiveLang(key)}
@@ -634,13 +624,13 @@ function VacancyViewModal({
                 <div key={key} className={activeLang === key ? "space-y-3" : "hidden"}>
                   {desc ? (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Description</p>
+                      <p className="text-xs text-muted-foreground mb-1">Описание</p>
                       <p className="text-sm leading-relaxed text-foreground/80">{desc}</p>
                     </div>
-                  ) : <p className="text-sm text-muted-foreground italic">No description</p>}
+                  ) : <p className="text-sm text-muted-foreground italic">Нет описания</p>}
                   {req && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Requirements</p>
+                      <p className="text-xs text-muted-foreground mb-1">Требования</p>
                       <p className="text-sm whitespace-pre-line leading-relaxed text-foreground/80">{req}</p>
                     </div>
                   )}
@@ -650,9 +640,9 @@ function VacancyViewModal({
           </div>
         </div>
         <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Close</button>
+          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Закрыть</button>
           <button onClick={onEdit} className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2">
-            <Edit2 className="w-4 h-4" /> Edit
+            <Edit2 className="w-4 h-4" /> Редактировать
           </button>
         </div>
       </div>
