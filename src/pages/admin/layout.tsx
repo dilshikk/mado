@@ -60,59 +60,59 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "",
     items: [
-      { label: "Dashboard", icon: LayoutDashboard, href: "/admin", section: "dashboard" },
+      { label: "Дашборд", icon: LayoutDashboard, href: "/admin", section: "dashboard" },
     ],
   },
   {
-    title: "CONTENT",
+    title: "КОНТЕНТ",
     items: [
-      { label: "Pages", icon: FileText, href: "/admin/pages", section: "pages" },
+      { label: "Страницы", icon: FileText, href: "/admin/pages", section: "pages" },
       {
-        label: "Menu",
+        label: "Меню",
         icon: UtensilsCrossed,
         section: "menu",
         children: [
-          { label: "Categories", href: "/admin/menu/categories" },
-          { label: "Dishes", href: "/admin/menu/dishes" },
+          { label: "Категории", href: "/admin/menu/categories" },
+          { label: "Блюда", href: "/admin/menu/dishes" },
         ],
       },
-      { label: "Locations", icon: MapPin, href: "/admin/locations", section: "locations" },
+      { label: "Филиалы", icon: MapPin, href: "/admin/locations", section: "locations" },
       {
-        label: "Catering",
+        label: "Кейтеринг",
         icon: PartyPopper,
         section: "catering",
         children: [
-          { label: "Content", href: "/admin/catering/content" },
-          { label: "Requests", href: "/admin/catering/requests" },
+          { label: "Контент", href: "/admin/catering/content" },
+          { label: "Заявки", href: "/admin/catering/requests" },
         ],
       },
-      { label: "Promotions", icon: Tag, href: "/admin/promotions", section: "promotions" },
-      { label: "Media", icon: Image, href: "/admin/media", section: "media" },
+      { label: "Акции", icon: Tag, href: "/admin/promotions", section: "promotions" },
+      { label: "Медиатека", icon: Image, href: "/admin/media", section: "media" },
     ],
   },
   {
-    title: "BUSINESS",
+    title: "БИЗНЕС",
     items: [
-      { label: "Requests", icon: Inbox, href: "/admin/requests", section: "requests" },
+      { label: "Заявки", icon: Inbox, href: "/admin/requests", section: "requests" },
       {
-        label: "Careers",
+        label: "Вакансии",
         icon: Briefcase,
         section: "careers",
         children: [
-          { label: "Vacancies", href: "/admin/careers/vacancies" },
-          { label: "Applications", href: "/admin/careers/applications" },
+          { label: "Вакансии", href: "/admin/careers/vacancies" },
+          { label: "Отклики", href: "/admin/careers/applications" },
         ],
       },
-      { label: "Reviews", icon: Star, href: "/admin/reviews", section: "reviews" },
+      { label: "Отзывы", icon: Star, href: "/admin/reviews", section: "reviews" },
     ],
   },
   {
-    title: "SYSTEM",
+    title: "СИСТЕМА",
     items: [
       { label: "FAQ", icon: HelpCircle, href: "/admin/faq", section: "faq" },
-      { label: "Users & Roles", icon: Users, href: "/admin/users", section: "users" },
-      { label: "Activity Log", icon: Activity, href: "/admin/activity", section: "activity" },
-      { label: "Settings", icon: Settings, href: "/admin/settings", section: "settings" },
+      { label: "Пользователи и роли", icon: Users, href: "/admin/users", section: "users" },
+      { label: "Журнал действий", icon: Activity, href: "/admin/activity", section: "activity" },
+      { label: "Настройки", icon: Settings, href: "/admin/settings", section: "settings" },
     ],
   },
 ];
@@ -127,9 +127,9 @@ const ACTION_COLORS: Record<string, string> = {
 
 function timeAgo(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)    return `${diff}s ago`;
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60)    return `${diff} с назад`;
+  if (diff < 3600)  return `${Math.floor(diff / 60)} мин назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`;
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }
 
@@ -302,13 +302,34 @@ export default function AdminLayout() {
         const seenDate = new Date(seenAt);
         setUnreadCount(items.filter((n) => new Date(n.created_at) > seenDate).length);
       }
-    } catch { /* ignore */ }
-    finally { setNotifLoading(false); }
+    } catch {
+      // ignore
+    } finally {
+      setNotifLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    if (isAuthenticated) void loadNotifications();
-  }, [isAuthenticated, loadNotifications]);
+  const handleOpenNotifications = async () => {
+    const opening = !notifOpen;
+    setNotifOpen(opening);
+    setProfileOpen(false);
+    if (opening) {
+      await loadNotifications();
+      localStorage.setItem(NOTIFICATIONS_SEEN_KEY, new Date().toISOString());
+      setUnreadCount(0);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      localStorage.removeItem("token");
+      api.clearToken();
+      navigate("/admin/login");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -320,99 +341,78 @@ export default function AdminLayout() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleOpenNotifications = async () => {
-    const opening = !notifOpen;
-    setNotifOpen(opening);
-    setProfileOpen(false);
-    if (opening) {
-      await loadNotifications();
-      try { localStorage.setItem(NOTIFICATIONS_SEEN_KEY, new Date().toISOString()); }
-      catch { /* ignore */ }
-      setUnreadCount(0);
-    }
-  };
-
-  const handleLogout = () => {
-    setLoggingOut(true);
-    api.clearToken();
-    localStorage.removeItem("token");
-    navigate("/admin/login");
-  };
-
-  const visibleNavSections = useMemo(() => {
+  // Filter nav sections based on role
+  const visibleSections = useMemo(() => {
     if (!currentUser) return [];
     return NAV_SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) => canAccessSection(currentUser.role, item.section)),
-    })).filter((s) => s.items.length > 0);
+    })).filter((section) => section.items.length > 0);
   }, [currentUser]);
 
-  if (isAuthenticated === null) {
+  if (isAuthenticated === null || !currentUser) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <div className="space-y-3 text-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Загрузка...</p>
+        </div>
       </div>
     );
   }
 
-  if (!currentUser) return null;
-
   const sidebar = (
     <aside
       className={cn(
-        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-200",
+        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
         collapsed ? "w-14" : "w-60"
       )}
     >
       {/* Logo */}
-      <div className={cn("flex items-center gap-2 px-4 py-4 border-b border-sidebar-border", collapsed && "justify-center px-0")}>
+      <div className={cn("flex items-center gap-3 px-4 py-4 border-b border-sidebar-border", collapsed && "justify-center px-2")}>
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shrink-0">
+          <span className="font-serif text-white text-sm font-bold">M</span>
+        </div>
         {!collapsed && (
-          <span className="font-serif text-lg font-bold text-sidebar-primary tracking-wide">MADO</span>
+          <div className="min-w-0">
+            <p className="font-serif font-bold text-sidebar-foreground text-sm leading-tight">MADO</p>
+            <p className="text-[10px] text-sidebar-foreground/50 leading-tight">Панель управления</p>
+          </div>
         )}
-        <button
-          onClick={handleToggleCollapsed}
-          className="ml-auto p-1 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
-          title={collapsed ? "Expand" : "Collapse"}
-        >
-          {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-        </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-        {visibleNavSections.map((section) => (
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+        {visibleSections.map((section) => (
           <div key={section.title}>
             {section.title && !collapsed && (
-              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+              <p className="px-3 mb-1 text-[10px] font-bold text-sidebar-foreground/40 uppercase tracking-widest">
                 {section.title}
               </p>
             )}
             <div className="space-y-0.5">
               {section.items.map((item) => (
-                <NavItemComponent key={item.section} item={item} collapsed={collapsed} />
+                <NavItemComponent key={item.href ?? item.section} item={item} collapsed={collapsed} />
               ))}
             </div>
           </div>
         ))}
       </nav>
 
-      {/* Bottom user info */}
-      <div className={cn("border-t border-sidebar-border px-3 py-3", collapsed && "px-1")}>
+      {/* Sidebar footer */}
+      <div className={cn("px-2 py-3 border-t border-sidebar-border", collapsed && "flex flex-col items-center")}>
         <button
-          onClick={() => navigate("/admin/profile")}
+          onClick={handleToggleCollapsed}
           className={cn(
-            "w-full flex items-center gap-2.5 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer text-left",
-            collapsed ? "justify-center p-1.5" : "px-2 py-2"
+            "flex items-center gap-2.5 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer",
+            collapsed ? "justify-center p-1.5" : "px-2 py-2 w-full"
           )}
-          title={collapsed ? currentUser.name : undefined}
+          title={collapsed ? "Развернуть" : "Свернуть"}
         >
-          <UserAvatar user={currentUser} size="sm" />
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{currentUser.name}</p>
-              <p className="text-[10px] text-sidebar-foreground/50 truncate">{ROLE_META[currentUser.role]?.name}</p>
-            </div>
-          )}
+          {collapsed
+            ? <PanelLeftOpen className="shrink-0 w-4 h-4" />
+            : <><PanelLeftClose className="shrink-0 w-4 h-4" /><span>Свернуть</span></>
+          }
         </button>
         <button
           onClick={handleLogout}
@@ -421,10 +421,10 @@ export default function AdminLayout() {
             "w-full mt-1 flex items-center gap-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer disabled:opacity-50",
             collapsed ? "justify-center p-1.5" : "px-2 py-2"
           )}
-          title={collapsed ? "Logout" : undefined}
+          title={collapsed ? "Выйти" : undefined}
         >
           <LogOut className="shrink-0 w-4 h-4" />
-          {!collapsed && <span>{loggingOut ? "Logging out..." : "Logout"}</span>}
+          {!collapsed && <span>{loggingOut ? "Выход..." : "Выйти"}</span>}
         </button>
       </div>
     </aside>
@@ -455,7 +455,7 @@ export default function AdminLayout() {
             <div className="flex-1 relative hidden sm:block max-w-sm">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
-                placeholder="Search..."
+                placeholder="Поиск..."
                 className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -466,7 +466,7 @@ export default function AdminLayout() {
                 <button
                   onClick={() => void handleOpenNotifications()}
                   className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  title="Notifications"
+                  title="Уведомления"
                 >
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
@@ -479,12 +479,12 @@ export default function AdminLayout() {
                 {notifOpen && (
                   <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                      <span className="text-sm font-semibold">Recent Activity</span>
+                      <span className="text-sm font-semibold">Последние действия</span>
                       <button
                         onClick={() => { setNotifOpen(false); navigate("/admin/activity"); }}
                         className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 cursor-pointer"
                       >
-                        View all
+                        Смотреть все
                       </button>
                     </div>
                     <div className="max-h-80 overflow-y-auto divide-y divide-border">
@@ -499,7 +499,7 @@ export default function AdminLayout() {
                           </div>
                         ))
                       ) : notifItems.length === 0 ? (
-                        <div className="text-center py-8 text-sm text-muted-foreground">No activity yet</div>
+                        <div className="text-center py-8 text-sm text-muted-foreground">Пока нет активности</div>
                       ) : notifItems.map((item) => (
                         <div key={item.id} className="px-4 py-3 hover:bg-muted/40 transition-colors">
                           <div className="flex items-start gap-2">
@@ -527,7 +527,7 @@ export default function AdminLayout() {
                 <button
                   onClick={() => { setProfileOpen((v) => !v); setNotifOpen(false); }}
                   className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                  title="Account"
+                  title="Аккаунт"
                 >
                   <UserAvatar user={currentUser} size="sm" />
                   <span className="hidden sm:flex flex-col items-start leading-tight">
@@ -556,14 +556,14 @@ export default function AdminLayout() {
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer text-left"
                       >
                         <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
-                        My Profile
+                        Мой профиль
                       </button>
                       <button
                         onClick={() => { setProfileOpen(false); navigate("/admin/settings"); }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer text-left"
                       >
                         <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
-                        Settings
+                        Настройки
                       </button>
                     </div>
 
@@ -574,7 +574,7 @@ export default function AdminLayout() {
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer disabled:opacity-50 text-left"
                       >
                         <LogOut className="w-4 h-4 shrink-0" />
-                        {loggingOut ? "Logging out..." : "Logout"}
+                        {loggingOut ? "Выход..." : "Выйти"}
                       </button>
                     </div>
 
@@ -584,7 +584,7 @@ export default function AdminLayout() {
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer text-left"
                       >
                         <ExternalLink className="w-4 h-4 shrink-0" />
-                        Go to site
+                        Перейти на сайт
                       </button>
                     </div>
                   </div>
