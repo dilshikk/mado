@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../db/pool.js';
-import { JWT_SECRET } from '../middleware/auth.js';
+import { authenticate, authorize, JWT_SECRET } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -14,13 +14,18 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const result = await pool.query('SELECT id, name, email, password_hash, role FROM users WHERE email = $1', [email]);
-  
+  const result = await pool.query('SELECT id, name, email, password_hash, role, status FROM users WHERE email = $1', [email]);
+
   if (result.rows.length === 0) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
   const user = result.rows[0];
+
+  if (user.status === 'blocked') {
+    return res.status(403).json({ error: 'This account has been blocked' });
+  }
+
   const validPassword = await bcrypt.compare(password, user.password_hash);
 
   if (!validPassword) {
@@ -47,34 +52,35 @@ router.post('/login', async (req, res) => {
   });
 });
 
-// Register (admin only)
-router.post('/register', async (req, res) => {
+// Register a new team member (admin only)
+router.post('/register', authenticate, authorize(['admin']), async (req, res) => {
   const { name, email, password, role = 'editor' } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password required' });
   }
 
+  if (!['admin', 'editor'].includes(role)) {
+    return res.status(400).json({ error: 'Role must be admin or editor' });
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     const result = await pool.query(
-      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role',
+      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, status, last_seen, created_at',
       [name, email, hashedPassword, role, 'active']
     );
 
     const user = result.rows[0];
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+    // Log activity
+    await pool.query(
+      'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.id, 'create', 'user', user.id, `Created team member: ${user.email}`]
     );
 
-    res.json({
-      token,
-      user
-    });
+    res.status(201).json(user);
   } catch (error) {
     if (error.code === '23505') {
       return res.status(400).json({ error: 'Email already exists' });
