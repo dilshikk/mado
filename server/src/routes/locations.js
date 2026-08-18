@@ -81,7 +81,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create location
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const {
     name, name_ru, name_uz, name_en, name_tr,
     district, district_ru, district_uz, district_en, district_tr,
@@ -141,7 +141,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update location
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { id } = req.params;
   const {
     name, name_ru, name_uz, name_en, name_tr,
