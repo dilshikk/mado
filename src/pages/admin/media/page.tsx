@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload, Trash2, Copy, Check, Search, X, ChevronLeft,
   ChevronRight, Pencil, Plus, FolderOpen, ImageIcon, Loader2,
@@ -25,7 +25,8 @@ type MediaCategory = { id: number; name: string };
 type MediaFile = {
   id: number;
   filename: string;
-  file_url: string;   // relative (/uploads/...) or absolute URL
+  file_url: string;       // stored path (may be relative or old absolute)
+  full_url: string;       // always absolute, computed by server per-request
   file_size: number | null;
   file_type: string | null;
   category_id: number | null;
@@ -51,8 +52,8 @@ function formatSize(bytes: number | null): string {
 
 /**
  * Copy text to clipboard.
- * Uses the modern Clipboard API when available (https / localhost),
- * and falls back to the legacy execCommand approach for plain http sites.
+ * Uses the modern Clipboard API on https/localhost,
+ * falls back to legacy execCommand for plain http.
  */
 function copyToClipboard(text: string): void {
   if (navigator.clipboard?.writeText) {
@@ -70,21 +71,13 @@ function legacyCopy(text: string): void {
   document.body.appendChild(ta);
   ta.focus();
   ta.select();
-  try {
-    document.execCommand("copy");
-  } finally {
-    document.body.removeChild(ta);
-  }
+  try { document.execCommand("copy"); } finally { document.body.removeChild(ta); }
 }
 
 // ─── Drop Zone ────────────────────────────────────────────────────────────────
 
 function DropZone({
-  onFiles,
-  uploading,
-  categories,
-  uploadCategoryId,
-  setUploadCategoryId,
+  onFiles, uploading, categories, uploadCategoryId, setUploadCategoryId,
 }: {
   onFiles: (files: File[]) => void;
   uploading: boolean;
@@ -98,9 +91,7 @@ function DropZone({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/"),
-    );
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
     if (files.length) onFiles(files);
     else toast.error("Только изображения (JPG, PNG, WEBP, GIF)");
   };
@@ -119,46 +110,29 @@ function DropZone({
       onClick={() => !uploading && inputRef.current?.click()}
       className={cn(
         "group relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 text-center transition-all cursor-pointer select-none",
-        dragging
-          ? "border-primary bg-primary/5 scale-[1.01]"
-          : "border-border hover:border-primary/50 hover:bg-muted/30",
+        dragging ? "border-primary bg-primary/5 scale-[1.01]" : "border-border hover:border-primary/50 hover:bg-muted/30",
         uploading && "pointer-events-none opacity-60",
       )}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="sr-only"
-        onChange={handleInput}
-      />
+      <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" onChange={handleInput} />
 
       <div className={cn(
         "flex h-14 w-14 items-center justify-center rounded-full transition-colors",
         dragging ? "bg-primary/10" : "bg-muted group-hover:bg-primary/10",
       )}>
-        {uploading ? (
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        ) : (
-          <Upload className={cn("h-6 w-6 transition-colors", dragging ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
-        )}
+        {uploading
+          ? <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          : <Upload className={cn("h-6 w-6 transition-colors", dragging ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />}
       </div>
 
       <div>
         <p className="text-sm font-semibold text-foreground">
           {uploading ? "Загрузка..." : dragging ? "Отпустите файлы" : "Перетащите файлы или нажмите"}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          PNG, JPG, WEBP, GIF · до 10 МБ · несколько файлов
-        </p>
+        <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WEBP, GIF · до 10 МБ · несколько файлов</p>
       </div>
 
-      {/* Category selector inside drop zone */}
-      <div
-        className="flex items-center gap-2"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
         <label className="text-xs text-muted-foreground">Категория:</label>
         <select
           value={uploadCategoryId}
@@ -166,9 +140,7 @@ function DropZone({
           className="text-xs border border-input rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">— без категории —</option>
-          {categories.map((c) => (
-            <option key={c.id} value={String(c.id)}>{c.name}</option>
-          ))}
+          {categories.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
         </select>
       </div>
     </div>
@@ -178,10 +150,7 @@ function DropZone({
 // ─── Preview Modal ────────────────────────────────────────────────────────────
 
 function PreviewModal({
-  file,
-  files,
-  onClose,
-  onNavigate,
+  file, files, onClose, onNavigate,
 }: {
   file: MediaFile;
   files: MediaFile[];
@@ -189,7 +158,6 @@ function PreviewModal({
   onNavigate: (f: MediaFile) => void;
 }) {
   const idx = files.findIndex((f) => f.id === file.id);
-  const fullUrl = api.getFileUrl(file.file_url);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -202,27 +170,20 @@ function PreviewModal({
   }, [idx, files, onClose, onNavigate]);
 
   const copyUrl = () => {
-    copyToClipboard(fullUrl);
+    copyToClipboard(file.full_url);
     toast.success("URL скопирован");
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
       <div
         className="relative flex max-h-[90vh] max-w-4xl w-full mx-4 flex-col bg-card rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border">
           <p className="text-sm font-semibold truncate max-w-xs">{file.filename}</p>
           <div className="flex gap-2">
-            <button
-              onClick={copyUrl}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-muted hover:bg-muted/80 text-muted-foreground font-medium cursor-pointer"
-            >
+            <button onClick={copyUrl} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-muted hover:bg-muted/80 text-muted-foreground font-medium cursor-pointer">
               <Copy className="w-3 h-3" /> Скопировать URL
             </button>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted cursor-pointer">
@@ -231,33 +192,20 @@ function PreviewModal({
           </div>
         </div>
 
-        {/* Image */}
         <div className="relative flex-1 bg-muted/30 flex items-center justify-center overflow-hidden min-h-[300px]">
-          <img
-            src={fullUrl}
-            alt={file.filename}
-            className="max-h-[65vh] max-w-full object-contain"
-          />
-
+          <img src={file.full_url} alt={file.filename} className="max-h-[65vh] max-w-full object-contain" />
           {idx > 0 && (
-            <button
-              onClick={() => onNavigate(files[idx - 1])}
-              className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-card/80 backdrop-blur border border-border hover:bg-card cursor-pointer"
-            >
+            <button onClick={() => onNavigate(files[idx - 1])} className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-card/80 backdrop-blur border border-border hover:bg-card cursor-pointer">
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
           {idx < files.length - 1 && (
-            <button
-              onClick={() => onNavigate(files[idx + 1])}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-card/80 backdrop-blur border border-border hover:bg-card cursor-pointer"
-            >
+            <button onClick={() => onNavigate(files[idx + 1])} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-card/80 backdrop-blur border border-border hover:bg-card cursor-pointer">
               <ChevronRight className="w-5 h-5" />
             </button>
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-5 py-3 border-t border-border flex gap-6 text-xs text-muted-foreground flex-wrap">
           <span>Размер: {formatSize(file.file_size)}</span>
           <span>Тип: {file.file_type ?? "—"}</span>
@@ -272,9 +220,7 @@ function PreviewModal({
 // ─── Categories Manager Modal ─────────────────────────────────────────────────
 
 function CategoriesModal({
-  categories,
-  onClose,
-  onRefresh,
+  categories, onClose, onRefresh,
 }: {
   categories: MediaCategory[];
   onClose: () => void;
@@ -293,11 +239,8 @@ function CategoriesModal({
       setNewName("");
       onRefresh();
       toast.success("Категория создана");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка"); }
+    finally { setSaving(false); }
   };
 
   const handleUpdate = async (id: number) => {
@@ -308,11 +251,8 @@ function CategoriesModal({
       setEditId(null);
       onRefresh();
       toast.success("Категория обновлена");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка"); }
+    finally { setSaving(false); }
   };
 
   const handleDelete = async (id: number) => {
@@ -320,20 +260,12 @@ function CategoriesModal({
       await api.deleteMediaCategory(id);
       onRefresh();
       toast.success("Категория удалена");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Ошибка");
-    }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка"); }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md mx-4 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md mx-4 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-base font-semibold">Управление категориями</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted cursor-pointer">
@@ -342,7 +274,6 @@ function CategoriesModal({
         </div>
 
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Add new */}
           <div className="flex gap-2">
             <input
               value={newName}
@@ -360,16 +291,12 @@ function CategoriesModal({
             </button>
           </div>
 
-          {/* List */}
           {categories.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Нет категорий</p>
           ) : (
             <ul className="space-y-2">
               {categories.map((cat) => (
-                <li
-                  key={cat.id}
-                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 bg-background"
-                >
+                <li key={cat.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 bg-background">
                   {editId === cat.id ? (
                     <>
                       <input
@@ -382,27 +309,17 @@ function CategoriesModal({
                         }}
                         className="flex-1 text-sm bg-transparent border-b border-primary outline-none"
                       />
-                      <button
-                        onClick={() => handleUpdate(cat.id)}
-                        disabled={saving}
-                        className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
-                      >
+                      <button onClick={() => handleUpdate(cat.id)} disabled={saving} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer">
                         <Check className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => setEditId(null)}
-                        className="p-1 text-muted-foreground hover:bg-muted rounded cursor-pointer"
-                      >
+                      <button onClick={() => setEditId(null)} className="p-1 text-muted-foreground hover:bg-muted rounded cursor-pointer">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </>
                   ) : (
                     <>
                       <span className="flex-1 text-sm font-medium">{cat.name}</span>
-                      <button
-                        onClick={() => { setEditId(cat.id); setEditName(cat.name); }}
-                        className="p-1 text-muted-foreground hover:bg-muted rounded cursor-pointer"
-                      >
+                      <button onClick={() => { setEditId(cat.id); setEditName(cat.name); }} className="p-1 text-muted-foreground hover:bg-muted rounded cursor-pointer">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <AlertDialog>
@@ -415,16 +332,12 @@ function CategoriesModal({
                           <AlertDialogHeader>
                             <AlertDialogTitle>Удалить категорию?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Категория <strong>{cat.name}</strong> будет удалена.
-                              Файлы в ней останутся, но потеряют категорию.
+                              Категория <strong>{cat.name}</strong> будет удалена. Файлы потеряют категорию.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Отмена</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(cat.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
+                            <AlertDialogAction onClick={() => handleDelete(cat.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                               Удалить
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -445,19 +358,16 @@ function CategoriesModal({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MediaPage() {
-  // ── Data ──
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<MediaCategory[]>([]);
 
-  // ── Filters ──
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState("");
 
-  // ── UI ──
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [copied, setCopied] = useState<number | null>(null);
   const [preview, setPreview] = useState<MediaFile | null>(null);
@@ -467,7 +377,6 @@ export default function MediaPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 350);
     return () => clearTimeout(t);
@@ -483,10 +392,7 @@ export default function MediaPage() {
   const loadFiles = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = {
-        page: String(page),
-        limit: String(PAGE_SIZE),
-      };
+      const params: Record<string, string> = { page: String(page), limit: String(PAGE_SIZE) };
       if (debouncedSearch) params.search = debouncedSearch;
       if (filterCategoryId) params.category_id = filterCategoryId;
 
@@ -504,12 +410,10 @@ export default function MediaPage() {
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
-  // ── Upload ──
   const handleUpload = async (newFiles: File[]) => {
     setUploading(true);
     try {
-      const catId = uploadCategoryId || undefined;
-      await api.uploadMedia(newFiles, catId);
+      await api.uploadMedia(newFiles, uploadCategoryId || undefined);
       toast.success(`Загружено ${newFiles.length} файл(ов)`);
       setPage(1);
       loadFiles();
@@ -520,7 +424,6 @@ export default function MediaPage() {
     }
   };
 
-  // ── Delete ──
   const handleDelete = async (id: number) => {
     try {
       await api.deleteMedia(id);
@@ -546,16 +449,13 @@ export default function MediaPage() {
     }
   };
 
-  // ── Copy URL ──
-  const handleCopy = (fileUrl: string, id: number) => {
-    const fullUrl = api.getFileUrl(fileUrl);
-    copyToClipboard(fullUrl);
-    setCopied(id);
+  const handleCopy = (file: MediaFile) => {
+    copyToClipboard(file.full_url);
+    setCopied(file.id);
     toast.success("URL скопирован");
     setTimeout(() => setCopied(null), 1500);
   };
 
-  // ── Select ──
   const toggleSelect = (id: number) => {
     setSelected((prev) => {
       const s = new Set(prev);
@@ -567,15 +467,9 @@ export default function MediaPage() {
   const selectAll = () => setSelected(new Set(files.map((f) => f.id)));
   const clearSelection = () => setSelected(new Set());
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _categoryMap = useMemo(
-    () => new Map(categories.map((c) => [c.id, c.name])),
-    [categories],
-  );
-
   return (
     <div className="space-y-5 max-w-6xl">
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-serif font-bold">Медиатека</h1>
@@ -583,17 +477,15 @@ export default function MediaPage() {
             {total} файл{total === 1 ? "" : total < 5 ? "а" : "ов"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowCategories(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-background text-sm font-medium hover:bg-muted cursor-pointer"
-          >
-            <FolderOpen className="w-4 h-4" /> Категории
-          </button>
-        </div>
+        <button
+          onClick={() => setShowCategories(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-background text-sm font-medium hover:bg-muted cursor-pointer"
+        >
+          <FolderOpen className="w-4 h-4" /> Категории
+        </button>
       </div>
 
-      {/* ── Drop zone ── */}
+      {/* Drop zone */}
       <DropZone
         onFiles={handleUpload}
         uploading={uploading}
@@ -602,9 +494,8 @@ export default function MediaPage() {
         setUploadCategoryId={setUploadCategoryId}
       />
 
-      {/* ── Filters ── */}
+      {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        {/* Search */}
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -620,14 +511,10 @@ export default function MediaPage() {
           )}
         </div>
 
-        {/* Category filter */}
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => { setFilterCategoryId(""); setPage(1); }}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-              filterCategoryId === "" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80",
-            )}
+            className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors", filterCategoryId === "" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
           >
             Все
           </button>
@@ -635,10 +522,7 @@ export default function MediaPage() {
             <button
               key={cat.id}
               onClick={() => { setFilterCategoryId(String(cat.id)); setPage(1); }}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                filterCategoryId === String(cat.id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80",
-              )}
+              className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors", filterCategoryId === String(cat.id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
             >
               {cat.name}
             </button>
@@ -646,16 +530,12 @@ export default function MediaPage() {
         </div>
       </div>
 
-      {/* ── Bulk bar ── */}
+      {/* Bulk bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-xl flex-wrap">
           <span className="text-sm font-semibold text-primary">{selected.size} выбрано</span>
-          <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer">
-            Сбросить
-          </button>
-          <button onClick={selectAll} className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer">
-            Выбрать всё
-          </button>
+          <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer">Сбросить</button>
+          <button onClick={selectAll} className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer">Выбрать всё</button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 font-medium cursor-pointer">
@@ -665,25 +545,18 @@ export default function MediaPage() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Удалить {selected.size} файл(а)?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Файлы будут удалены безвозвратно с сервера.
-                </AlertDialogDescription>
+                <AlertDialogDescription>Файлы будут удалены безвозвратно с сервера.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Отмена</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleBulkDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Удалить
-                </AlertDialogAction>
+                <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Удалить</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
       )}
 
-      {/* ── Grid ── */}
+      {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загрузка...
@@ -695,146 +568,89 @@ export default function MediaPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {files.map((file) => {
-            const imgSrc = api.getFileUrl(file.file_url);
-            return (
-              <div
-                key={file.id}
-                className={cn(
-                  "group relative bg-card border rounded-xl overflow-hidden transition-all",
-                  selected.has(file.id)
-                    ? "border-primary ring-2 ring-primary/20"
-                    : "border-border hover:border-accent/60",
-                )}
-              >
-                {/* Checkbox */}
-                <div
-                  onClick={() => toggleSelect(file.id)}
-                  className="absolute top-1.5 left-1.5 z-10 cursor-pointer"
-                >
-                  <div className={cn(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
-                    selected.has(file.id)
-                      ? "bg-primary border-primary"
-                      : "border-white/70 bg-black/20 group-hover:border-white",
-                  )}>
-                    {selected.has(file.id) && <Check className="w-3 h-3 text-primary-foreground" />}
-                  </div>
-                </div>
-
-                {/* Image */}
-                <div
-                  className="aspect-square bg-muted cursor-zoom-in"
-                  onClick={() => setPreview(file)}
-                >
-                  <img
-                    src={imgSrc}
-                    alt={file.filename}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-
-                {/* Info */}
-                <div className="p-2">
-                  <p className="text-[11px] font-medium text-foreground truncate">{file.filename}</p>
-                  <div className="flex items-center justify-between mt-0.5 gap-1 flex-wrap">
-                    <span className="text-[10px] text-muted-foreground">{formatSize(file.file_size)}</span>
-                    {file.category_name && (
-                      <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded truncate max-w-[70px]">
-                        {file.category_name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Hover actions */}
-                <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleCopy(file.file_url, file.id); }}
-                    className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-muted cursor-pointer"
-                    title="Скопировать URL"
-                  >
-                    {copied === file.id
-                      ? <Check className="w-3 h-3 text-emerald-600" />
-                      : <Copy className="w-3 h-3 text-muted-foreground" />}
-                  </button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-destructive/10 cursor-pointer"
-                        title="Удалить"
-                      >
-                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Удалить файл?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          <strong>{file.filename}</strong> будет удалён безвозвратно.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Отмена</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(file.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Удалить
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+          {files.map((file) => (
+            <div
+              key={file.id}
+              className={cn(
+                "group relative bg-card border rounded-xl overflow-hidden transition-all",
+                selected.has(file.id) ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-accent/60",
+              )}
+            >
+              {/* Checkbox */}
+              <div onClick={() => toggleSelect(file.id)} className="absolute top-1.5 left-1.5 z-10 cursor-pointer">
+                <div className={cn(
+                  "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
+                  selected.has(file.id) ? "bg-primary border-primary" : "border-white/70 bg-black/20 group-hover:border-white",
+                )}>
+                  {selected.has(file.id) && <Check className="w-3 h-3 text-primary-foreground" />}
                 </div>
               </div>
-            );
-          })}
+
+              {/* Image — uses full_url from server */}
+              <div className="aspect-square bg-muted cursor-zoom-in" onClick={() => setPreview(file)}>
+                <img src={file.full_url} alt={file.filename} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+
+              {/* Info */}
+              <div className="p-2">
+                <p className="text-[11px] font-medium text-foreground truncate">{file.filename}</p>
+                <div className="flex items-center justify-between mt-0.5 gap-1 flex-wrap">
+                  <span className="text-[10px] text-muted-foreground">{formatSize(file.file_size)}</span>
+                  {file.category_name && (
+                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded truncate max-w-[70px]">
+                      {file.category_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Hover actions */}
+              <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCopy(file); }}
+                  className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-muted cursor-pointer"
+                  title="Скопировать URL"
+                >
+                  {copied === file.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
+                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button onClick={(e) => e.stopPropagation()} className="p-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border hover:bg-destructive/10 cursor-pointer" title="Удалить">
+                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить файл?</AlertDialogTitle>
+                      <AlertDialogDescription><strong>{file.filename}</strong> будет удалён безвозвратно.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(file.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Удалить</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ── Pagination ── */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 pt-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="p-2 rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-40 cursor-pointer disabled:cursor-default"
-          >
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-2 rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-40 cursor-pointer disabled:cursor-default">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm text-muted-foreground">
-            Страница {page} из {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="p-2 rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-40 cursor-pointer disabled:cursor-default"
-          >
+          <span className="text-sm text-muted-foreground">Страница {page} из {totalPages}</span>
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-2 rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-40 cursor-pointer disabled:cursor-default">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* ── Preview modal ── */}
-      {preview && (
-        <PreviewModal
-          file={preview}
-          files={files}
-          onClose={() => setPreview(null)}
-          onNavigate={setPreview}
-        />
-      )}
-
-      {/* ── Categories modal ── */}
-      {showCategories && (
-        <CategoriesModal
-          categories={categories}
-          onClose={() => setShowCategories(false)}
-          onRefresh={loadCategories}
-        />
-      )}
+      {preview && <PreviewModal file={preview} files={files} onClose={() => setPreview(null)} onNavigate={setPreview} />}
+      {showCategories && <CategoriesModal categories={categories} onClose={() => setShowCategories(false)} onRefresh={loadCategories} />}
     </div>
   );
 }
