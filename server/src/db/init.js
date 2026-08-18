@@ -258,6 +258,7 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS applications (
         id SERIAL PRIMARY KEY,
         vacancy_id INT NOT NULL REFERENCES vacancies(id) ON DELETE CASCADE,
+        location_id INT REFERENCES locations(id) ON DELETE SET NULL,
         name VARCHAR(255) NOT NULL,
         phone VARCHAR(20) NOT NULL,
         email VARCHAR(255) NOT NULL,
@@ -270,8 +271,9 @@ const initDb = async () => {
       )
     `);
 
-    // Safe migration: add note column to applications
+    // Safe migrations for applications table
     await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS note TEXT`);
+    await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS location_id INT REFERENCES locations(id) ON DELETE SET NULL`);
 
     // FAQ table
     await pool.query(`
