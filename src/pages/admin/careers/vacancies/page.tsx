@@ -28,13 +28,21 @@ type Vacancy = {
   requirements_tr: string;
 };
 
+type Location = {
+  id: string;
+  name: string;
+  name_ru: string;
+  district: string;
+  district_ru: string;
+  status: string;
+};
+
 const STATUS_META: Record<VacancyStatus, { label: string; color: string }> = {
   published: { label: "Published", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
   draft: { label: "Draft", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
   closed: { label: "Closed", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
 };
 
-// Language labels with flags
 const LANG_TABS = [
   { key: "ru", label: "RU", flag: "🇷🇺", name: "Русский" },
   { key: "uz", label: "UZ", flag: "🇺🇿", name: "O'zbek" },
@@ -44,7 +52,6 @@ const LANG_TABS = [
 type LangKey = "ru" | "uz" | "en" | "tr";
 
 const DEPARTMENTS = ["Service", "Kitchen", "Bar", "Management", "Delivery", "Cleaning"];
-const BRANCHES = ["Tashkent — Chilanzar", "Tashkent — Yunusabad", "Tashkent — Mirzo Ulugbek", "All branches"];
 const TYPES = ["Full Time", "Part Time", "Internship", "Seasonal"];
 
 type ModalMode = "add" | "edit" | "view" | null;
@@ -52,20 +59,20 @@ type ModalMode = "add" | "edit" | "view" | null;
 function emptyVacancy(): Vacancy {
   return {
     id: "", position: "", position_ru: "", position_uz: "", position_en: "", position_tr: "",
-    department: "Service", branch: "All branches", employment_type: "Full Time",
+    department: "Service", branch: "", employment_type: "Full Time",
     status: "published", applicationCount: 0, salary: "",
     description_ru: "", description_uz: "", description_en: "", description_tr: "",
     requirements_ru: "", requirements_uz: "", requirements_en: "", requirements_tr: "",
   };
 }
 
-/** Returns how many of the 4 language position fields are filled */
 function langFillCount(v: Vacancy): number {
   return [v.position_ru, v.position_uz, v.position_en, v.position_tr].filter(Boolean).length;
 }
 
 export default function VacanciesPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
@@ -76,8 +83,12 @@ export default function VacanciesPage() {
   const load = async () => {
     try {
       setError(null);
-      const data = await api.getVacancies();
-      const rows = Array.isArray(data) ? data : [];
+      const [vacData, locData] = await Promise.all([
+        api.getVacancies(),
+        api.getLocations(),
+      ]);
+
+      const rows = Array.isArray(vacData) ? vacData : [];
       setVacancies(rows.map((v: Record<string, unknown>) => ({
         id: String(v.id ?? ""),
         position: String(v.position ?? ""),
@@ -100,8 +111,18 @@ export default function VacanciesPage() {
         requirements_en: String(v.requirements_en ?? ""),
         requirements_tr: String(v.requirements_tr ?? ""),
       })));
+
+      const locRows = Array.isArray(locData) ? locData : [];
+      setLocations(locRows.map((l: Record<string, unknown>) => ({
+        id: String(l.id ?? ""),
+        name: String(l.name ?? ""),
+        name_ru: String(l.name_ru ?? ""),
+        district: String(l.district ?? ""),
+        district_ru: String(l.district_ru ?? ""),
+        status: String(l.status ?? "open"),
+      })));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load vacancies");
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -111,7 +132,16 @@ export default function VacanciesPage() {
 
   const filtered = statusFilter === "all" ? vacancies : vacancies.filter((v) => v.status === statusFilter);
 
-  const openAdd = () => { setTarget(emptyVacancy()); setModalMode("add"); };
+  const openAdd = () => {
+    const empty = emptyVacancy();
+    // Default branch to first open location name if available
+    const firstOpen = locations.find((l) => l.status === "open");
+    if (firstOpen) {
+      empty.branch = firstOpen.name_ru || firstOpen.name;
+    }
+    setTarget(empty);
+    setModalMode("add");
+  };
   const openEdit = (v: Vacancy) => { setTarget({ ...v }); setModalMode("edit"); };
   const openView = (v: Vacancy) => { setTarget(v); setModalMode("view"); };
 
@@ -241,68 +271,68 @@ export default function VacanciesPage() {
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
                         : filled > 0
                         ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400"
-                        : "border-border bg-muted text-muted-foreground"
+                        : "border-border text-muted-foreground"
                     )}>
                       <Globe className="w-3 h-3" />
                       {filled}/4 langs
                     </span>
                   </div>
-                  {/* Secondary names row */}
-                  {(vac.position_uz || vac.position_en || vac.position_tr) && (
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {vac.position_uz && <span className="text-[11px] text-muted-foreground">UZ: {vac.position_uz}</span>}
-                      {vac.position_en && <span className="text-[11px] text-muted-foreground">EN: {vac.position_en}</span>}
-                      {vac.position_tr && <span className="text-[11px] text-muted-foreground">TR: {vac.position_tr}</span>}
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {vac.branch}</span>
-                    <span>{vac.department}</span>
-                    <span>{vac.employment_type}</span>
-                    {vac.salary && <span>{vac.salary}</span>}
+                  <div className="flex gap-3 mt-0.5 flex-wrap">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> {vac.branch || "—"}
+                    </span>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Users className="w-3 h-3" /> {vac.applicationCount} applicants
+                    </span>
+                    <span className="text-xs text-muted-foreground">{vac.employment_type}</span>
+                    {vac.salary && <span className="text-xs text-muted-foreground">{vac.salary}</span>}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="text-right hidden sm:block">
-                  <div className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-sm font-bold text-foreground">{vac.applicationCount}</p>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">applicants</p>
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openView(vac)} className="p-2 rounded-lg hover:bg-muted" title="View">
-                    <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
-                  </button>
-                  <button onClick={() => openEdit(vac)} className="p-2 rounded-lg hover:bg-muted" title="Edit">
-                    <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                  </button>
-                  <button onClick={() => handleDelete(vac.id)} className="p-2 rounded-lg hover:bg-destructive/10" title="Delete">
-                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-                  </button>
-                </div>
+              <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => openView(vac)}
+                  className="p-2 rounded-lg border border-border hover:bg-muted text-muted-foreground text-xs"
+                  title="View"
+                >
+                  <Users className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => openEdit(vac)}
+                  className="p-2 rounded-lg border border-border hover:bg-muted text-muted-foreground"
+                  title="Edit"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(vac.id)}
+                  className="p-2 rounded-lg border border-red-200 hover:bg-red-50 text-red-500 dark:border-red-900 dark:hover:bg-red-950"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
           );
         })}
         {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
-            <Briefcase className="w-12 h-12 mx-auto mb-3 opacity-20" />
+            <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p className="text-sm">No vacancies</p>
           </div>
         )}
       </div>
 
-      {/* Add/Edit modal */}
+      {/* Form modal (add / edit) */}
       {(modalMode === "add" || modalMode === "edit") && target && (
         <VacancyFormModal
-          mode={modalMode}
           vacancy={target}
+          locations={locations}
+          mode={modalMode}
+          saving={saving}
           onChange={setTarget}
           onSave={handleSave}
           onClose={() => setModalMode(null)}
-          saving={saving}
         />
       )}
 
@@ -310,7 +340,7 @@ export default function VacanciesPage() {
       {modalMode === "view" && target && (
         <VacancyViewModal
           vacancy={target}
-          onEdit={() => setModalMode("edit")}
+          onEdit={() => { setTarget({ ...target }); setModalMode("edit"); }}
           onClose={() => setModalMode(null)}
         />
       )}
@@ -321,121 +351,59 @@ export default function VacanciesPage() {
 // ── Form Modal ────────────────────────────────────────────────────────────────
 
 function VacancyFormModal({
-  mode, vacancy, onChange, onSave, onClose, saving,
+  vacancy, locations, mode, saving, onChange, onSave, onClose,
 }: {
-  mode: "add" | "edit";
   vacancy: Vacancy;
+  locations: Location[];
+  mode: "add" | "edit";
+  saving: boolean;
   onChange: (v: Vacancy) => void;
   onSave: () => void;
   onClose: () => void;
-  saving: boolean;
 }) {
   const [activeLang, setActiveLang] = useState<LangKey>("ru");
-  const set = <K extends keyof Vacancy>(key: K, value: Vacancy[K]) => onChange({ ...vacancy, [key]: value });
 
-  const inputCls = "w-full px-3 py-2.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring";
+  const set = <K extends keyof Vacancy>(key: K, value: Vacancy[K]) => {
+    onChange({ ...vacancy, [key]: value });
+  };
+
+  const inputCls = "w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring";
   const textareaCls = `${inputCls} resize-none`;
+
+  // Branch options: locations from DB + "All branches" fallback
+  const branchOptions = locations.length > 0
+    ? [
+        ...locations.map((l) => ({
+          value: l.name_ru || l.name,
+          label: `${l.name_ru || l.name}${(l.district_ru || l.district) ? ` — ${l.district_ru || l.district}` : ""}`,
+        })),
+        { value: "All branches", label: "All branches" },
+      ]
+    : [{ value: "All branches", label: "All branches" }];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4 z-10">
-          <h2 className="font-serif font-bold text-lg">{mode === "add" ? "Add Vacancy" : "Edit Vacancy"}</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted"><X className="w-4 h-4" /></button>
+        <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4">
+          <h2 className="font-serif font-bold text-lg">
+            {mode === "add" ? "Add Vacancy" : "Edit Vacancy"}
+          </h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* ── Section: Multilingual position names ── */}
+          {/* ── Section: Position names ── */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-accent" />
-              <span className="text-sm font-semibold">Position titles by language</span>
+              <span className="text-sm font-semibold">Position name by language</span>
             </div>
-
             {/* Lang tabs */}
-            <div className="flex gap-1 mb-3 border border-border rounded-lg p-1 w-fit">
-              {LANG_TABS.map(({ key, label, flag, name }) => {
-                const filled = Boolean(vacancy[`position_${key}` as keyof Vacancy]);
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setActiveLang(key)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                      activeLang === key
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    )}
-                    title={name}
-                  >
-                    <span>{flag}</span>
-                    <span>{label}</span>
-                    {filled && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {LANG_TABS.map(({ key, name }) => (
-              <div key={key} className={activeLang === key ? "block" : "hidden"}>
-                <label className="text-sm font-medium mb-1.5 block">
-                  Position name — {name}
-                </label>
-                <input
-                  value={String(vacancy[`position_${key}` as keyof Vacancy] ?? "")}
-                  onChange={(e) => set(`position_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
-                  placeholder={`Position name in ${name}...`}
-                  className={inputCls}
-                />
-              </div>
-            ))}
-          </section>
-
-          {/* ── Section: Core fields ── */}
-          <section>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Details</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Department</label>
-                <select value={vacancy.department} onChange={(e) => set("department", e.target.value)}
-                  className={inputCls}>
-                  {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Branch</label>
-                <select value={vacancy.branch} onChange={(e) => set("branch", e.target.value)}
-                  className={inputCls}>
-                  {BRANCHES.map((b) => <option key={b}>{b}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Employment Type</label>
-                <select value={vacancy.employment_type} onChange={(e) => set("employment_type", e.target.value)}
-                  className={inputCls}>
-                  {TYPES.map((t) => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Salary</label>
-                <input value={vacancy.salary} onChange={(e) => set("salary", e.target.value)}
-                  placeholder="e.g. 4,000,000 UZS"
-                  className={inputCls} />
-              </div>
-            </div>
-          </section>
-
-          {/* ── Section: Multilingual description & requirements ── */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Globe className="w-4 h-4 text-accent" />
-              <span className="text-sm font-semibold">Description & Requirements by language</span>
-            </div>
-
-            {/* Reuse same lang tabs for description */}
             <div className="flex gap-1 mb-3 border border-border rounded-lg p-1 w-fit">
               {LANG_TABS.map(({ key, label, flag, name }) => (
                 <button
@@ -443,14 +411,92 @@ function VacancyFormModal({
                   onClick={() => setActiveLang(key)}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                    activeLang === key
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted"
+                    activeLang === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                   )}
                   title={name}
                 >
-                  <span>{flag}</span>
-                  <span>{label}</span>
+                  <span>{flag}</span> <span>{label}</span>
+                </button>
+              ))}
+            </div>
+            {LANG_TABS.map(({ key, name, flag }) => (
+              <div key={key} className={activeLang === key ? "block" : "hidden"}>
+                <label className="text-sm font-medium mb-1.5 block">
+                  {flag} Position name in {name}
+                </label>
+                <input
+                  value={String(vacancy[`position_${key}` as keyof Vacancy] ?? "")}
+                  onChange={(e) => set(`position_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
+                  placeholder={`E.g. Waiter, Cashier...`}
+                  className={inputCls}
+                />
+              </div>
+            ))}
+          </section>
+
+          {/* ── Section: Basic info ── */}
+          <section>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Basic Info</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Department</label>
+                <select value={vacancy.department} onChange={(e) => set("department", e.target.value)} className={inputCls}>
+                  {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Branch / Restaurant</label>
+                <select
+                  value={vacancy.branch}
+                  onChange={(e) => set("branch", e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">— Select restaurant —</option>
+                  {branchOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {locations.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">No restaurants in DB — add them in Locations first</p>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Employment Type</label>
+                <select value={vacancy.employment_type} onChange={(e) => set("employment_type", e.target.value)} className={inputCls}>
+                  {TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Salary</label>
+                <input
+                  value={vacancy.salary}
+                  onChange={(e) => set("salary", e.target.value)}
+                  placeholder="e.g. 4,000,000 UZS"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ── Section: Description & Requirements ── */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-4 h-4 text-accent" />
+              <span className="text-sm font-semibold">Description & Requirements by language</span>
+            </div>
+
+            <div className="flex gap-1 mb-3 border border-border rounded-lg p-1 w-fit">
+              {LANG_TABS.map(({ key, label, flag, name }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveLang(key)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    activeLang === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  )}
+                  title={name}
+                >
+                  <span>{flag}</span> <span>{label}</span>
                 </button>
               ))}
             </div>
@@ -459,17 +505,23 @@ function VacancyFormModal({
               <div key={key} className={cn("space-y-3", activeLang === key ? "block" : "hidden")}>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Description — {name}</label>
-                  <textarea rows={3} value={String(vacancy[`description_${key}` as keyof Vacancy] ?? "")}
+                  <textarea
+                    rows={3}
+                    value={String(vacancy[`description_${key}` as keyof Vacancy] ?? "")}
                     onChange={(e) => set(`description_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
                     placeholder={`Role description in ${name}...`}
-                    className={textareaCls} />
+                    className={textareaCls}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Requirements — {name}</label>
-                  <textarea rows={3} value={String(vacancy[`requirements_${key}` as keyof Vacancy] ?? "")}
+                  <textarea
+                    rows={3}
+                    value={String(vacancy[`requirements_${key}` as keyof Vacancy] ?? "")}
                     onChange={(e) => set(`requirements_${key}` as keyof Vacancy, e.target.value as Vacancy[keyof Vacancy])}
                     placeholder={`• Requirement 1\n• Requirement 2`}
-                    className={textareaCls} />
+                    className={textareaCls}
+                  />
                 </div>
               </div>
             ))}
@@ -495,8 +547,14 @@ function VacancyFormModal({
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Cancel</button>
-          <button onClick={onSave} disabled={saving} className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2 disabled:opacity-60">
+          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2 disabled:opacity-60"
+          >
             <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Vacancy"}
           </button>
         </div>
@@ -529,7 +587,7 @@ function VacancyViewModal({
         </div>
         <div className="p-6 space-y-4">
           <div className="flex flex-wrap gap-3 text-sm">
-            <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /> {vacancy.branch}</span>
+            <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /> {vacancy.branch || "—"}</span>
             <span className="flex items-center gap-1 text-muted-foreground"><Users className="w-3.5 h-3.5" /> {vacancy.applicationCount} applicants</span>
           </div>
           {vacancy.salary && (
