@@ -96,6 +96,28 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   },
 ];
 
+/**
+ * Find which nav section the current pathname belongs to.
+ *
+ * The previous implementation used `startsWith(item.href)` for every item, which
+ * caused the Dashboard item ("/admin") to match ALL admin paths because
+ * "/admin/media".startsWith("/admin") is true.
+ *
+ * Fix: the root "/admin" item uses exact match; all deeper items use startsWith.
+ */
+function findCurrentSection(pathname: string): NavItem | undefined {
+  const allItems = NAV_SECTIONS.flatMap((s) => s.items);
+  return allItems.find((item) => {
+    if (item.href) {
+      // Root dashboard route: exact match only
+      if (item.href === "/admin") return pathname === "/admin";
+      return pathname.startsWith(item.href);
+    }
+    // Group items without a top-level href: check children
+    return item.children?.some((c) => pathname.startsWith(c.href));
+  });
+}
+
 function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const [open, setOpen] = useState(false);
 
@@ -194,12 +216,11 @@ export default function AdminLayout() {
     void checkAuth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Redirect away from a section the current role can't access (e.g. deep link or role changed)
+  // Redirect away from a section the current role can't access (e.g. deep link or role changed).
+  // This is a secondary UX guard — the primary guard is RoleGuard in App.tsx.
   useEffect(() => {
     if (!currentUser) return;
-    const currentSection = NAV_SECTIONS.flatMap((s) => s.items).find((item) =>
-      item.href ? location.pathname.startsWith(item.href) : item.children?.some((c) => location.pathname.startsWith(c.href))
-    );
+    const currentSection = findCurrentSection(location.pathname);
     if (currentSection && !canAccessSection(currentUser.role, currentSection.section)) {
       navigate('/admin', { replace: true });
     }
