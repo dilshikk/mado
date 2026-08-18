@@ -9,8 +9,9 @@ router.get('/', async (req, res) => {
   const { vacancy_id, status } = req.query;
 
   let query = `
-    SELECT a.id, a.vacancy_id, a.name, a.phone, a.email, a.experience, a.status, a.created_at,
-           v.position, v.branch
+    SELECT a.id, a.vacancy_id, a.name, a.phone, a.email, a.experience,
+           a.message, a.note, a.status, a.created_at,
+           v.position, v.position_ru, v.position_uz, v.position_en, v.position_tr, v.branch
     FROM applications a
     JOIN vacancies v ON a.vacancy_id = v.id
   `;
@@ -43,7 +44,7 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query(`
-    SELECT a.*, v.position, v.branch
+    SELECT a.*, v.position, v.position_ru, v.position_uz, v.position_en, v.position_tr, v.branch
     FROM applications a
     JOIN vacancies v ON a.vacancy_id = v.id
     WHERE a.id = $1
@@ -56,12 +57,21 @@ router.get('/:id', async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// Create application
+// Create application (public endpoint)
 router.post('/', async (req, res) => {
   const { vacancy_id, name, phone, email, experience, message } = req.body;
 
   if (!vacancy_id || !name || !phone || !email) {
     return res.status(400).json({ error: 'Required fields missing' });
+  }
+
+  // Validate vacancy exists
+  const vacancyCheck = await pool.query(
+    'SELECT id FROM vacancies WHERE id = $1 AND status = $2',
+    [vacancy_id, 'published']
+  );
+  if (vacancyCheck.rows.length === 0) {
+    return res.status(404).json({ error: 'Vacancy not found or not active' });
   }
 
   const result = await pool.query(`
@@ -70,7 +80,6 @@ router.post('/', async (req, res) => {
     RETURNING id, name, vacancy_id
   `, [vacancy_id, name, phone, email, experience || null, message || null]);
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [null, 'received', 'application', result.rows[0].id, `New application from ${name}`]
@@ -97,7 +106,6 @@ router.patch('/:id/status', authenticate, authorize(['admin', 'editor']), async 
     return res.status(404).json({ error: 'Application not found' });
   }
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'update', 'application', id, `Changed application status to ${status}`]
@@ -106,17 +114,36 @@ router.patch('/:id/status', authenticate, authorize(['admin', 'editor']), async 
   res.json(result.rows[0]);
 });
 
-// Delete application
-router.delete('/:id', authenticate, authorize(['admin']), async (req, res) => {
+// Save internal note for application
+router.patch('/:id/note', authenticate, authorize(['admin', 'editor']), async (req, res) => {
   const { id } = req.params;
+  const { note } = req.body;
 
-  const result = await pool.query('DELETE FROM applications WHERE id = $1 RETURNING id, name', [id]);
+  const result = await pool.query(
+    'UPDATE applications SET note = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
+    [note || null, id]
+  );
 
   if (result.rows.length === 0) {
     return res.status(404).json({ error: 'Application not found' });
   }
 
-  // Log activity
+  res.json({ message: 'Note saved' });
+});
+
+// Delete application
+router.delete('/:id', authenticate, authorize(['admin']), async (req, res) => {
+  const { id } = req.params;
+
+  const result = await pool.query(
+    'DELETE FROM applications WHERE id = $1 RETURNING id, name',
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Application not found' });
+  }
+
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'delete', 'application', id, `Deleted application from ${result.rows[0].name}`]
