@@ -6,8 +6,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Server origin — strip trailing /api (or /api/) to get the base server URL.
-// Used to resolve relative paths like /uploads/file.jpg returned by the backend.
-// Example: "https://api.madouz.uz/api" → "https://api.madouz.uz"
 const SERVER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 
 interface RequestOptions extends RequestInit {
@@ -35,16 +33,9 @@ class ApiClient {
     localStorage.removeItem('token');
   }
 
-  /**
-   * Resolve a relative server path to a full URL.
-   * Works for both old rows (full http://localhost:3000/uploads/...) and
-   * new rows (relative /uploads/...).
-   */
   getFileUrl(fileUrl: string): string {
     if (!fileUrl) return '';
-    // Already absolute (http:// or https://)
     if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
-    // Relative path — prepend server origin
     return `${SERVER_ORIGIN}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
   }
 
@@ -82,7 +73,6 @@ class ApiClient {
     }
   }
 
-  /** Upload files via multipart/form-data (no Content-Type header — browser sets boundary) */
   async uploadFiles(endpoint: string, formData: FormData): Promise<unknown> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {};
@@ -101,6 +91,12 @@ class ApiClient {
       throw new Error(errData.error ?? 'Upload failed');
     }
     return data;
+  }
+
+  // ── Dashboard ───────────────────────────────────────────────────────────────
+
+  getDashboardStats(): Promise<unknown> {
+    return this.request('/dashboard/stats');
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -280,7 +276,6 @@ class ApiClient {
   updateApplicationStatus(id: string | number, status: string): Promise<unknown> {
     return this.request(`/applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
-  /** Save or clear the internal HR note for an application */
   updateApplicationNote(id: string | number, note: string): Promise<unknown> {
     return this.request(`/applications/${id}/note`, { method: 'PATCH', body: JSON.stringify({ note }) });
   }
