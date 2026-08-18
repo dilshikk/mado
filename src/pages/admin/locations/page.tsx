@@ -15,8 +15,8 @@ const LANGS = [
 
 type LangCode = "ru" | "uz" | "en" | "tr";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const ALL_SERVICES = ["Dine-in", "Takeaway", "Delivery", "Reservation", "Events"];
+const DAYS = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+const ALL_SERVICES = ["В зале", "Навынос", "Доставка", "Бронирование", "Мероприятия"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ export default function LocationsPage() {
       const data: ApiLocation[] = await api.getLocations();
       setLocations(data.map(fromApi));
     } catch {
-      toast.error("Failed to load locations");
+      toast.error("Не удалось загрузить филиалы");
     } finally {
       setLoading(false);
     }
@@ -120,7 +120,7 @@ export default function LocationsPage() {
   useEffect(() => { void loadLocations(); }, [loadLocations]);
 
   const openAdd = () => {
-    setEditTarget({ id: "", langs: emptyLangs(), phone: "", email: "", mapsUrl: "", photoUrl: "", hours: defaultHours(), status: "open", services: ["Dine-in"] });
+    setEditTarget({ id: "", langs: emptyLangs(), phone: "", email: "", mapsUrl: "", photoUrl: "", hours: defaultHours(), status: "open", services: ["В зале"] });
     setModalMode("add");
   };
 
@@ -132,18 +132,18 @@ export default function LocationsPage() {
   const handleSave = async () => {
     if (!editTarget) return;
     if (!editTarget.langs.ru.name || !editTarget.langs.ru.district || !editTarget.langs.ru.address || !editTarget.phone) {
-      toast.error("Please fill in all required fields (RU tab minimum)");
+      toast.error("Заполните обязательные поля (минимум вкладка RU)");
       return;
     }
     try {
       setSaving(true);
       const payload = toApiPayload(editTarget);
-      if (modalMode === "add") { await api.createLocation(payload); toast.success("Location added"); }
-      else { await api.updateLocation(editTarget.id, payload); toast.success("Location updated"); }
+      if (modalMode === "add") { await api.createLocation(payload); toast.success("Филиал добавлен"); }
+      else { await api.updateLocation(editTarget.id, payload); toast.success("Филиал обновлён"); }
       setModalMode(null); setEditTarget(null);
       await loadLocations();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save location");
+      toast.error(err instanceof Error ? err.message : "Не удалось сохранить филиал");
     } finally { setSaving(false); }
   };
 
@@ -151,11 +151,11 @@ export default function LocationsPage() {
     if (!deleteConfirm) return;
     try {
       await api.deleteLocation(deleteConfirm.id);
-      toast.success(`"${deleteConfirm.langs.ru.name || deleteConfirm.langs.en.name}" deleted`);
+      toast.success(`"${deleteConfirm.langs.ru.name || deleteConfirm.langs.en.name}" удалён`);
       setDeleteConfirm(null);
       await loadLocations();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete location");
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить филиал");
     }
   };
 
@@ -165,16 +165,16 @@ export default function LocationsPage() {
       setToggling(loc.id);
       await api.updateLocation(loc.id, toApiPayload({ ...loc, status: newStatus }));
       setLocations((prev) => prev.map((l) => l.id === loc.id ? { ...l, status: newStatus } : l));
-    } catch { toast.error("Failed to update status"); }
+    } catch { toast.error("Не удалось обновить статус"); }
     finally { setToggling(null); }
   };
 
   const handleSaveHours = async (loc: Location, hours: WeekHours) => {
     try {
       await api.updateLocation(loc.id, toApiPayload({ ...loc, hours }));
-      toast.success("Hours updated"); setHoursModal(null);
+      toast.success("Часы обновлены"); setHoursModal(null);
       await loadLocations();
-    } catch { toast.error("Failed to update hours"); }
+    } catch { toast.error("Не удалось обновить часы"); }
   };
 
   const openCount = locations.filter((l) => l.status === "open").length;
@@ -183,11 +183,11 @@ export default function LocationsPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-serif font-bold">Locations</h1>
-          <p className="text-sm text-muted-foreground mt-1">{loading ? "Loading…" : `${locations.length} branches · ${openCount} open`}</p>
+          <h1 className="text-2xl font-serif font-bold">Филиалы</h1>
+          <p className="text-sm text-muted-foreground mt-1">{loading ? "Загрузка…" : `${locations.length} филиалов · ${openCount} открыто`}</p>
         </div>
         <button onClick={openAdd} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
-          <Plus className="w-4 h-4" /> Add Location
+          <Plus className="w-4 h-4" /> Добавить филиал
         </button>
       </div>
 
@@ -200,8 +200,8 @@ export default function LocationsPage() {
       {!loading && locations.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <MapPin className="w-10 h-10 mb-3 opacity-30" />
-          <p className="font-medium">No locations yet</p>
-          <p className="text-sm mt-1">Click "Add Location" to create the first branch</p>
+          <p className="font-medium">Нет филиалов</p>
+          <p className="text-sm mt-1">Нажмите "Добавить филиал" чтобы создать первый</p>
         </div>
       )}
 
@@ -215,7 +215,6 @@ export default function LocationsPage() {
 
             return (
               <div key={loc.id} className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-colors">
-                {/* Photo */}
                 {loc.photoUrl ? (
                   <img src={loc.photoUrl} alt={displayName} className="w-full h-40 object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -236,7 +235,7 @@ export default function LocationsPage() {
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full",
                         loc.status === "open" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400")}>
-                        {loc.status === "open" ? "● Open" : "○ Disabled"}
+                        {loc.status === "open" ? "● Открыт" : "○ Отключён"}
                       </span>
                       <div className="flex gap-0.5 text-xs">{filledLangs.join(" ")}</div>
                     </div>
@@ -254,16 +253,16 @@ export default function LocationsPage() {
                       <span className="text-xs">
                         {(() => {
                           const open = loc.hours.filter((h) => !h.closed);
-                          if (open.length === 0) return "Closed all week";
+                          if (open.length === 0) return "Закрыто всю неделю";
                           const first = open[0];
                           const allSame = open.every((h) => h.open === first.open && h.close === first.close);
-                          return allSame ? `${first.open} – ${first.close} daily` : "Varies by day";
+                          return allSame ? `${first.open} – ${first.close} ежедневно` : "Зависит от дня";
                         })()}
                       </span>
                     </div>
                     {loc.mapsUrl && (
                       <a href={loc.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline">
-                        <Globe className="w-3.5 h-3.5 shrink-0" /><span className="text-xs">View on Google Maps</span>
+                        <Globe className="w-3.5 h-3.5 shrink-0" /><span className="text-xs">Посмотреть на Google Maps</span>
                       </a>
                     )}
                   </div>
@@ -276,13 +275,13 @@ export default function LocationsPage() {
 
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => openEdit(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
-                      <Edit2 className="w-3.5 h-3.5" /> Edit
+                      <Edit2 className="w-3.5 h-3.5" /> Редактировать
                     </button>
                     <button onClick={() => setHoursModal(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
-                      <Clock className="w-3.5 h-3.5" /> Hours
+                      <Clock className="w-3.5 h-3.5" /> Часы
                     </button>
                     <button onClick={() => toggle(loc)} disabled={toggling === loc.id}
-                      className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50" title={loc.status === "open" ? "Disable" : "Enable"}>
+                      className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50" title={loc.status === "open" ? "Отключить" : "Включить"}>
                       {toggling === loc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : loc.status === "open" ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-500" />}
                     </button>
                     <button onClick={() => setDeleteConfirm(loc)} className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
@@ -304,14 +303,14 @@ export default function LocationsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
           <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
-            <h2 className="font-serif font-bold text-lg">Delete Location?</h2>
+            <h2 className="font-serif font-bold text-lg">Удалить филиал?</h2>
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-foreground">"{deleteConfirm.langs.ru.name || deleteConfirm.langs.en.name}"</span>? This cannot be undone.
+              Вы уверены, что хотите удалить{" "}
+              <span className="font-semibold text-foreground">"{deleteConfirm.langs.ru.name || deleteConfirm.langs.en.name}"</span>? Это действие нельзя отменить.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Cancel</button>
-              <button onClick={handleDelete} className="flex-1 py-2.5 text-sm font-medium bg-destructive text-white rounded-lg hover:bg-destructive/90">Delete</button>
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Отмена</button>
+              <button onClick={handleDelete} className="flex-1 py-2.5 text-sm font-medium bg-destructive text-white rounded-lg hover:bg-destructive/90">Удалить</button>
             </div>
           </div>
         </div>
@@ -344,14 +343,13 @@ function LocationFormModal({ mode, location, saving, onChange, onSave, onClose }
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between px-6 py-4 z-10">
-          <h2 className="font-serif font-bold text-lg">{mode === "add" ? "Add Location" : "Edit Location"}</h2>
+          <h2 className="font-serif font-bold text-lg">{mode === "add" ? "Добавить филиал" : "Редактировать филиал"}</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Photo URL */}
           <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Restaurant Photo URL</label>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">URL фото ресторана</label>
             <input
               value={location.photoUrl}
               onChange={(e) => onChange({ ...location, photoUrl: e.target.value })}
@@ -366,9 +364,8 @@ function LocationFormModal({ mode, location, saving, onChange, onSave, onClose }
             )}
           </div>
 
-          {/* Language tabs */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Content language</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Язык контента</p>
             <div className="flex gap-2">
               {LANGS.map((l) => {
                 const filled = !!location.langs[l.code].name;
@@ -382,24 +379,23 @@ function LocationFormModal({ mode, location, saving, onChange, onSave, onClose }
                 );
               })}
             </div>
-            {activeLang === "ru" && <p className="text-xs text-muted-foreground mt-1.5">* RU is required. Other languages are optional.</p>}
+            {activeLang === "ru" && <p className="text-xs text-muted-foreground mt-1.5">* RU обязателен. Остальные языки — опционально.</p>}
           </div>
 
-          {/* Multilingual fields */}
           <div className="space-y-4 bg-muted/30 rounded-xl p-4">
-            <Field label={`Branch Name${activeLang === "ru" ? " *" : ""}`} value={cur.name} onChange={(v) => setLangField("name", v)} placeholder={activeLang === "ru" ? "e.g. MADO Ташкент — Мирабад" : "e.g. MADO Tashkent — Mirabad"} />
-            <Field label={`District${activeLang === "ru" ? " *" : ""}`} value={cur.district} onChange={(v) => setLangField("district", v)} placeholder={activeLang === "ru" ? "e.g. Мирабад" : "e.g. Mirabad"} />
-            <Field label={`Full Address${activeLang === "ru" ? " *" : ""}`} value={cur.address} onChange={(v) => setLangField("address", v)} placeholder={activeLang === "ru" ? "Улица, квартал, город" : "Street, block, city"} />
+            <Field label={`Название филиала${activeLang === "ru" ? " *" : ""}`} value={cur.name} onChange={(v) => setLangField("name", v)} placeholder={activeLang === "ru" ? "например, MADO Ташкент — Мирабад" : "e.g. MADO Tashkent — Mirabad"} />
+            <Field label={`Район${activeLang === "ru" ? " *" : ""}`} value={cur.district} onChange={(v) => setLangField("district", v)} placeholder={activeLang === "ru" ? "например, Мирабад" : "e.g. Mirabad"} />
+            <Field label={`Полный адрес${activeLang === "ru" ? " *" : ""}`} value={cur.address} onChange={(v) => setLangField("address", v)} placeholder={activeLang === "ru" ? "Улица, квартал, город" : "Street, block, city"} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Phone *" value={location.phone} onChange={(v) => onChange({ ...location, phone: v })} placeholder="+998 71 ..." />
+            <Field label="Телефон *" value={location.phone} onChange={(v) => onChange({ ...location, phone: v })} placeholder="+998 71 ..." />
             <Field label="Email" value={location.email} onChange={(v) => onChange({ ...location, email: v })} placeholder="branch@madouz.uz" />
           </div>
           <Field label="Google Maps URL" value={location.mapsUrl} onChange={(v) => onChange({ ...location, mapsUrl: v })} placeholder="https://maps.google.com/..." />
 
           <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">Services</label>
+            <label className="text-sm font-medium text-foreground mb-2 block">Услуги</label>
             <div className="flex flex-wrap gap-2">
               {ALL_SERVICES.map((s) => (
                 <button key={s} onClick={() => toggleService(s)}
@@ -413,11 +409,11 @@ function LocationFormModal({ mode, location, saving, onChange, onSave, onClose }
         </div>
 
         <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Отмена</button>
           <button onClick={onSave} disabled={saving}
             className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2 disabled:opacity-70">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Сохранение…" : "Сохранить"}
           </button>
         </div>
       </div>
@@ -443,21 +439,21 @@ function HoursModal({ location, onSave, onClose }: { location: Location; onSave:
       <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-card border-b border-border px-6 py-4">
           <h2 className="font-serif font-bold">{displayName}</h2>
-          <p className="text-sm text-muted-foreground">Working hours</p>
+          <p className="text-sm text-muted-foreground">Часы работы</p>
         </div>
         <div className="p-6 space-y-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={sameHours} onChange={(e) => setSameHours(e.target.checked)} className="rounded" />
-            <span className="text-sm font-medium">Same hours every day</span>
+            <span className="text-sm font-medium">Одинаковые часы каждый день</span>
           </label>
           {sameHours ? (
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="text-xs text-muted-foreground mb-1 block">Opens</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Открывается</label>
                 <input type="time" value={hours[0].open} onChange={(e) => setAll("open", e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none" />
               </div>
               <div className="flex-1">
-                <label className="text-xs text-muted-foreground mb-1 block">Closes</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Закрывается</label>
                 <input type="time" value={hours[0].close} onChange={(e) => setAll("close", e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none" />
               </div>
             </div>
@@ -465,10 +461,10 @@ function HoursModal({ location, onSave, onClose }: { location: Location; onSave:
             <div className="space-y-2">
               {hours.map((h, i) => (
                 <div key={h.day} className="flex items-center gap-2">
-                  <span className="text-sm font-medium w-20 shrink-0">{h.day.slice(0, 3)}</span>
+                  <span className="text-sm font-medium w-24 shrink-0">{h.day.slice(0, 3)}</span>
                   <label className="flex items-center gap-1 cursor-pointer shrink-0">
                     <input type="checkbox" checked={h.closed} onChange={(e) => setDay(i, "closed", e.target.checked)} className="rounded" />
-                    <span className="text-xs text-muted-foreground">Closed</span>
+                    <span className="text-xs text-muted-foreground">Закрыто</span>
                   </label>
                   {!h.closed && (
                     <>
@@ -483,8 +479,8 @@ function HoursModal({ location, onSave, onClose }: { location: Location; onSave:
           )}
         </div>
         <div className="sticky bottom-0 bg-card border-t border-border flex gap-3 px-6 py-4">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Cancel</button>
-          <button onClick={() => onSave(hours)} className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg">Save Hours</button>
+          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Отмена</button>
+          <button onClick={() => onSave(hours)} className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg">Сохранить часы</button>
         </div>
       </div>
     </div>
