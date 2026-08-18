@@ -70,7 +70,7 @@ router.get('/categories', async (req, res) => {
   res.json(result.rows);
 });
 
-router.post('/categories', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/categories', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
 
@@ -87,7 +87,7 @@ router.post('/categories', authenticate, authorize(['admin', 'editor']), async (
   res.status(201).json(result.rows[0]);
 });
 
-router.put('/categories/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/categories/:id', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
@@ -159,7 +159,7 @@ router.get('/', async (req, res) => {
 router.post(
   '/upload',
   authenticate,
-  authorize(['admin', 'editor']),
+  authorize(['admin', 'marketing', 'content_manager']),
   upload.array('files', 20),
   async (req, res) => {
     if (!req.files || req.files.length === 0) {
@@ -197,7 +197,7 @@ router.post(
 );
 
 // PATCH /api/media/:id/category
-router.patch('/:id/category', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.patch('/:id/category', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const { category_id } = req.body;
   const result = await pool.query(
@@ -209,7 +209,7 @@ router.patch('/:id/category', authenticate, authorize(['admin', 'editor']), asyn
 });
 
 // DELETE /api/media/:id
-router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.delete('/:id', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const result = await pool.query('DELETE FROM media WHERE id = $1 RETURNING *', [id]);
   if (result.rows.length === 0) return res.status(404).json({ error: 'File not found' });
@@ -225,7 +225,7 @@ router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, 
 });
 
 // POST /api/media/bulk-delete
-router.post('/bulk-delete', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/bulk-delete', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'ids array required' });
