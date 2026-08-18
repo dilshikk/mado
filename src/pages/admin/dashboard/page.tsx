@@ -38,34 +38,34 @@ type QuickAction = { label: string; href: string; primary?: boolean };
 
 const QUICK_ACTIONS_BY_ROLE: Record<UserRole, QuickAction[]> = {
   admin: [
-    { label: "+ Add Dish",         href: "/admin/menu/dishes",         primary: true },
-    { label: "+ Add Location",     href: "/admin/locations" },
-    { label: "+ Add Vacancy",      href: "/admin/careers/vacancies" },
-    { label: "+ Create Promotion", href: "/admin/promotions" },
-    { label: "Manage Users",       href: "/admin/users" },
-    { label: "Activity Log",       href: "/admin/activity" },
+    { label: "+ Добавить блюдо",      href: "/admin/menu/dishes",         primary: true },
+    { label: "+ Добавить филиал",     href: "/admin/locations" },
+    { label: "+ Добавить вакансию",   href: "/admin/careers/vacancies" },
+    { label: "+ Создать акцию",       href: "/admin/promotions" },
+    { label: "Управление пользователями", href: "/admin/users" },
+    { label: "Журнал действий",       href: "/admin/activity" },
   ],
   hr: [
-    { label: "+ Add Vacancy",     href: "/admin/careers/vacancies",     primary: true },
-    { label: "View Applications", href: "/admin/careers/applications" },
+    { label: "+ Добавить вакансию",   href: "/admin/careers/vacancies",   primary: true },
+    { label: "Просмотр откликов",     href: "/admin/careers/applications" },
   ],
   marketing: [
-    { label: "+ Create Promotion", href: "/admin/promotions",  primary: true },
-    { label: "View Reviews",       href: "/admin/reviews" },
-    { label: "View Requests",      href: "/admin/requests" },
-    { label: "Open Media Library", href: "/admin/media" },
+    { label: "+ Создать акцию",       href: "/admin/promotions",          primary: true },
+    { label: "Просмотр отзывов",      href: "/admin/reviews" },
+    { label: "Просмотр заявок",       href: "/admin/requests" },
+    { label: "Открыть медиатеку",     href: "/admin/media" },
   ],
   content_manager: [
-    { label: "+ Add Dish",         href: "/admin/menu/dishes",   primary: true },
-    { label: "Edit Categories",    href: "/admin/menu/categories" },
-    { label: "Edit Pages",         href: "/admin/pages" },
-    { label: "Manage FAQ",         href: "/admin/faq" },
-    { label: "Open Media Library", href: "/admin/media" },
+    { label: "+ Добавить блюдо",      href: "/admin/menu/dishes",         primary: true },
+    { label: "Редактировать категории", href: "/admin/menu/categories" },
+    { label: "Редактировать страницы",  href: "/admin/pages" },
+    { label: "Управление FAQ",        href: "/admin/faq" },
+    { label: "Открыть медиатеку",     href: "/admin/media" },
   ],
   restaurant_manager: [
-    { label: "+ Add Location",   href: "/admin/locations",         primary: true },
-    { label: "Catering Content", href: "/admin/catering/content" },
-    { label: "Catering Requests",href: "/admin/catering/requests" },
+    { label: "+ Добавить филиал",     href: "/admin/locations",           primary: true },
+    { label: "Контент кейтеринга",    href: "/admin/catering/content" },
+    { label: "Заявки кейтеринга",     href: "/admin/catering/requests" },
   ],
 };
 
@@ -90,9 +90,9 @@ function actionColor(action: string) {
 
 function timeAgo(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)  return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60)  return `${diff} с назад`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`;
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }
 
@@ -106,12 +106,12 @@ type StatCard = {
 };
 
 const STAT_CARDS: StatCard[] = [
-  { label: "Published Dishes",   key: "dishes",           icon: UtensilsCrossed, href: "/admin/menu/dishes",         color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
-  { label: "Open Locations",     key: "locations",        icon: MapPin,          href: "/admin/locations",           color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
-  { label: "New Requests",       key: "newRequests",      icon: Inbox,           href: "/admin/requests",            color: "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400" },
-  { label: "Active Vacancies",   key: "activeVacancies",  icon: Briefcase,       href: "/admin/careers/vacancies",   color: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400" },
-  { label: "Admin Users",        key: "users",            icon: Users,           href: "/admin/users",               color: "bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400" },
-  { label: "Active Promotions",  key: "activePromotions", icon: Tag,             href: "/admin/promotions",          color: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
+  { label: "Блюда в меню",        key: "dishes",           icon: UtensilsCrossed, href: "/admin/menu/dishes",         color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+  { label: "Открытых филиалов",   key: "locations",        icon: MapPin,          href: "/admin/locations",           color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
+  { label: "Новых заявок",        key: "newRequests",      icon: Inbox,           href: "/admin/requests",            color: "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400" },
+  { label: "Активных вакансий",   key: "activeVacancies",  icon: Briefcase,       href: "/admin/careers/vacancies",   color: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400" },
+  { label: "Пользователей",       key: "users",            icon: Users,           href: "/admin/users",               color: "bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400" },
+  { label: "Активных акций",      key: "activePromotions", icon: Tag,             href: "/admin/promotions",          color: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ export default function AdminDashboard() {
       const data = await api.getDashboardStats();
       setStats(data as DashboardStats);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load stats");
+      setError(e instanceof Error ? e.message : "Не удалось загрузить статистику");
     } finally {
       setLoading(false);
     }
@@ -141,8 +141,8 @@ export default function AdminDashboard() {
 
   const now = new Date();
   const hour = now.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const dateStr  = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const greeting = hour < 12 ? "Доброе утро" : hour < 17 ? "Добрый день" : "Добрый вечер";
+  const dateStr  = now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-serif font-bold text-foreground">
-            {greeting}, {name || "Admin"}
+            {greeting}, {name || "Администратор"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">{dateStr}</p>
         </div>
@@ -158,7 +158,7 @@ export default function AdminDashboard() {
           onClick={() => void loadStats()}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors shrink-0"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          <RefreshCw className="w-3.5 h-3.5" /> Обновить
         </button>
       </div>
 
@@ -201,10 +201,10 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-accent" />
-              Recent Activity
+              Последние действия
             </h2>
             <Link to="/admin/activity" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
-              View all
+              Смотреть все
             </Link>
           </div>
 
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
                 </div>
               ))
             ) : !stats || stats.recentActivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No activity yet</p>
+              <p className="text-sm text-muted-foreground py-6 text-center">Пока нет активности</p>
             ) : stats.recentActivity.map((item) => (
               <div key={item.id} className="flex items-start gap-3">
                 <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
@@ -241,7 +241,7 @@ export default function AdminDashboard() {
 
         {/* Quick Actions */}
         <div className="bg-card border border-border rounded-xl p-5">
-          <h2 className="font-semibold text-foreground mb-4">Quick Actions</h2>
+          <h2 className="font-semibold text-foreground mb-4">Быстрые действия</h2>
           <div className="space-y-2">
             {quickActions.map((a) => (
               <Link
@@ -263,13 +263,13 @@ export default function AdminDashboard() {
             <div className="mt-5 pt-4 border-t border-border space-y-1.5">
               {stats.newApplications > 0 && (
                 <Link to="/admin/careers/applications" className="flex items-center justify-between text-xs text-muted-foreground hover:text-foreground">
-                  <span>New applications</span>
+                  <span>Новые отклики</span>
                   <span className="font-semibold text-amber-600 dark:text-amber-400">{stats.newApplications}</span>
                 </Link>
               )}
               <div className="flex items-center gap-2 pt-1">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-sm text-muted-foreground">Website: Online</span>
+                <span className="text-sm text-muted-foreground">Сайт: Онлайн</span>
               </div>
             </div>
           )}
