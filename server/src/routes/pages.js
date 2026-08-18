@@ -32,7 +32,7 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Create page
-router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.post('/', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const {
     title, title_ru, title_uz, title_en, title_tr,
     slug, content, status = 'published', sections = 0,
@@ -67,7 +67,7 @@ router.post('/', authenticate, authorize(['admin', 'editor']), async (req, res) 
 });
 
 // Update page
-router.put('/:id', authenticate, authorize(['admin', 'editor']), async (req, res) => {
+router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const {
     title, title_ru, title_uz, title_en, title_tr,
