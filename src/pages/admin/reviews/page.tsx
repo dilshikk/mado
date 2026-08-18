@@ -52,35 +52,30 @@ type ApiReviewItem = {
 
 const STATUS_META: Record<ReviewStatus, { label: string; color: string }> = {
   new: {
-    label: "New",
-    color:
-      "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
+    label: "Новый",
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
   },
   approved: {
-    label: "Approved",
-    color:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+    label: "Одобрен",
+    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
   },
   hidden: {
-    label: "Hidden",
+    label: "Скрыт",
     color: "bg-gray-100 text-gray-500 dark:bg-gray-800",
   },
 };
 
 const SOURCE_COLORS: Record<string, string> = {
-  Google:
-    "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-  Website:
-    "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400",
-  Yandex:
-    "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+  Google: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+  Website: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400",
+  Yandex: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
 };
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "date_desc", label: "Сначала новые" },
-  { value: "date_asc", label: "Сначала старые" },
+  { value: "date_asc",  label: "Сначала старые" },
   { value: "rating_desc", label: "Высокий рейтинг" },
-  { value: "rating_asc", label: "Низкий рейтинг" },
+  { value: "rating_asc",  label: "Низкий рейтинг" },
 ];
 
 export default function ReviewsPage() {
@@ -102,26 +97,24 @@ export default function ReviewsPage() {
           const rawDate = new Date(item.created_at);
           return {
             id: String(item.id),
-            author: item.author_name ?? "Anonymous",
+            author: item.author_name ?? "Аноним",
             rating: Number(item.rating) || 0,
             text: item.text ?? "",
             source: item.source ?? "Website",
-            date: rawDate.toLocaleDateString("en-GB", {
+            date: rawDate.toLocaleDateString("ru-RU", {
               day: "2-digit",
               month: "short",
             }),
             rawDate,
             status: (item.status as ReviewStatus) ?? "new",
             location: item.location_id
-              ? `Location #${item.location_id}`
-              : "General",
+              ? `Филиал #${item.location_id}`
+              : "Общий",
           };
         }),
       );
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load reviews",
-      );
+      setError(err instanceof Error ? err.message : "Не удалось загрузить отзывы");
     } finally {
       setLoading(false);
     }
@@ -131,14 +124,11 @@ export default function ReviewsPage() {
     loadReviews();
   }, [loadReviews]);
 
-  // ─── Stats (memoised) ───────────────────────────────────────────────────
   const { approved, avg, dist } = useMemo(() => {
     const approved = reviews.filter((r) => r.status === "approved");
     const avg =
       approved.length
-        ? (
-            approved.reduce((a, r) => a + r.rating, 0) / approved.length
-          ).toFixed(1)
+        ? (approved.reduce((a, r) => a + r.rating, 0) / approved.length).toFixed(1)
         : "—";
     const dist = [5, 4, 3, 2, 1].map((n) => ({
       n,
@@ -147,7 +137,6 @@ export default function ReviewsPage() {
     return { approved, avg, dist };
   }, [reviews]);
 
-  // ─── Filtered + sorted list ──────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const list = reviews.filter((r) => {
@@ -160,35 +149,26 @@ export default function ReviewsPage() {
 
     return [...list].sort((a, b) => {
       switch (sort) {
-        case "date_asc":
-          return a.rawDate.getTime() - b.rawDate.getTime();
-        case "date_desc":
-          return b.rawDate.getTime() - a.rawDate.getTime();
-        case "rating_asc":
-          return a.rating - b.rating;
-        case "rating_desc":
-          return b.rating - a.rating;
+        case "date_asc":    return a.rawDate.getTime() - b.rawDate.getTime();
+        case "date_desc":   return b.rawDate.getTime() - a.rawDate.getTime();
+        case "rating_asc":  return a.rating - b.rating;
+        case "rating_desc": return b.rating - a.rating;
       }
     });
   }, [reviews, filter, search, sort]);
 
-  // ─── Actions ─────────────────────────────────────────────────────────────
   const setStatus = async (id: string, status: ReviewStatus) => {
     try {
       await api.updateReviewStatus(id, status);
-      setReviews((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status } : r)),
-      );
+      setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
       const labels: Record<ReviewStatus, string> = {
         approved: "Отзыв опубликован",
-        hidden: "Отзыв скрыт",
-        new: "Статус обновлён",
+        hidden:   "Отзыв скрыт",
+        new:      "Статус обновлён",
       };
       toast.success(labels[status]);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update review status",
-      );
+      toast.error(err instanceof Error ? err.message : "Не удалось обновить статус отзыва");
     }
   };
 
@@ -198,9 +178,7 @@ export default function ReviewsPage() {
       setReviews((prev) => prev.filter((r) => r.id !== id));
       toast.success("Отзыв удалён");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to delete review",
-      );
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить отзыв");
     }
   };
 
@@ -210,22 +188,17 @@ export default function ReviewsPage() {
         <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <span className="mt-0.5 text-base">⚠</span>
           <div className="flex-1">{error}</div>
-          <button
-            onClick={() => setError(null)}
-            className="text-red-700 hover:text-red-900"
-          >
-            ✕
-          </button>
+          <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">✕</button>
         </div>
       )}
 
       {/* Header + rating summary */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif font-bold">Reviews</h1>
+          <h1 className="text-2xl font-serif font-bold">Отзывы</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {reviews.filter((r) => r.status === "new").length} new ·{" "}
-            {approved.length} published
+            {reviews.filter((r) => r.status === "new").length} новых ·{" "}
+            {approved.length} опубликованных
           </p>
         </div>
 
@@ -235,9 +208,7 @@ export default function ReviewsPage() {
               <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
               <span className="text-3xl font-bold">{avg}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {approved.length} reviews
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{approved.length} отзывов</p>
           </div>
           <div className="space-y-1 min-w-[100px]">
             {dist.map(({ n, count }) => (
@@ -246,16 +217,10 @@ export default function ReviewsPage() {
                 <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
                   <div
                     className="h-full bg-amber-400 rounded-full transition-all"
-                    style={{
-                      width: approved.length
-                        ? `${(count / approved.length) * 100}%`
-                        : "0%",
-                    }}
+                    style={{ width: approved.length ? `${(count / approved.length) * 100}%` : "0%" }}
                   />
                 </div>
-                <span className="text-xs text-muted-foreground w-3">
-                  {count}
-                </span>
+                <span className="text-xs text-muted-foreground w-3">{count}</span>
               </div>
             ))}
           </div>
@@ -269,7 +234,7 @@ export default function ReviewsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search reviews..."
+            placeholder="Поиск отзывов..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -287,13 +252,12 @@ export default function ReviewsPage() {
               )}
             >
               {s === "all"
-                ? `All (${reviews.length})`
+                ? `Все (${reviews.length})`
                 : `${STATUS_META[s].label} (${reviews.filter((r) => r.status === s).length})`}
             </button>
           ))}
         </div>
 
-        {/* Sort */}
         <div className="relative">
           <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <select
@@ -302,9 +266,7 @@ export default function ReviewsPage() {
             className="pl-8 pr-4 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
           >
             {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </div>
@@ -313,22 +275,17 @@ export default function ReviewsPage() {
       {/* Review list */}
       {loading ? (
         <div className="flex items-center justify-center rounded-xl border border-border bg-card p-10 text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading reviews...
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Загрузка отзывов...
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((rev) => (
-            <div
-              key={rev.id}
-              className="bg-card border border-border rounded-xl p-4"
-            >
+            <div key={rev.id} className="bg-card border border-border rounded-xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-primary-foreground">
-                        {rev.author[0]}
-                      </span>
+                      <span className="text-xs font-bold text-primary-foreground">{rev.author[0]}</span>
                     </div>
                     <div>
                       <p className="text-sm font-semibold">{rev.author}</p>
@@ -337,41 +294,21 @@ export default function ReviewsPage() {
                           {Array.from({ length: 5 }).map((_, i) => (
                             <Star
                               key={i}
-                              className={cn(
-                                "w-3 h-3",
-                                i < rev.rating
-                                  ? "text-amber-400 fill-amber-400"
-                                  : "text-muted-foreground/30",
-                              )}
+                              className={cn("w-3 h-3", i < rev.rating ? "text-amber-400 fill-amber-400" : "text-muted-foreground/30")}
                             />
                           ))}
                         </div>
-                        <span
-                          className={cn(
-                            "text-[10px] font-semibold px-1.5 py-0.5 rounded",
-                            SOURCE_COLORS[rev.source] ??
-                              "bg-muted text-muted-foreground",
-                          )}
-                        >
+                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", SOURCE_COLORS[rev.source] ?? "bg-muted text-muted-foreground")}>
                           {rev.source}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {rev.location} · {rev.date}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{rev.location} · {rev.date}</span>
                       </div>
                     </div>
                   </div>
-                  <p className="text-sm text-foreground/80 leading-relaxed">
-                    {rev.text}
-                  </p>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{rev.text}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <span
-                    className={cn(
-                      "text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                      STATUS_META[rev.status].color,
-                    )}
-                  >
+                  <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", STATUS_META[rev.status].color)}>
                     {STATUS_META[rev.status].label}
                   </span>
                 </div>
@@ -383,7 +320,7 @@ export default function ReviewsPage() {
                     onClick={() => setStatus(rev.id, "approved")}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 rounded-lg hover:opacity-80 font-medium"
                   >
-                    <Check className="w-3 h-3" /> Approve
+                    <Check className="w-3 h-3" /> Одобрить
                   </button>
                 )}
                 {rev.status === "approved" && (
@@ -391,7 +328,7 @@ export default function ReviewsPage() {
                     onClick={() => setStatus(rev.id, "hidden")}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 font-medium"
                   >
-                    <EyeOff className="w-3 h-3" /> Hide
+                    <EyeOff className="w-3 h-3" /> Скрыть
                   </button>
                 )}
                 {rev.status === "hidden" && (
@@ -399,7 +336,7 @@ export default function ReviewsPage() {
                     onClick={() => setStatus(rev.id, "approved")}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 font-medium"
                   >
-                    <ExternalLink className="w-3 h-3" /> Restore
+                    <ExternalLink className="w-3 h-3" /> Восстановить
                   </button>
                 )}
                 {rev.status === "new" && (
@@ -407,23 +344,21 @@ export default function ReviewsPage() {
                     onClick={() => setStatus(rev.id, "hidden")}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 font-medium"
                   >
-                    <EyeOff className="w-3 h-3" /> Ignore
+                    <EyeOff className="w-3 h-3" /> Игнорировать
                   </button>
                 )}
 
-                {/* Delete with confirmation */}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 font-medium ml-auto">
-                      <Trash2 className="w-3 h-3" /> Delete
+                      <Trash2 className="w-3 h-3" /> Удалить
                     </button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Удалить отзыв?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Отзыв от <strong>{rev.author}</strong> будет удалён
-                        безвозвратно. Это действие нельзя отменить.
+                        Отзыв от <strong>{rev.author}</strong> будет удалён безвозвратно. Это действие нельзя отменить.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -444,7 +379,7 @@ export default function ReviewsPage() {
           {filtered.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
               <Star className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">No reviews found</p>
+              <p className="text-sm">Отзывы не найдены</p>
             </div>
           )}
         </div>
