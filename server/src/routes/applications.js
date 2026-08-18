@@ -9,11 +9,16 @@ router.get('/', async (req, res) => {
   const { vacancy_id, status } = req.query;
 
   let query = `
-    SELECT a.id, a.vacancy_id, a.name, a.phone, a.email, a.experience,
+    SELECT a.id, a.vacancy_id, a.location_id, a.name, a.phone, a.email, a.experience,
            a.message, a.note, a.status, a.created_at,
-           v.position, v.position_ru, v.position_uz, v.position_en, v.position_tr, v.branch
+           v.position, v.position_ru, v.position_uz, v.position_en, v.position_tr, v.branch,
+           l.name AS location_name,
+           l.name_ru AS location_name_ru,
+           l.name_uz AS location_name_uz,
+           l.name_en AS location_name_en
     FROM applications a
     JOIN vacancies v ON a.vacancy_id = v.id
+    LEFT JOIN locations l ON a.location_id = l.id
   `;
   const params = [];
   let paramCount = 0;
@@ -44,9 +49,15 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query(`
-    SELECT a.*, v.position, v.position_ru, v.position_uz, v.position_en, v.position_tr, v.branch
+    SELECT a.*,
+           v.position, v.position_ru, v.position_uz, v.position_en, v.position_tr, v.branch,
+           l.name AS location_name,
+           l.name_ru AS location_name_ru,
+           l.name_uz AS location_name_uz,
+           l.name_en AS location_name_en
     FROM applications a
     JOIN vacancies v ON a.vacancy_id = v.id
+    LEFT JOIN locations l ON a.location_id = l.id
     WHERE a.id = $1
   `, [id]);
 
@@ -59,13 +70,13 @@ router.get('/:id', async (req, res) => {
 
 // Create application (public endpoint)
 router.post('/', async (req, res) => {
-  const { vacancy_id, name, phone, email, experience, message } = req.body;
+  const { vacancy_id, location_id, name, phone, email, experience, message } = req.body;
 
   if (!vacancy_id || !name || !phone || !email) {
     return res.status(400).json({ error: 'Required fields missing' });
   }
 
-  // Validate vacancy exists
+  // Validate vacancy exists and is published
   const vacancyCheck = await pool.query(
     'SELECT id FROM vacancies WHERE id = $1 AND status = $2',
     [vacancy_id, 'published']
@@ -74,11 +85,19 @@ router.post('/', async (req, res) => {
     return res.status(404).json({ error: 'Vacancy not found or not active' });
   }
 
+  // Validate location if provided
+  if (location_id) {
+    const locCheck = await pool.query('SELECT id FROM locations WHERE id = $1', [location_id]);
+    if (locCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+  }
+
   const result = await pool.query(`
-    INSERT INTO applications (vacancy_id, name, phone, email, experience, message, status)
-    VALUES ($1, $2, $3, $4, $5, $6, 'new')
-    RETURNING id, name, vacancy_id
-  `, [vacancy_id, name, phone, email, experience || null, message || null]);
+    INSERT INTO applications (vacancy_id, location_id, name, phone, email, experience, message, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'new')
+    RETURNING id, name, vacancy_id, location_id
+  `, [vacancy_id, location_id || null, name, phone, email, experience || null, message || null]);
 
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
