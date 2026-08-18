@@ -22,11 +22,11 @@ type Application = {
 };
 
 const STATUS_META: Record<AppStatus, { label: string; color: string; next: AppStatus[] }> = {
-  new: { label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400", next: ["reviewing", "rejected"] },
-  reviewing: { label: "Reviewing", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400", next: ["interview", "rejected"] },
-  interview: { label: "Interview", color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400", next: ["accepted", "rejected"] },
-  accepted: { label: "Accepted", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400", next: [] },
-  rejected: { label: "Rejected", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400", next: ["reviewing"] },
+  new:       { label: "Новый",           color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400",       next: ["reviewing", "rejected"] },
+  reviewing: { label: "Рассматривается", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400", next: ["interview", "rejected"] },
+  interview: { label: "Собеседование",   color: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400", next: ["accepted", "rejected"] },
+  accepted:  { label: "Принят",          color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400", next: [] },
+  rejected:  { label: "Отклонён",        color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400",           next: ["reviewing"] },
 };
 
 export default function ApplicationsPage() {
@@ -48,20 +48,19 @@ export default function ApplicationsPage() {
         ? data.map((item: Record<string, unknown>) => ({
             id: String(item.id ?? ""),
             name: String(item.name ?? "Unknown"),
-            position: String(item.position_ru || item.position || "General position"),
+            position: String(item.position_ru || item.position || "Общая должность"),
             position_ru: String(item.position_ru ?? ""),
             branch: String(item.branch ?? ""),
-            // Prefer location from DB; fallback to vacancy branch field
             locationName: String(
               item.location_name_ru || item.location_name || item.branch || "—"
             ),
             phone: String(item.phone ?? "N/A"),
             email: String(item.email ?? "N/A"),
-            experience: String(item.experience ?? "Not provided"),
+            experience: String(item.experience ?? "Не указан"),
             message: String(item.message ?? ""),
             note: String(item.note ?? ""),
             status: (item.status ?? "new") as AppStatus,
-            date: new Date(String(item.created_at ?? Date.now())).toLocaleDateString("en-GB", {
+            date: new Date(String(item.created_at ?? Date.now())).toLocaleDateString("ru-RU", {
               day: "2-digit",
               month: "short",
               year: "numeric",
@@ -70,7 +69,7 @@ export default function ApplicationsPage() {
         : [];
       setApps(mapped);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load applications");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить отклики");
     } finally {
       setLoading(false);
     }
@@ -96,7 +95,7 @@ export default function ApplicationsPage() {
       setApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
       if (viewing?.id === id) setViewing((v) => (v ? { ...v, status } : v));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
+      setError(err instanceof Error ? err.message : "Не удалось обновить статус");
     }
   };
 
@@ -108,7 +107,7 @@ export default function ApplicationsPage() {
       setApps((prev) => prev.map((a) => (a.id === viewing.id ? { ...a, note } : a)));
       setViewing((v) => (v ? { ...v, note } : v));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save note");
+      setError(err instanceof Error ? err.message : "Не удалось сохранить заметку");
     } finally {
       setNoteSaving(false);
     }
@@ -127,10 +126,10 @@ export default function ApplicationsPage() {
   return (
     <div className="space-y-5 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-serif font-bold">Applications</h1>
+        <h1 className="text-2xl font-serif font-bold">Отклики</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {apps.filter((a) => a.status === "new").length} new ·{" "}
-          {apps.filter((a) => a.status === "interview").length} in interview
+          {apps.filter((a) => a.status === "new").length} новых ·{" "}
+          {apps.filter((a) => a.status === "interview").length} на собеседовании
         </p>
       </div>
 
@@ -169,7 +168,7 @@ export default function ApplicationsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, position or restaurant..."
+            placeholder="Поиск по имени, должности или ресторану..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -185,7 +184,7 @@ export default function ApplicationsPage() {
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              {s === "all" ? "All" : STATUS_META[s as AppStatus].label}
+              {s === "all" ? "Все" : STATUS_META[s as AppStatus].label}
             </button>
           ))}
         </div>
@@ -228,7 +227,7 @@ export default function ApplicationsPage() {
                         </span>
                         {app.note && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-medium">
-                            has note
+                            есть заметка
                           </span>
                         )}
                       </div>
@@ -247,7 +246,7 @@ export default function ApplicationsPage() {
                     onClick={() => openViewing(app)}
                     className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <Eye className="w-3 h-3" /> Review
+                    <Eye className="w-3 h-3" /> Просмотреть
                   </button>
                 </div>
               ))}
@@ -255,7 +254,7 @@ export default function ApplicationsPage() {
         {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">No applications</p>
+            <p className="text-sm">Нет откликов</p>
           </div>
         )}
       </div>
@@ -284,20 +283,20 @@ export default function ApplicationsPage() {
             <div className="p-6 space-y-5">
               <section>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                  Contact
+                  Контакт
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <InfoField label="Phone" value={viewing.phone} />
-                  <InfoField label="Email" value={viewing.email} />
-                  <InfoField label="Applied" value={viewing.date} />
-                  <InfoField label="Experience" value={viewing.experience} />
-                  <InfoField label="Restaurant" value={viewing.locationName} />
+                  <InfoField label="Телефон"    value={viewing.phone} />
+                  <InfoField label="Email"      value={viewing.email} />
+                  <InfoField label="Подал заявку" value={viewing.date} />
+                  <InfoField label="Опыт"       value={viewing.experience} />
+                  <InfoField label="Ресторан"   value={viewing.locationName} />
                 </div>
               </section>
               {viewing.message && (
                 <section>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Cover Message
+                    Сопроводительное письмо
                   </p>
                   <p className="text-sm bg-muted rounded-xl p-4 leading-relaxed">
                     {viewing.message}
@@ -306,24 +305,24 @@ export default function ApplicationsPage() {
               )}
               <section>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Internal Note
+                  Внутренняя заметка
                 </p>
                 <textarea
                   rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add HR notes about this candidate..."
+                  placeholder="Заметка HR о кандидате..."
                   className="w-full px-3 py-2.5 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
                 {note !== (viewing.note ?? "") && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Unsaved changes — click Save & Close to persist
+                    Несохранённые изменения — нажмите «Сохранить и закрыть»
                   </p>
                 )}
               </section>
               <section>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Update Status
+                  Изменить статус
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(Object.keys(STATUS_META) as AppStatus[]).map((s) => (
@@ -348,7 +347,7 @@ export default function ApplicationsPage() {
                 onClick={() => setViewing(null)}
                 className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg"
               >
-                Close
+                Закрыть
               </button>
               <button
                 onClick={async () => {
@@ -358,7 +357,7 @@ export default function ApplicationsPage() {
                 disabled={noteSaving}
                 className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-60"
               >
-                {noteSaving ? "Saving…" : "Save & Close"}
+                {noteSaving ? "Сохранение…" : "Сохранить и закрыть"}
               </button>
             </div>
           </div>
