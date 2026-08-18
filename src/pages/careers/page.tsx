@@ -43,6 +43,16 @@ type Vacancy = {
   salary: string;
 };
 
+type Location = {
+  id: string;
+  name: string;
+  name_ru: string;
+  name_uz: string;
+  name_en: string;
+  district: string;
+  district_ru: string;
+};
+
 // ─── Why Work ────────────────────────────────────────────────────────────────
 const WHY_ITEMS = [
   {
@@ -73,6 +83,7 @@ const applySchema = z.object({
   phone: z.string().min(1, "Введите номер телефона"),
   email: z.string().email("Введите корректный email"),
   vacancyId: z.string().min(1, "Выберите вакансию"),
+  locationId: z.string().min(1, "Выберите ресторан"),
   experience: z.string().optional(),
   message: z.string().optional(),
 });
@@ -82,7 +93,7 @@ type ApplyFormValues = z.infer<typeof applySchema>;
 const selectCls =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
+function ApplyForm({ vacancies, locations }: { vacancies: Vacancy[]; locations: Location[] }) {
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<ApplyFormValues>({
@@ -92,6 +103,7 @@ function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
       phone: "",
       email: "",
       vacancyId: "",
+      locationId: "",
       experience: "",
       message: "",
     },
@@ -102,6 +114,7 @@ function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
     try {
       await api.createApplication({
         vacancy_id: values.vacancyId,
+        location_id: values.locationId,
         name: values.fullName,
         phone: values.phone,
         email: values.email,
@@ -157,7 +170,7 @@ function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="sm:col-span-2">
               <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input placeholder="example@gmail.com" {...field} />
@@ -178,6 +191,27 @@ function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
                   {vacancies.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.position_ru || v.position_en || v.position}
+                    </option>
+                  ))}
+                </select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="locationId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Ресторан</FormLabel>
+              <FormControl>
+                <select className={selectCls} {...field}>
+                  <option value="">Выберите ресторан</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name_ru || loc.name}
+                      {(loc.district_ru || loc.district) ? ` — ${loc.district_ru || loc.district}` : ""}
                     </option>
                   ))}
                 </select>
@@ -236,13 +270,17 @@ function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Careers() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getVacancies("published")
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setVacancies(data.map((v: Record<string, unknown>) => ({
+    Promise.all([
+      api.getVacancies("published"),
+      api.getLocations(),
+    ])
+      .then(([vacData, locData]) => {
+        if (Array.isArray(vacData)) {
+          setVacancies(vacData.map((v: Record<string, unknown>) => ({
             id: String(v.id ?? ""),
             position: String(v.position ?? ""),
             position_ru: String(v.position_ru ?? ""),
@@ -255,9 +293,25 @@ export default function Careers() {
             salary: String(v.salary ?? ""),
           })));
         }
+        if (Array.isArray(locData)) {
+          // Only show open locations
+          setLocations(
+            locData
+              .filter((l: Record<string, unknown>) => l.status === "open" || !l.status)
+              .map((l: Record<string, unknown>) => ({
+                id: String(l.id ?? ""),
+                name: String(l.name ?? ""),
+                name_ru: String(l.name_ru ?? ""),
+                name_uz: String(l.name_uz ?? ""),
+                name_en: String(l.name_en ?? ""),
+                district: String(l.district ?? ""),
+                district_ru: String(l.district_ru ?? ""),
+              }))
+          );
+        }
       })
       .catch(() => {
-        // Silently fail — positions section will just be empty
+        // Silently fail — sections will show empty state
       })
       .finally(() => setLoading(false));
   }, []);
@@ -483,7 +537,7 @@ export default function Careers() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
             className="mt-10 rounded-2xl bg-background p-6 shadow-sm sm:p-10"
           >
-            <ApplyForm vacancies={vacancies} />
+            <ApplyForm vacancies={vacancies} locations={locations} />
           </motion.div>
         </div>
       </section>
