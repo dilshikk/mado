@@ -1,10 +1,32 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import pool from '../db/pool.js';
 import { authenticate, authorize, VALID_ROLES, JWT_SECRET } from '../middleware/auth.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const avatarDir = path.resolve(process.cwd(), 'uploads', 'avatars');
+if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+
 const router = express.Router();
+
+// Avatar upload: store in memory, then process with sharp
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG, PNG, WEBP allowed'));
+  },
+});
 
 // Login
 router.post('/login', async (req, res) => {
@@ -98,7 +120,7 @@ router.get('/me', async (req, res) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const result = await pool.query(
-      'SELECT id, name, email, role, status, last_seen, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, status, last_seen, created_at, avatar_url FROM users WHERE id = $1',
       [decoded.id]
     );
 
@@ -106,7 +128,16 @@ router.get('/me', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(result.rows[0]);
+    const user = result.rows[0];
+    // Build full avatar URL if relative path
+    if (user.avatar_url && !/^https?:\/\//i.test(user.avatar_url)) {
+      const base = process.env.BASE_URL
+        ? process.env.BASE_URL.replace(/\/$/, '')
+        : `${req.protocol}://${req.get('host')}`;
+      user.avatar_url = `${base}${user.avatar_url.startsWith('/') ? '' : '/'}${user.avatar_url}`;
+    }
+
+    res.json(user);
   } catch (error) {
     res.status(401).json({ error: 'Invalid token' });
   }
@@ -158,11 +189,58 @@ router.put('/me', authenticate, async (req, res) => {
   );
 
   const updated = await pool.query(
-    'SELECT id, name, email, role, status, last_seen, created_at FROM users WHERE id = $1',
+    'SELECT id, name, email, role, status, last_seen, created_at, avatar_url FROM users WHERE id = $1',
     [req.user.id]
   );
 
-  res.json(updated.rows[0]);
+  const user = updated.rows[0];
+  if (user.avatar_url && !/^https?:\/\//i.test(user.avatar_url)) {
+    const base = process.env.BASE_URL
+      ? process.env.BASE_URL.replace(/\/$/, '')
+      : `${req.protocol}://${req.get('host')}`;
+    user.avatar_url = `${base}${user.avatar_url.startsWith('/') ? '' : '/'}${user.avatar_url}`;
+  }
+
+  res.json(user);
+});
+
+// Upload / replace profile avatar (auto-cropped to 200×200)
+router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  // Delete old avatar file if it was stored locally
+  const existing = await pool.query('SELECT avatar_url FROM users WHERE id = $1', [req.user.id]);
+  const oldUrl = existing.rows[0]?.avatar_url;
+  if (oldUrl && oldUrl.startsWith('/uploads/avatars/')) {
+    const oldPath = path.join(process.cwd(), oldUrl);
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+
+  const filename = `avatar-${req.user.id}-${Date.now()}.jpg`;
+  const filePath = path.join(avatarDir, filename);
+  const relativeUrl = `/uploads/avatars/${filename}`;
+
+  // Crop and resize to 200×200 using sharp (cover fit = center crop)
+  await sharp(req.file.buffer)
+    .resize(200, 200, { fit: 'cover', position: 'center' })
+    .jpeg({ quality: 85 })
+    .toFile(filePath);
+
+  await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [relativeUrl, req.user.id]);
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'update', 'user', req.user.id, 'Updated profile avatar']
+  );
+
+  const base = process.env.BASE_URL
+    ? process.env.BASE_URL.replace(/\/$/, '')
+    : `${req.protocol}://${req.get('host')}`;
+  const fullUrl = `${base}${relativeUrl}`;
+
+  res.json({ avatar_url: fullUrl });
 });
 
 export default router;
