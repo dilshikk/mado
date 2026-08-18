@@ -14,6 +14,31 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const router = express.Router();
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Build the public base URL of the server from the incoming request.
+ * Uses BASE_URL env var if set (e.g. "https://api.madouz.uz"),
+ * otherwise falls back to req.protocol + req.get('host').
+ */
+function getBaseUrl(req) {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+/**
+ * Enrich a media row with a `full_url` field that is always an absolute URL.
+ * Handles both old rows (already absolute) and new rows (relative /uploads/...).
+ */
+function withFullUrl(req, row) {
+  if (!row) return row;
+  const base = getBaseUrl(req);
+  const full_url = /^https?:\/\//i.test(row.file_url)
+    ? row.file_url
+    : `${base}${row.file_url.startsWith('/') ? '' : '/'}${row.file_url}`;
+  return { ...row, full_url };
+}
+
 // ── Multer config ─────────────────────────────────────────────────────────────
 
 const storage = multer.diskStorage({
@@ -30,7 +55,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (allowed.includes(file.mimetype)) cb(null, true);
@@ -123,7 +148,7 @@ router.get('/', async (req, res) => {
   ]);
 
   res.json({
-    files: dataRes.rows,
+    files: dataRes.rows.map((row) => withFullUrl(req, row)),
     total: parseInt(countRes.rows[0].count),
     page,
     limit,
@@ -145,8 +170,7 @@ router.post(
 
     const inserted = [];
     for (const file of req.files) {
-      // Store only the relative path — the frontend constructs the full URL
-      // using VITE_API_URL so it works in any environment (local, staging, prod)
+      // Store only the relative path — full_url is computed on read
       const filePath = `/uploads/${file.filename}`;
       const result = await pool.query(
         `INSERT INTO media (filename, file_url, file_size, file_type, category_id, uploaded_by)
@@ -160,7 +184,7 @@ router.post(
           req.user.id,
         ]
       );
-      inserted.push(result.rows[0]);
+      inserted.push(withFullUrl(req, result.rows[0]));
     }
 
     await pool.query(
@@ -181,7 +205,7 @@ router.patch('/:id/category', authenticate, authorize(['admin', 'editor']), asyn
     [category_id || null, id]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'File not found' });
-  res.json(result.rows[0]);
+  res.json(withFullUrl(req, result.rows[0]));
 });
 
 // DELETE /api/media/:id
@@ -191,7 +215,6 @@ router.delete('/:id', authenticate, authorize(['admin', 'editor']), async (req, 
   if (result.rows.length === 0) return res.status(404).json({ error: 'File not found' });
 
   const file = result.rows[0];
-  // file_url is a relative path like /uploads/filename.jpg
   const filename = file.file_url.replace(/^\/uploads\//, '');
   if (filename) {
     const filePath = path.join(uploadDir, filename);
