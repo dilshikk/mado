@@ -93,6 +93,14 @@ class ApiClient {
     return data;
   }
 
+  /** Upload a profile avatar image. Returns { avatar_url: string } */
+  async uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const result = await this.uploadFiles('/auth/me/avatar', formData);
+    return result as { avatar_url: string };
+  }
+
   // ── Dashboard ───────────────────────────────────────────────────────────────
 
   getDashboardStats(): Promise<unknown> {
