@@ -21,16 +21,16 @@ const CAT_COLORS: Record<FaqCategory, string> = {
 };
 
 const INITIAL: FaqItem[] = [
-  { id: "1", question: "What types of events do you cater?", answer: "We cater all types of events including corporate events, weddings, birthdays, conferences, and private parties.", category: "Catering" },
-  { id: "2", question: "Can you handle dietary requirements?", answer: "Yes, we offer vegetarian, vegan, halal, and gluten-free options. Please specify your requirements when submitting the form.", category: "Catering" },
-  { id: "3", question: "Do you provide event setup?", answer: "Yes, our team handles full setup and breakdown including tables, linens, and serving equipment.", category: "Catering" },
-  { id: "4", question: "What is the minimum guest count for catering?", answer: "Our minimum is 20 guests for full catering service. For smaller events, please contact us for custom options.", category: "Catering" },
-  { id: "5", question: "How far in advance should I book?", answer: "We recommend booking at least 2 weeks in advance. For large events (100+ guests), please book 4\u20136 weeks ahead.", category: "Catering" },
-  { id: "6", question: "Is the menu halal?", answer: "Yes, all our meat is halal certified. We also have clearly marked vegetarian options.", category: "Menu" },
-  { id: "7", question: "Do you have a kids\u2019 menu?", answer: "We have dishes suitable for children across most of our menu sections. Ask your waiter for recommendations.", category: "Menu" },
-  { id: "8", question: "Where are you located?", answer: "We have multiple branches across Tashkent. Visit our Locations page for addresses and working hours.", category: "General" },
-  { id: "9", question: "Do you take reservations?", answer: "Yes, you can call any branch directly to make a reservation. Online booking is coming soon.", category: "General" },
-  { id: "10", question: "How do I apply for a job at MADO?", answer: "Visit our Careers page and fill out the application form. Our HR team will be in touch within 3\u20135 business days.", category: "Careers" },
+  { id: "1", question: "Какие виды мероприятий вы обслуживаете?", answer: "Мы организуем кейтеринг для всех типов мероприятий: корпоративных, свадеб, дней рождений, конференций и частных вечеринок.", category: "Catering" },
+  { id: "2", question: "Учитываете ли вы диетические требования?", answer: "Да, у нас есть вегетарианские, веганские, халяльные и безглютеновые блюда. Укажите требования при заполнении формы.", category: "Catering" },
+  { id: "3", question: "Вы занимаетесь оформлением мероприятия?", answer: "Да, наша команда берёт на себя полный монтаж и демонтаж, включая столы, скатерти и инвентарь для сервировки.", category: "Catering" },
+  { id: "4", question: "Какое минимальное количество гостей для кейтеринга?", answer: "Минимум — 20 гостей для полного кейтинга. Для меньших мероприятий свяжитесь с нами для индивидуального предложения.", category: "Catering" },
+  { id: "5", question: "За сколько нужно бронировать заранее?", answer: "Рекомендуем бронировать минимум за 2 недели. Для крупных мероприятий (100+ гостей) — за 4–6 недель.", category: "Catering" },
+  { id: "6", question: "Меню халяльное?", answer: "Да, всё мясо имеет халяльный сертификат. Вегетарианские блюда чётко отмечены.", category: "Menu" },
+  { id: "7", question: "Есть ли детское меню?", answer: "На большинстве разделов нашего меню есть блюда, подходящие для детей. Спросите у официанта.", category: "Menu" },
+  { id: "8", question: "Где вы находитесь?", answer: "У нас несколько филиалов по всему Ташкенту. Адреса и режим работы — на странице Филиалы.", category: "General" },
+  { id: "9", question: "Принимаете ли вы бронирование?", answer: "Да, позвоните в любой филиал напрямую. Онлайн-бронирование скоро появится.", category: "General" },
+  { id: "10", question: "Как подать заявку на работу в MADO?", answer: "Откройте страницу Вакансии и заполните форму заявки. HR-команда свяжется с вами в течение 3–5 рабочих дней.", category: "Careers" },
 ];
 
 export default function FaqPage() {
@@ -88,13 +88,13 @@ export default function FaqPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-serif font-bold">FAQ</h1>
-          <p className="text-sm text-muted-foreground mt-1">{items.length} questions across {CATEGORIES.length} categories</p>
+          <p className="text-sm text-muted-foreground mt-1">{items.length} вопросов в {CATEGORIES.length} категориях</p>
         </div>
         <button
           onClick={() => setAdding(true)}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
         >
-          <Plus className="w-4 h-4" /> Add Question
+          <Plus className="w-4 h-4" /> Добавить вопрос
         </button>
       </div>
 
@@ -105,7 +105,7 @@ export default function FaqPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search questions..."
+            placeholder="Поиск..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -114,7 +114,7 @@ export default function FaqPage() {
             onClick={() => setCatFilter("all")}
             className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors", catFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
           >
-            All
+            Все
           </button>
           {CATEGORIES.map((cat) => (
             <button
@@ -133,17 +133,17 @@ export default function FaqPage() {
         <div className="bg-card border border-accent/50 rounded-xl p-4 space-y-3">
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-xs text-muted-foreground mb-1 block">Question</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Вопрос</label>
               <input
                 autoFocus
                 value={newQ}
                 onChange={(e) => setNewQ(e.target.value)}
-                placeholder="e.g. Do you have parking?"
+                placeholder="например, Есть ли у вас парковка?"
                 className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Category</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Категория</label>
               <select value={newCat} onChange={(e) => setNewCat(e.target.value as FaqCategory)}
                 className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none">
                 {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
@@ -151,18 +151,18 @@ export default function FaqPage() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Answer</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Ответ</label>
             <textarea
               rows={3}
               value={newA}
               onChange={(e) => setNewA(e.target.value)}
-              placeholder="Write the answer..."
+              placeholder="Напишите ответ..."
               className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
           <div className="flex gap-2">
-            <button onClick={handleAdd} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Add</button>
-            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm">Cancel</button>
+            <button onClick={handleAdd} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Добавить</button>
+            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm">Отмена</button>
           </div>
         </div>
       )}
@@ -181,7 +181,7 @@ export default function FaqPage() {
               >
                 {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                 <span className={cn("text-xs font-bold px-2 py-0.5 rounded", CAT_COLORS[cat])}>{cat}</span>
-                <span className="text-sm text-muted-foreground">{catItems.length} questions</span>
+                <span className="text-sm text-muted-foreground">{catItems.length} вопросов</span>
               </button>
               {isOpen && (
                 <div className="divide-y divide-border border-t border-border">
@@ -231,7 +231,7 @@ export default function FaqPage() {
                     </div>
                   ))}
                   {catItems.length === 0 && (
-                    <div className="text-center py-6 text-xs text-muted-foreground">No questions in this category</div>
+                    <div className="text-center py-6 text-xs text-muted-foreground">Нет вопросов</div>
                   )}
                 </div>
               )}
