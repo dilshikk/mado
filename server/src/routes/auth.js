@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../db/pool.js';
-import { authenticate, authorize, JWT_SECRET } from '../middleware/auth.js';
+import { authenticate, authorize, VALID_ROLES, JWT_SECRET } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -54,14 +54,14 @@ router.post('/login', async (req, res) => {
 
 // Register a new team member (admin only)
 router.post('/register', authenticate, authorize(['admin']), async (req, res) => {
-  const { name, email, password, role = 'editor' } = req.body;
+  const { name, email, password, role } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'Name, email, and password required' });
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ error: 'Name, email, password, and role required' });
   }
 
-  if (!['admin', 'editor'].includes(role)) {
-    return res.status(400).json({ error: 'Role must be admin or editor' });
+  if (!VALID_ROLES.includes(role)) {
+    return res.status(400).json({ error: `Role must be one of: ${VALID_ROLES.join(', ')}` });
   }
 
   try {
