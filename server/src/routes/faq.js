@@ -49,6 +49,11 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
     RETURNING id, question_ru
   `, [question_ru, answer_ru, category]);
 
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'create', 'faq', result.rows[0].id, `Created FAQ: ${question_ru}`]
+  );
+
   res.status(201).json(result.rows[0]);
 });
 
@@ -65,6 +70,11 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     WHERE id = $10
   `, [question_ru, question_uz, question_en, question_tr, answer_ru, answer_uz, answer_en, answer_tr, category, id]);
 
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'update', 'faq', id, `Updated FAQ: ${question_ru}`]
+  );
+
   res.json({ message: 'FAQ item updated' });
 });
 
@@ -72,11 +82,16 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
 router.delete('/:id', authenticate, authorize(['admin']), async (req, res) => {
   const { id } = req.params;
 
-  const result = await pool.query('DELETE FROM faq WHERE id = $1 RETURNING id', [id]);
+  const result = await pool.query('DELETE FROM faq WHERE id = $1 RETURNING id, question_ru', [id]);
 
   if (result.rows.length === 0) {
     return res.status(404).json({ error: 'FAQ item not found' });
   }
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'delete', 'faq', id, `Deleted FAQ: ${result.rows[0].question_ru}`]
+  );
 
   res.json({ message: 'FAQ item deleted' });
 });
