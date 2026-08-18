@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import {
   ArrowRight,
   ChevronRight,
   Send,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -25,6 +27,21 @@ import {
 } from "@/components/ui/form.tsx";
 import Navbar from "../_components/navbar.tsx";
 import Footer from "../_components/footer.tsx";
+import api from "@/lib/api.ts";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Vacancy = {
+  id: string;
+  position: string;
+  position_ru: string;
+  position_uz: string;
+  position_en: string;
+  position_tr: string;
+  department: string;
+  branch: string;
+  employment_type: string;
+  salary: string;
+};
 
 // ─── Why Work ────────────────────────────────────────────────────────────────
 const WHY_ITEMS = [
@@ -50,52 +67,58 @@ const WHY_ITEMS = [
   },
 ] as const;
 
-// ─── Open Positions ───────────────────────────────────────────────────────────
-const POSITIONS = [
-  { title: "Официант / Официантка", type: "Полная занятость", city: "Ташкент" },
-  { title: "Бариста", type: "Полная занятость", city: "Ташкент" },
-  { title: "Раннер", type: "Полная занятость", city: "Ташкент" },
-  { title: "Повар холодного цеха", type: "Полная занятость", city: "Ташкент" },
-  { title: "Администратор зала", type: "Полная занятость", city: "Ташкент" },
-  { title: "Кассир", type: "Полная занятость", city: "Ташкент" },
-] as const;
-
 // ─── Apply form ───────────────────────────────────────────────────────────────
 const applySchema = z.object({
   fullName: z.string().min(1, "Введите ваше имя"),
   phone: z.string().min(1, "Введите номер телефона"),
   email: z.string().email("Введите корректный email"),
-  position: z.string().min(1, "Выберите вакансию"),
-  branch: z.string().min(1, "Выберите ресторан"),
+  vacancyId: z.string().min(1, "Выберите вакансию"),
   experience: z.string().optional(),
   message: z.string().optional(),
 });
 
 type ApplyFormValues = z.infer<typeof applySchema>;
 
-// Shared select class
 const selectCls =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-function ApplyForm() {
+function ApplyForm({ vacancies }: { vacancies: Vacancy[] }) {
+  const [submitting, setSubmitting] = useState(false);
+
   const form = useForm<ApplyFormValues>({
     resolver: zodResolver(applySchema),
     defaultValues: {
       fullName: "",
       phone: "",
       email: "",
-      position: "",
-      branch: "",
+      vacancyId: "",
       experience: "",
       message: "",
     },
   });
 
-  const onSubmit = (values: ApplyFormValues) => {
-    toast.success("Заявка отправлена!", {
-      description: `Спасибо, ${values.fullName}! Мы свяжемся с вами в ближайшее время.`,
-    });
-    form.reset();
+  const onSubmit = async (values: ApplyFormValues) => {
+    setSubmitting(true);
+    try {
+      await api.createApplication({
+        vacancy_id: values.vacancyId,
+        name: values.fullName,
+        phone: values.phone,
+        email: values.email,
+        experience: values.experience ?? "",
+        message: values.message ?? "",
+      });
+      toast.success("Заявка отправлена!", {
+        description: `Спасибо, ${values.fullName}! Мы свяжемся с вами в ближайшее время.`,
+      });
+      form.reset();
+    } catch {
+      toast.error("Не удалось отправить заявку", {
+        description: "Пожалуйста, попробуйте ещё раз или свяжитесь с нами напрямую.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -145,16 +168,16 @@ function ApplyForm() {
         />
         <FormField
           control={form.control}
-          name="position"
+          name="vacancyId"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Вакансия</FormLabel>
               <FormControl>
                 <select className={selectCls} {...field}>
                   <option value="">Выберите вакансию</option>
-                  {POSITIONS.map((p) => (
-                    <option key={p.title} value={p.title}>
-                      {p.title}
+                  {vacancies.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.position_ru || v.position_en || v.position}
                     </option>
                   ))}
                 </select>
@@ -165,26 +188,9 @@ function ApplyForm() {
         />
         <FormField
           control={form.control}
-          name="branch"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Ресторан</FormLabel>
-              <FormControl>
-                <select className={selectCls} {...field}>
-                  <option value="">Выберите ресторан</option>
-                  <option value="city-mall">MADO Сити Молл</option>
-                  <option value="park-in-mall">MADO Парк ин Молл</option>
-                </select>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
           name="experience"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="sm:col-span-2">
               <FormLabel>Опыт работы</FormLabel>
               <FormControl>
                 <Input placeholder="Например: 2 года официантом" {...field} />
@@ -213,9 +219,14 @@ function ApplyForm() {
         <Button
           type="submit"
           size="lg"
+          disabled={submitting}
           className="cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 sm:col-span-2"
         >
-          Отправить заявку <Send className="size-4" />
+          {submitting ? (
+            <><Loader2 className="size-4 animate-spin" /> Отправка...</>
+          ) : (
+            <>Отправить заявку <Send className="size-4" /></>
+          )}
         </Button>
       </form>
     </Form>
@@ -224,6 +235,33 @@ function ApplyForm() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Careers() {
+  const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getVacancies("published")
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setVacancies(data.map((v: Record<string, unknown>) => ({
+            id: String(v.id ?? ""),
+            position: String(v.position ?? ""),
+            position_ru: String(v.position_ru ?? ""),
+            position_uz: String(v.position_uz ?? ""),
+            position_en: String(v.position_en ?? ""),
+            position_tr: String(v.position_tr ?? ""),
+            department: String(v.department ?? ""),
+            branch: String(v.branch ?? ""),
+            employment_type: String(v.employment_type ?? "Full Time"),
+            salary: String(v.salary ?? ""),
+          })));
+        }
+      })
+      .catch(() => {
+        // Silently fail — positions section will just be empty
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -347,7 +385,7 @@ export default function Careers() {
         </div>
       </section>
 
-      {/* Open positions */}
+      {/* Open positions — loaded from API */}
       <section className="bg-background py-16 sm:py-24">
         <div className="mx-auto max-w-[1140px] px-6">
           <motion.div
@@ -368,35 +406,50 @@ export default function Careers() {
           </motion.div>
 
           <div className="mt-10 flex flex-col gap-3">
-            {POSITIONS.map((pos, i) => (
-              <motion.div
-                key={pos.title}
-                initial={{ opacity: 0, x: -16 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
-                className="group flex items-center justify-between rounded-xl border border-border/60 bg-secondary/40 px-5 py-4 transition-all hover:border-accent/40 hover:bg-secondary/70"
-              >
-                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-4">
-                  <span className="font-medium text-foreground">{pos.title}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent">
-                      {pos.type}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {pos.city}
-                    </span>
-                  </div>
-                </div>
-                <a
-                  href="#apply"
-                  className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-accent"
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-xl bg-secondary/40 animate-pulse" />
+              ))
+            ) : vacancies.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                В данный момент открытых вакансий нет. Проверьте позже.
+              </div>
+            ) : (
+              vacancies.map((vac, i) => (
+                <motion.div
+                  key={vac.id}
+                  initial={{ opacity: 0, x: -16 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
+                  className="group flex items-center justify-between rounded-xl border border-border/60 bg-secondary/40 px-5 py-4 transition-all hover:border-accent/40 hover:bg-secondary/70"
                 >
-                  Откликнуться
-                  <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                </a>
-              </motion.div>
-            ))}
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-4">
+                    <span className="font-medium text-foreground">
+                      {vac.position_ru || vac.position_en || vac.position}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent">
+                        {vac.employment_type}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{vac.branch}</span>
+                      {vac.salary && (
+                        <span className="text-xs text-muted-foreground hidden sm:inline">
+                          {vac.salary}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <a
+                    href="#apply"
+                    className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-accent"
+                  >
+                    Откликнуться
+                    <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </a>
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -430,7 +483,7 @@ export default function Careers() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
             className="mt-10 rounded-2xl bg-background p-6 shadow-sm sm:p-10"
           >
-            <ApplyForm />
+            <ApplyForm vacancies={vacancies} />
           </motion.div>
         </div>
       </section>
