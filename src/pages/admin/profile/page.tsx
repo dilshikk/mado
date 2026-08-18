@@ -16,7 +16,6 @@ type UserProfile = {
   avatar_url?: string | null;
 };
 
-// Helper: render avatar circle (image or initial letter)
 function AvatarCircle({
   src,
   name,
@@ -58,10 +57,8 @@ export default function ProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Access layout context to refresh avatar in navbar
   const ctx = useContext(AdminUserContext);
 
-  // Form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -82,7 +79,7 @@ export default function ProfilePage() {
       setName(me.name);
       setEmail(me.email);
     } catch {
-      setErrorMsg("Failed to load profile");
+      setErrorMsg("Не удалось загрузить профиль");
     } finally {
       setLoading(false);
     }
@@ -90,7 +87,6 @@ export default function ProfilePage() {
 
   useEffect(() => { void load(); }, []);
 
-  // Handle avatar file selection — auto-upload immediately (no save button needed)
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -99,19 +95,16 @@ export default function ProfilePage() {
     setErrorMsg(null);
     try {
       const result = await api.uploadAvatar(file);
-      // Update local profile state
       setProfile((prev) => prev ? { ...prev, avatar_url: result.avatar_url } : prev);
-      // Update navbar context if available
       if (ctx) {
         (ctx as { avatar_url?: string }).avatar_url = result.avatar_url;
       }
-      setSuccessMsg("Profile photo updated!");
+      setSuccessMsg("Фото профиля обновлено!");
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to upload photo");
+      setErrorMsg(err instanceof Error ? err.message : "Не удалось загрузить фото");
     } finally {
       setAvatarUploading(false);
-      // Reset input so the same file can be re-uploaded if needed
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -122,18 +115,18 @@ export default function ProfilePage() {
     setSuccessMsg(null);
 
     if (newPassword && newPassword !== confirmPassword) {
-      setErrorMsg("New passwords do not match");
+      setErrorMsg("Новые пароли не совпадают");
       return;
     }
     if (newPassword && newPassword.length < 6) {
-      setErrorMsg("New password must be at least 6 characters");
+      setErrorMsg("Минимум 6 символов");
       return;
     }
 
     setSaving(true);
     try {
-      const updated = await api.request('/auth/me', {
-        method: 'PUT',
+      const updated = await api.request("/auth/me", {
+        method: "PUT",
         body: JSON.stringify({
           name,
           email,
@@ -145,17 +138,17 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setSuccessMsg("Profile updated successfully");
+      setSuccessMsg("Профиль успешно обновлён");
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Failed to update profile");
+      setErrorMsg(e instanceof Error ? e.message : "Не удалось обновить профиль");
     } finally {
       setSaving(false);
     }
   };
 
   const formatDate = (iso: string | null) => {
-    if (!iso) return "Never";
+    if (!iso) return "Никогда";
     return new Date(iso).toLocaleString("ru-RU", {
       day: "2-digit", month: "short", year: "numeric",
       hour: "2-digit", minute: "2-digit",
@@ -179,24 +172,22 @@ export default function ProfilePage() {
     <div className="max-w-2xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-serif font-bold">My Profile</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your account settings and security</p>
+        <h1 className="text-2xl font-serif font-bold">Мой профиль</h1>
+        <p className="text-sm text-muted-foreground mt-1">Управление настройками и безопасностью аккаунта</p>
       </div>
 
       {/* Profile card info */}
       {profile && (
         <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-5">
-          {/* Avatar with upload overlay */}
           <div className="relative shrink-0 group">
             <AvatarCircle src={profile.avatar_url} name={profile.name} size="xl" />
 
-            {/* Overlay button */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={avatarUploading}
               className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
-              title="Change photo"
+              title="Изменить фото"
             >
               {avatarUploading
                 ? <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -204,7 +195,6 @@ export default function ProfilePage() {
               }
             </button>
 
-            {/* Hidden file input */}
             <input
               ref={fileInputRef}
               type="file"
@@ -218,14 +208,13 @@ export default function ProfilePage() {
             <p className="text-lg font-semibold">{profile.name}</p>
             <p className="text-sm text-muted-foreground">{profile.email}</p>
 
-            {/* Upload hint */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={avatarUploading}
               className="mt-1.5 text-xs text-primary hover:underline cursor-pointer disabled:opacity-50"
             >
-              {avatarUploading ? "Uploading..." : profile.avatar_url ? "Change photo" : "Upload photo"}
+              {avatarUploading ? "Загрузка..." : profile.avatar_url ? "Изменить фото" : "Загрузить фото"}
             </button>
 
             <div className="flex flex-wrap gap-3 mt-2">
@@ -235,15 +224,15 @@ export default function ProfilePage() {
               </span>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Calendar className="w-3.5 h-3.5" />
-                Joined {formatDate(profile.created_at)}
+                Зарегистрирован {formatDate(profile.created_at)}
               </span>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Calendar className="w-3.5 h-3.5" />
-                Last seen {formatDate(profile.last_seen)}
+                Последний раз в сети {formatDate(profile.last_seen)}
               </span>
             </div>
           </div>
-          <div className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${profile.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-red-100 text-red-700'}`}>
+          <div className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${profile.status === "active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-red-100 text-red-700"}`}>
             {profile.status}
           </div>
         </div>
@@ -251,7 +240,6 @@ export default function ProfilePage() {
 
       {/* Edit form */}
       <form onSubmit={(e) => void handleSave(e)} className="space-y-5">
-        {/* Success / Error messages */}
         {successMsg && (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 p-3 text-sm text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="w-4 h-4 shrink-0" /> {successMsg}
@@ -266,23 +254,23 @@ export default function ProfilePage() {
         {/* Personal info */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
           <h2 className="font-semibold flex items-center gap-2">
-            <User className="w-4 h-4 text-muted-foreground" /> Personal Information
+            <User className="w-4 h-4 text-muted-foreground" /> Личная информация
           </h2>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Full Name</label>
+            <label className="text-sm font-medium">Полное имя</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               className="w-full px-3 py-2.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Your full name"
+              placeholder="Ваше имя"
             />
           </div>
 
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-muted-foreground" /> Email Address
+              <Mail className="w-3.5 h-3.5 text-muted-foreground" /> Адрес email
             </label>
             <input
               type="email"
@@ -298,20 +286,19 @@ export default function ProfilePage() {
         {/* Change password */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
           <h2 className="font-semibold flex items-center gap-2">
-            <Lock className="w-4 h-4 text-muted-foreground" /> Change Password
-            <span className="text-xs text-muted-foreground font-normal">(leave blank to keep current)</span>
+            <Lock className="w-4 h-4 text-muted-foreground" /> Изменить пароль
+            <span className="text-xs text-muted-foreground font-normal">(оставьте пустым для сохранения)</span>
           </h2>
 
-          {/* Current password */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">Current Password</label>
+            <label className="text-sm font-medium">Текущий пароль</label>
             <div className="relative">
               <input
                 type={showCurrent ? "text" : "password"}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full px-3 py-2.5 pr-10 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Enter current password"
+                placeholder="Введите текущий пароль"
               />
               <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -319,17 +306,16 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* New password */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium">New Password</label>
+              <label className="text-sm font-medium">Новый пароль</label>
               <div className="relative">
                 <input
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3 py-2.5 pr-10 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Min 6 characters"
+                  placeholder="Минимум 6 символов"
                 />
                 <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -337,7 +323,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Confirm New Password</label>
+              <label className="text-sm font-medium">Подтвердите пароль</label>
               <div className="relative">
                 <input
                   type={showConfirm ? "text" : "password"}
@@ -346,14 +332,14 @@ export default function ProfilePage() {
                   className={`w-full px-3 py-2.5 pr-10 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring ${
                     confirmPassword && confirmPassword !== newPassword ? "border-red-400" : "border-input"
                   }`}
-                  placeholder="Repeat new password"
+                  placeholder="Повторите пароль"
                 />
                 <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {confirmPassword && confirmPassword !== newPassword && (
-                <p className="text-xs text-red-500">Passwords do not match</p>
+                <p className="text-xs text-red-500">Пароли не совпадают</p>
               )}
             </div>
           </div>
@@ -367,7 +353,7 @@ export default function ProfilePage() {
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-60 transition-colors"
           >
             <Save className="w-4 h-4" />
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? "Сохранение..." : "Сохранить изменения"}
           </button>
         </div>
       </form>
