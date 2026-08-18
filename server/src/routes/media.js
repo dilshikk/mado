@@ -16,20 +16,11 @@ const router = express.Router();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Build the public base URL of the server from the incoming request.
- * Uses BASE_URL env var if set (e.g. "https://api.madouz.uz"),
- * otherwise falls back to req.protocol + req.get('host').
- */
 function getBaseUrl(req) {
   if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
   return `${req.protocol}://${req.get('host')}`;
 }
 
-/**
- * Enrich a media row with a `full_url` field that is always an absolute URL.
- * Handles both old rows (already absolute) and new rows (relative /uploads/...).
- */
 function withFullUrl(req, row) {
   if (!row) return row;
   const base = getBaseUrl(req);
@@ -110,7 +101,6 @@ router.delete('/categories/:id', authenticate, authorize(['admin']), async (req,
 
 // ── Media files ───────────────────────────────────────────────────────────────
 
-// GET /api/media?page=1&limit=24&search=...&category_id=...
 router.get('/', async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 24));
@@ -155,7 +145,6 @@ router.get('/', async (req, res) => {
   });
 });
 
-// POST /api/media/upload
 router.post(
   '/upload',
   authenticate,
@@ -170,33 +159,24 @@ router.post(
 
     const inserted = [];
     for (const file of req.files) {
-      // Store only the relative path — full_url is computed on read
       const filePath = `/uploads/${file.filename}`;
       const result = await pool.query(
         `INSERT INTO media (filename, file_url, file_size, file_type, category_id, uploaded_by)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [
-          file.originalname,
-          filePath,
-          file.size,
-          file.mimetype,
-          category_id || null,
-          req.user.id,
-        ]
+        [file.originalname, filePath, file.size, file.mimetype, category_id || null, req.user.id]
       );
       inserted.push(withFullUrl(req, result.rows[0]));
     }
 
     await pool.query(
       'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
-      [req.user.id, 'upload', 'media', `Uploaded ${inserted.length} file(s)`]
+      [req.user.id, 'upload', 'media', `Uploaded ${inserted.length} file(s): ${inserted.map(f => f.filename).join(', ')}`]
     );
 
     res.status(201).json(inserted);
   }
 );
 
-// PATCH /api/media/:id/category
 router.patch('/:id/category', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const { category_id } = req.body;
@@ -208,7 +188,6 @@ router.patch('/:id/category', authenticate, authorize(['admin', 'marketing', 'co
   res.json(withFullUrl(req, result.rows[0]));
 });
 
-// DELETE /api/media/:id
 router.delete('/:id', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const result = await pool.query('DELETE FROM media WHERE id = $1 RETURNING *', [id]);
@@ -221,10 +200,14 @@ router.delete('/:id', authenticate, authorize(['admin', 'marketing', 'content_ma
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'delete', 'media', id, `Deleted file: ${file.filename}`]
+  );
+
   res.json({ message: 'File deleted' });
 });
 
-// POST /api/media/bulk-delete
 router.post('/bulk-delete', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -244,6 +227,11 @@ router.post('/bulk-delete', authenticate, authorize(['admin', 'marketing', 'cont
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
   }
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
+    [req.user.id, 'bulk_delete', 'media', `Bulk deleted ${result.rowCount} file(s)`]
+  );
 
   res.json({ deleted: result.rowCount });
 });
