@@ -11,15 +11,12 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form.tsx";
 import Navbar from "@/pages/_components/navbar.tsx";
 import Footer from "@/pages/_components/footer.tsx";
+import PageMeta from "@/components/page-meta.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 
@@ -165,24 +162,15 @@ function StarSelector({ value, onChange, lang }: { value: number; onChange: (v: 
     <div className="flex flex-col gap-1">
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            onMouseEnter={() => setHovered(n)}
-            onMouseLeave={() => setHovered(0)}
+          <button key={n} type="button"
+            onMouseEnter={() => setHovered(n)} onMouseLeave={() => setHovered(0)}
             onClick={() => onChange(n)}
-            className="cursor-pointer transition-transform hover:scale-110"
-            aria-label={`${n} star`}
-          >
+            className="cursor-pointer transition-transform hover:scale-110" aria-label={`${n} star`}>
             <Star className={cn("w-8 h-8 transition-colors", n <= active ? "text-amber-400 fill-amber-400" : "text-muted-foreground/30")} />
           </button>
         ))}
       </div>
-      {active > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {(T[lang].ratingLabel as (n: number) => string)(active)}
-        </p>
-      )}
+      {active > 0 && <p className="text-xs text-muted-foreground">{(T[lang].ratingLabel as (n: number) => string)(active)}</p>}
     </div>
   );
 }
@@ -224,7 +212,8 @@ function ReviewCard({ rev, index }: { rev: Review; index: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReviewsPublicPage() {
-  const [lang, setLang] = useState<Lang>("ru");
+  // Use global lang — synced with navbar switcher
+  const { lang, setLang } = useLanguage();
 
   // ── List state ──
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -237,10 +226,8 @@ export default function ReviewsPublicPage() {
 
   const t = T[lang];
 
-  // Load approved reviews once
   useEffect(() => {
-    api
-      .getReviews({})
+    api.getReviews({})
       .then((result: unknown) => {
         const items = Array.isArray(result) ? (result as ApiReviewItem[]) : [];
         const approved = items
@@ -252,7 +239,6 @@ export default function ReviewsPublicPage() {
             text: r.text ?? "",
             date: new Date(r.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" }),
           }))
-          // newest first
           .sort((a, b) => b.id.localeCompare(a.id));
         setReviews(approved);
       })
@@ -290,20 +276,15 @@ export default function ReviewsPublicPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta slug="reviews" lang={lang} />
       <Navbar />
 
       {/* Hero */}
       <section className="bg-[#143968] text-primary-foreground py-20 px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" as const }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" as const }}>
             <div className="flex justify-center gap-1 mb-6">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} className="w-6 h-6 text-amber-400 fill-amber-400" />
-              ))}
+              {[1, 2, 3, 4, 5].map((i) => <Star key={i} className="w-6 h-6 text-amber-400 fill-amber-400" />)}
             </div>
             <h1 className="font-serif text-4xl md:text-5xl font-bold mb-4">{t.title}</h1>
             <p className="text-primary-foreground/75 text-lg max-w-lg mx-auto">{t.subtitle}</p>
@@ -314,22 +295,20 @@ export default function ReviewsPublicPage() {
       {/* Language switcher */}
       <div className="flex justify-center gap-2 pt-10 px-6">
         {LANGUAGES.map(({ code, label }) => (
-          <button
-            key={code}
+          <button key={code}
             onClick={() => { setLang(code); form.clearErrors(); }}
             className={cn(
-              "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors border",
+              "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors border cursor-pointer",
               lang === code
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary",
-            )}
-          >
+            )}>
             {label}
           </button>
         ))}
       </div>
 
-      {/* ── Full reviews list ── */}
+      {/* Full reviews list */}
       <section className="py-12 px-6">
         <div className="mx-auto max-w-[1140px]">
           <h2 className="font-serif text-2xl font-bold mb-8">{t.listTitle}</h2>
@@ -346,19 +325,12 @@ export default function ReviewsPublicPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {shownReviews.map((rev, i) => (
-                  <ReviewCard key={rev.id} rev={rev} index={i} />
-                ))}
+                {shownReviews.map((rev, i) => <ReviewCard key={rev.id} rev={rev} index={i} />)}
               </div>
-
               {hasMore && (
                 <div className="mt-10 flex justify-center">
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="gap-2 cursor-pointer"
-                    onClick={() => setVisible((v) => v + PAGE_SIZE)}
-                  >
+                  <Button variant="secondary" size="lg" className="gap-2 cursor-pointer"
+                    onClick={() => setVisible((v) => v + PAGE_SIZE)}>
                     <ChevronDown className="w-4 h-4" />
                     {t.loadMore} ({Math.min(PAGE_SIZE, reviews.length - visible)})
                   </Button>
@@ -369,79 +341,46 @@ export default function ReviewsPublicPage() {
         </div>
       </section>
 
-      {/* ── Submit form ── */}
+      {/* Submit form */}
       <section className="pb-20 px-6 border-t border-border pt-12">
         <div className="mx-auto max-w-xl">
           <AnimatePresence mode="wait">
             {submitted ? (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+              <motion.div key="success"
+                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.3, ease: "easeOut" as const }}
-                className="text-center py-16 px-6 bg-card border border-border rounded-2xl shadow-sm"
-              >
+                className="text-center py-16 px-6 bg-card border border-border rounded-2xl shadow-sm">
                 <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
                 <h2 className="font-serif text-2xl font-bold mb-2">{t.successTitle}</h2>
                 <p className="text-muted-foreground mb-8">{t.successDesc}</p>
                 <Button onClick={handleReset} variant="secondary">{t.sendAnother}</Button>
               </motion.div>
             ) : (
-              <motion.div
-                key="form"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -16 }}
+              <motion.div key="form"
+                initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
                 transition={{ duration: 0.3, ease: "easeOut" as const }}
-                className="bg-card border border-border rounded-2xl p-8 shadow-sm"
-              >
+                className="bg-card border border-border rounded-2xl p-8 shadow-sm">
                 <h2 className="font-serif text-xl font-bold mb-6">{t.formTitle}</h2>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                    <FormField
-                      control={form.control}
-                      name="author"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t.name}</FormLabel>
-                          <FormControl><Input placeholder={t.namePlaceholder} {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="rating"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t.rating}</FormLabel>
-                          <FormControl>
-                            <StarSelector value={field.value} onChange={field.onChange} lang={lang} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="text"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t.review}</FormLabel>
-                          <FormControl><Textarea rows={5} placeholder={t.reviewPlaceholder} {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <FormField control={form.control} name="author" render={({ field }) => (
+                      <FormItem><FormLabel>{t.name}</FormLabel><FormControl><Input placeholder={t.namePlaceholder} {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="rating" render={({ field }) => (
+                      <FormItem><FormLabel>{t.rating}</FormLabel><FormControl>
+                        <StarSelector value={field.value} onChange={field.onChange} lang={lang} />
+                      </FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="text" render={({ field }) => (
+                      <FormItem><FormLabel>{t.review}</FormLabel><FormControl>
+                        <Textarea rows={5} placeholder={t.reviewPlaceholder} {...field} />
+                      </FormControl><FormMessage /></FormItem>
+                    )} />
                     <Button type="submit" disabled={submitting} className="w-full gap-2">
                       {submitting ? (
                         <>
-                          <motion.span
-                            animate={{ rotate: 360 }}
-                            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                            className="inline-block w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full"
-                          />
+                          <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                            className="inline-block w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full" />
                           {t.sending}
                         </>
                       ) : (
