@@ -3,6 +3,8 @@ import { ArrowRight, IceCreamCone, Bike, UtensilsCrossed, Wine } from "lucide-re
 import { Button } from "@/components/ui/button.tsx";
 import Navbar from "./_components/navbar.tsx";
 import Footer from "./_components/footer.tsx";
+import PageMeta from "@/components/page-meta.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
 
 const HISTORY_PHOTOS = [
   {
@@ -66,8 +68,11 @@ const GALLERY_STRIP = [
 ] as const;
 
 export default function Story() {
+  const { lang } = useLanguage();
+
   return (
     <div>
+      <PageMeta slug="story" lang={lang} />
       <Navbar />
 
       <section
@@ -151,15 +156,9 @@ export default function Story() {
 
             <div className="grid grid-cols-2 gap-3">
               {HISTORY_PHOTOS.map((photo) => (
-                <div
-                  key={photo.src}
-                  className="overflow-hidden rounded-lg shadow-md"
-                >
-                  <img
-                    src={photo.src}
-                    alt={photo.alt}
-                    className="aspect-square w-full object-cover object-top grayscale"
-                  />
+                <div key={photo.src} className="overflow-hidden rounded-lg shadow-md">
+                  <img src={photo.src} alt={photo.alt}
+                    className="aspect-square w-full object-cover object-top grayscale" />
                 </div>
               ))}
             </div>
@@ -167,21 +166,15 @@ export default function Story() {
 
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((feature, i) => (
-              <motion.div
-                key={feature.title}
+              <motion.div key={feature.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
-                className="rounded-xl border border-border/60 bg-background px-5 py-8 text-center shadow-sm"
-              >
+                className="rounded-xl border border-border/60 bg-background px-5 py-8 text-center shadow-sm">
                 <feature.icon className="mx-auto size-7 text-accent" />
-                <h3 className="mt-4 font-serif text-lg font-bold text-foreground">
-                  {feature.title}
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {feature.text}
-                </p>
+                <h3 className="mt-4 font-serif text-lg font-bold text-foreground">{feature.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{feature.text}</p>
               </motion.div>
             ))}
           </div>
@@ -190,53 +183,27 @@ export default function Story() {
 
       <section
         className="relative overflow-hidden bg-primary bg-cover bg-center py-16"
-        style={{
-          backgroundImage:
-            "url(https://images.unsplash.com/photo-1679867646687-3a7cb8cbfb81?auto=format&fit=crop&w=1600&q=80)",
-        }}
+        style={{ backgroundImage: "url(https://images.unsplash.com/photo-1679867646687-3a7cb8cbfb81?auto=format&fit=crop&w=1600&q=80)" }}
       >
         <div className="absolute inset-0 bg-primary/75" />
         <div className="relative mx-auto grid max-w-[1140px] grid-cols-1 items-center gap-10 px-6 lg:grid-cols-2">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-          >
-            <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">
-              Восхитительный опыт
-            </p>
+          <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: "easeOut" }}>
+            <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">Восхитительный опыт</p>
             <h2 className="mt-3 text-balance font-serif text-3xl font-bold text-primary-foreground sm:text-4xl">
               Ужин, мероприятие или праздник?
             </h2>
             <p className="mt-4 max-w-md text-primary-foreground/80">
-              Планируете уютный ужин, корпоративное мероприятие или особое
-              торжество — MADO предлагает элегантную атмосферу в сочетании с
-              аутентичными турецкими вкусами. Каждое событие создано так,
-              чтобы стать незабываемым.
+              Планируете уютный ужин, корпоративное мероприятие или особое торжество — MADO предлагает элегантную атмосферу в сочетании с аутентичными турецкими вкусами.
             </p>
-            <Button
-              className="mt-6 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90"
-              asChild
-            >
-              <a href="#contact">
-                Узнать больше <ArrowRight className="size-4" />
-              </a>
+            <Button className="mt-6 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90" asChild>
+              <a href="#contact">Узнать больше <ArrowRight className="size-4" /></a>
             </Button>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="overflow-hidden rounded-xl shadow-xl"
-          >
-            <img
-              src="https://images.unsplash.com/photo-1773209928058-cfd3314acc7c?auto=format&fit=crop&w=1000&q=80"
-              alt="Праздничный стол с турецкими блюдами"
-              className="aspect-4/3 w-full object-cover"
-            />
+          <motion.div initial={{ opacity: 0, scale: 0.94 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: "easeOut" }}
+            className="overflow-hidden rounded-xl shadow-xl">
+            <img src="https://images.unsplash.com/photo-1773209928058-cfd3314acc7c?auto=format&fit=crop&w=1000&q=80"
+              alt="Праздничный стол с турецкими блюдами" className="aspect-4/3 w-full object-cover" />
           </motion.div>
         </div>
       </section>
@@ -244,11 +211,8 @@ export default function Story() {
       <section className="grid grid-cols-2 sm:grid-cols-4">
         {GALLERY_STRIP.map((photo) => (
           <div key={photo.src} className="aspect-square overflow-hidden">
-            <img
-              src={photo.src}
-              alt={photo.alt}
-              className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-            />
+            <img src={photo.src} alt={photo.alt}
+              className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
           </div>
         ))}
       </section>
