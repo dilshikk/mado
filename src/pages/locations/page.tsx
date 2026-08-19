@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button.tsx";
 import Navbar from "../_components/navbar.tsx";
 import Footer from "../_components/footer.tsx";
 import api from "@/lib/api.ts";
+import PageMeta from "@/components/page-meta.tsx";
+import { useLanguage, LANG_OPTIONS } from "@/hooks/use-language.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,15 +39,6 @@ type ApiLocation = {
 };
 
 type LangCode = "ru" | "uz" | "en" | "tr";
-
-// ─── Language config ──────────────────────────────────────────────────────────
-
-const LANG_OPTIONS: { code: LangCode; label: string; flag: string }[] = [
-  { code: "ru", label: "RU", flag: "🇷🇺" },
-  { code: "uz", label: "UZ", flag: "🇺🇿" },
-  { code: "en", label: "EN", flag: "🇬🇧" },
-  { code: "tr", label: "TR", flag: "🇹🇷" },
-];
 
 // ─── Service translations ─────────────────────────────────────────────────────
 
@@ -167,8 +160,10 @@ export default function Locations() {
   const [locations, setLocations] = useState<ApiLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [lang, setLang] = useState<LangCode>("ru");
   const [filter, setFilter] = useState("all");
+
+  // Use global language instead of local state
+  const { lang, setLang } = useLanguage();
 
   const t = UI_TEXT[lang];
 
@@ -183,6 +178,7 @@ export default function Locations() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta slug="locations" lang={lang} />
       <Navbar />
 
       {/* Hero */}
@@ -202,7 +198,7 @@ export default function Locations() {
             className="mt-5 flex justify-center gap-2">
             {LANG_OPTIONS.map((l) => (
               <button key={l.code} onClick={() => setLang(l.code)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${lang === l.code ? "bg-accent text-accent-foreground shadow" : "bg-white/10 text-white/80 hover:bg-white/20"}`}>
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${lang === l.code ? "bg-accent text-accent-foreground shadow" : "bg-white/10 text-white/80 hover:bg-white/20"}`}>
                 <span>{l.flag}</span> {l.label}
               </button>
             ))}
@@ -247,16 +243,12 @@ export default function Locations() {
                     transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
                     className="group overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm transition-shadow hover:shadow-md"
                   >
-                    {/* Photo */}
                     {loc.photo_url ? (
                       <div className="relative h-48 overflow-hidden">
-                        <img
-                          src={loc.photo_url}
-                          alt={name}
+                        <img src={loc.photo_url} alt={name}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
                         />
-                        {/* Status badge over photo */}
                         <span className={`absolute top-3 right-3 rounded-full px-2.5 py-0.5 text-xs font-semibold shadow ${open ? "bg-green-500 text-white" : "bg-red-500 text-white"}`}>
                           {open ? t.openNow : t.closedNow}
                         </span>
@@ -270,7 +262,6 @@ export default function Locations() {
                     <div className="p-6">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-serif text-xl font-bold text-foreground">{name}</h3>
-                        {/* Status badge when no photo */}
                         {!loc.photo_url && (
                           <span className={`mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${open ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>
                             {open ? t.openNow : t.closedNow}
@@ -292,7 +283,6 @@ export default function Locations() {
                         </div>
                       </div>
 
-                      {/* Services */}
                       {loc.services.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-1.5">
                           {loc.services.map((s) => (
