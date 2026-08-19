@@ -38,6 +38,15 @@ type Page = {
   meta_title: string | null;
   meta_description: string | null;
   og_image: string | null;
+  // Multilingual meta
+  meta_title_ru: string | null;
+  meta_title_uz: string | null;
+  meta_title_en: string | null;
+  meta_title_tr: string | null;
+  meta_description_ru: string | null;
+  meta_description_uz: string | null;
+  meta_description_en: string | null;
+  meta_description_tr: string | null;
   updated_at: string;
 };
 
@@ -51,107 +60,138 @@ type DefaultPageDef = {
   status: PageStatus;
   meta_title: string;
   meta_description: string;
+  meta_title_ru?: string;
+  meta_title_uz?: string;
+  meta_title_en?: string;
+  meta_title_tr?: string;
+  meta_description_ru?: string;
+  meta_description_uz?: string;
+  meta_description_en?: string;
+  meta_description_tr?: string;
 };
 
 // ─── Default pages seed data ──────────────────────────────────────────────────
-// All 8 public routes from App.tsx, with titles + SEO in RU / UZ / EN / TR
 
 const DEFAULT_PAGES: DefaultPageDef[] = [
   {
-    title: "Главная",
-    slug: "",
-    title_ru: "Главная",
-    title_uz: "Bosh sahifa",
-    title_en: "Home",
-    title_tr: "Ana Sayfa",
+    title: "Главная", slug: "",
+    title_ru: "Главная", title_uz: "Bosh sahifa", title_en: "Home", title_tr: "Ana Sayfa",
     status: "published",
     meta_title: "MADO — Турецкий ресторан в Ташкенте",
-    meta_description:
-      "Аутентичная турецкая кухня, десерты и мороженое MADO в Ташкенте. Зал, доставка, кейтеринг и мероприятия.",
+    meta_description: "Аутентичная турецкая кухня, десерты и мороженое MADO в Ташкенте. Зал, доставка, кейтеринг и мероприятия.",
+    meta_title_ru: "MADO — Турецкий ресторан в Ташкенте",
+    meta_title_uz: "MADO — Toshkentdagi turk restorani",
+    meta_title_en: "MADO — Turkish Restaurant in Tashkent",
+    meta_title_tr: "MADO — Taşkent'teki Türk Restoranı",
+    meta_description_ru: "Аутентичная турецкая кухня, десерты и мороженое MADO в Ташкенте. Зал, доставка, кейтеринг и мероприятия.",
+    meta_description_uz: "Toshkentda MADO ning haqiqiy turk taomlari, desertlar va muzqaymoq. Zal, yetkazib berish, keytering.",
+    meta_description_en: "Authentic Turkish cuisine, desserts and MADO ice cream in Tashkent. Dine-in, delivery, catering and events.",
+    meta_description_tr: "Taşkent'te otantik Türk mutfağı, tatlılar ve MADO dondurması. Salon, teslimat, catering ve etkinlikler.",
   },
   {
-    title: "Наша история",
-    slug: "story",
-    title_ru: "Наша история",
-    title_uz: "Bizning tariximiz",
-    title_en: "Our Story",
-    title_tr: "Hikayemiz",
+    title: "Наша история", slug: "story",
+    title_ru: "Наша история", title_uz: "Bizning tariximiz", title_en: "Our Story", title_tr: "Hikayemiz",
     status: "published",
     meta_title: "Наша история — MADO Ташкент",
-    meta_description:
-      "История бренда MADO: от традиционного мараш-дондурмы до международной ресторанной сети с более чем 300 филиалами.",
+    meta_description: "История бренда MADO: от традиционного мараш-дондурмы до международной ресторанной сети.",
+    meta_title_ru: "Наша история — MADO Ташкент",
+    meta_title_uz: "Bizning tarixiyimiz — MADO Toshkent",
+    meta_title_en: "Our Story — MADO Tashkent",
+    meta_title_tr: "Hikayemiz — MADO Taşkent",
+    meta_description_ru: "История бренда MADO: от традиционного мараш-дондурмы до международной ресторанной сети.",
+    meta_description_uz: "MADO brendining tarixi: an'anaviy maraş muzqaymoqidan xalqaro restoran tarmog'igacha.",
+    meta_description_en: "The MADO story: from traditional Maraş ice cream to an international restaurant chain.",
+    meta_description_tr: "MADO'nun hikayesi: geleneksel Maraş dondurmasından uluslararası bir restoran zincirine.",
   },
   {
-    title: "Меню",
-    slug: "menu",
-    title_ru: "Меню",
-    title_uz: "Menyu",
-    title_en: "Menu",
-    title_tr: "Menü",
+    title: "Меню", slug: "menu",
+    title_ru: "Меню", title_uz: "Menyu", title_en: "Menu", title_tr: "Menü",
     status: "published",
     meta_title: "Меню — MADO Ташкент",
-    meta_description:
-      "Полное меню ресторана MADO: турецкие блюда, десерты, мороженое дондурма, напитки и многое другое.",
+    meta_description: "Полное меню ресторана MADO: турецкие блюда, десерты, мороженое дондурма, напитки.",
+    meta_title_ru: "Меню — MADO Ташкент",
+    meta_title_uz: "Menyu — MADO Toshkent",
+    meta_title_en: "Menu — MADO Tashkent",
+    meta_title_tr: "Menü — MADO Taşkent",
+    meta_description_ru: "Полное меню ресторана MADO: турецкие блюда, десерты, мороженое дондурма, напитки.",
+    meta_description_uz: "MADO restoranining to'liq menyusi: turk taomlari, desertlar, don durma muzqaymoq.",
+    meta_description_en: "Full MADO restaurant menu: Turkish dishes, desserts, dondurma ice cream, drinks.",
+    meta_description_tr: "MADO restoranı tam menüsü: Türk yemekleri, tatlılar, dondurma, içecekler.",
   },
   {
-    title: "Кейтеринг",
-    slug: "catering",
-    title_ru: "Кейтеринг",
-    title_uz: "Keytering",
-    title_en: "Catering",
-    title_tr: "Catering",
+    title: "Кейтеринг", slug: "catering",
+    title_ru: "Кейтеринг", title_uz: "Keytering", title_en: "Catering", title_tr: "Catering",
     status: "published",
     meta_title: "Кейтеринг — MADO Ташкент",
-    meta_description:
-      "Организуйте незабываемое мероприятие с кейтерингом от MADO. Корпоративные обеды, свадьбы, праздники — аутентичная турецкая кухня.",
+    meta_description: "Организуйте незабываемое мероприятие с кейтерингом от MADO.",
+    meta_title_ru: "Кейтеринг — MADO Ташкент",
+    meta_title_uz: "Keytering — MADO Toshkent",
+    meta_title_en: "Catering — MADO Tashkent",
+    meta_title_tr: "Catering — MADO Taşkent",
+    meta_description_ru: "Организуйте незабываемое мероприятие с кейтерингом от MADO. Свадьбы, корпоративы, торжества.",
+    meta_description_uz: "MADO keyteringi bilan unutilmas tadbir uyushtiring. To'ylar, korporativlar, bayramlar.",
+    meta_description_en: "Organise an unforgettable event with MADO catering. Weddings, corporate events, celebrations.",
+    meta_description_tr: "MADO catering ile unutulmaz bir etkinlik düzenleyin. Düğünler, kurumsal etkinlikler.",
   },
   {
-    title: "Филиалы",
-    slug: "locations",
-    title_ru: "Филиалы",
-    title_uz: "Filiallar",
-    title_en: "Locations",
-    title_tr: "Şubelerimiz",
+    title: "Филиалы", slug: "locations",
+    title_ru: "Филиалы", title_uz: "Filiallar", title_en: "Locations", title_tr: "Şubelerimiz",
     status: "published",
     meta_title: "Филиалы MADO в Ташкенте",
-    meta_description:
-      "Найдите ближайший ресторан MADO в Ташкенте. Адреса, время работы и контакты всех филиалов.",
+    meta_description: "Найдите ближайший ресторан MADO в Ташкенте. Адреса, время работы и контакты.",
+    meta_title_ru: "Филиалы MADO в Ташкенте",
+    meta_title_uz: "Toshkentdagi MADO filiallari",
+    meta_title_en: "MADO Locations in Tashkent",
+    meta_title_tr: "Taşkent'teki MADO Şubeleri",
+    meta_description_ru: "Найдите ближайший ресторан MADO в Ташкенте. Адреса, время работы и контакты всех филиалов.",
+    meta_description_uz: "Toshkentda eng yaqin MADO restoranini toping. Barcha filiallarning manzillari va ish vaqtlari.",
+    meta_description_en: "Find your nearest MADO restaurant in Tashkent. Addresses, opening hours and contacts.",
+    meta_description_tr: "Taşkent'teki en yakın MADO restoranını bulun. Adresler, çalışma saatleri ve iletişim.",
   },
   {
-    title: "Карьера",
-    slug: "careers",
-    title_ru: "Карьера",
-    title_uz: "Karyera",
-    title_en: "Careers",
-    title_tr: "Kariyer",
+    title: "Карьера", slug: "careers",
+    title_ru: "Карьера", title_uz: "Karyera", title_en: "Careers", title_tr: "Kariyer",
     status: "published",
     meta_title: "Карьера в MADO — Вакансии в Ташкенте",
-    meta_description:
-      "Присоединяйтесь к команде MADO. Открытые вакансии в ресторанах MADO в Ташкенте — работа для поваров, официантов и менеджеров.",
+    meta_description: "Присоединяйтесь к команде MADO. Открытые вакансии в ресторанах MADO в Ташкенте.",
+    meta_title_ru: "Карьера в MADO — Вакансии в Ташкенте",
+    meta_title_uz: "MADO da karyera — Toshkentdagi vakansiyalar",
+    meta_title_en: "Careers at MADO — Vacancies in Tashkent",
+    meta_title_tr: "MADO'da Kariyer — Taşkent'teki Pozisyonlar",
+    meta_description_ru: "Присоединяйтесь к команде MADO. Открытые вакансии в ресторанах Ташкента.",
+    meta_description_uz: "MADO jamoasiga qo'shiling. Toshkentdagi restoranlarda ochiq vakansiyalar.",
+    meta_description_en: "Join the MADO team. Open positions at MADO restaurants in Tashkent.",
+    meta_description_tr: "MADO ekibine katılın. Taşkent'teki MADO restoranlarında açık pozisyonlar.",
   },
   {
-    title: "Контакты",
-    slug: "contact",
-    title_ru: "Контакты",
-    title_uz: "Aloqa",
-    title_en: "Contact",
-    title_tr: "İletişim",
+    title: "Контакты", slug: "contact",
+    title_ru: "Контакты", title_uz: "Aloqa", title_en: "Contact", title_tr: "İletişim",
     status: "published",
     meta_title: "Контакты — MADO Ташкент",
-    meta_description:
-      "Свяжитесь с рестораном MADO в Ташкенте. Телефон, email, адреса и форма обратной связи.",
+    meta_description: "Свяжитесь с рестораном MADO в Ташкенте. Телефон, email, адреса.",
+    meta_title_ru: "Контакты — MADO Ташкент",
+    meta_title_uz: "Aloqa — MADO Toshkent",
+    meta_title_en: "Contact — MADO Tashkent",
+    meta_title_tr: "İletişim — MADO Taşkent",
+    meta_description_ru: "Свяжитесь с рестораном MADO в Ташкенте. Телефон, email, адреса и форма обратной связи.",
+    meta_description_uz: "Toshkentdagi MADO restorani bilan bog'laning. Telefon, email va manzillar.",
+    meta_description_en: "Contact MADO restaurant in Tashkent. Phone, email, addresses and contact form.",
+    meta_description_tr: "Taşkent'teki MADO restoranı ile iletişime geçin. Telefon, e-posta, adresler.",
   },
   {
-    title: "Отзывы",
-    slug: "reviews",
-    title_ru: "Отзывы",
-    title_uz: "Sharhlar",
-    title_en: "Reviews",
-    title_tr: "Yorumlar",
+    title: "Отзывы", slug: "reviews",
+    title_ru: "Отзывы", title_uz: "Sharhlar", title_en: "Reviews", title_tr: "Yorumlar",
     status: "published",
     meta_title: "Отзывы о MADO Ташкент",
-    meta_description:
-      "Читайте отзывы гостей ресторана MADO в Ташкенте. Узнайте, за что нас любят, и оставьте свой отзыв.",
+    meta_description: "Читайте отзывы гостей ресторана MADO в Ташкенте и оставьте свой отзыв.",
+    meta_title_ru: "Отзывы о MADO Ташкент",
+    meta_title_uz: "MADO Toshkent haqida sharhlar",
+    meta_title_en: "MADO Tashkent Reviews",
+    meta_title_tr: "MADO Taşkent Yorumları",
+    meta_description_ru: "Читайте отзывы гостей ресторана MADO в Ташкенте. Узнайте, за что нас любят, и оставьте свой отзыв.",
+    meta_description_uz: "Toshkentdagi MADO restorani mehmonlarining sharhlarini o'qing va o'z sharhingizni qoldiring.",
+    meta_description_en: "Read guest reviews of MADO restaurant in Tashkent. See why guests love us and leave your review.",
+    meta_description_tr: "Taşkent MADO restoranının misafir yorumlarını okuyun ve kendi yorumunuzu bırakın.",
   },
 ];
 
@@ -183,6 +223,14 @@ const pageSchema = z.object({
   meta_title: z.string().optional(),
   meta_description: z.string().optional(),
   og_image: z.string().optional(),
+  meta_title_ru: z.string().optional(),
+  meta_title_uz: z.string().optional(),
+  meta_title_en: z.string().optional(),
+  meta_title_tr: z.string().optional(),
+  meta_description_ru: z.string().optional(),
+  meta_description_uz: z.string().optional(),
+  meta_description_en: z.string().optional(),
+  meta_description_tr: z.string().optional(),
 });
 
 type PageFormValues = z.infer<typeof pageSchema>;
@@ -198,7 +246,7 @@ function PageFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [tab, setTab] = useState<"basic" | "seo">("basic");
+  const [tab, setTab] = useState<"basic" | "seo" | "seo_lang">("basic");
   const [saving, setSaving] = useState(false);
 
   const form = useForm<PageFormValues>({
@@ -214,6 +262,14 @@ function PageFormModal({
       meta_title: initial?.meta_title ?? "",
       meta_description: initial?.meta_description ?? "",
       og_image: initial?.og_image ?? "",
+      meta_title_ru: initial?.meta_title_ru ?? "",
+      meta_title_uz: initial?.meta_title_uz ?? "",
+      meta_title_en: initial?.meta_title_en ?? "",
+      meta_title_tr: initial?.meta_title_tr ?? "",
+      meta_description_ru: initial?.meta_description_ru ?? "",
+      meta_description_uz: initial?.meta_description_uz ?? "",
+      meta_description_en: initial?.meta_description_en ?? "",
+      meta_description_tr: initial?.meta_description_tr ?? "",
     },
   });
 
@@ -231,6 +287,14 @@ function PageFormModal({
         meta_title: values.meta_title || null,
         meta_description: values.meta_description || null,
         og_image: values.og_image || null,
+        meta_title_ru: values.meta_title_ru || null,
+        meta_title_uz: values.meta_title_uz || null,
+        meta_title_en: values.meta_title_en || null,
+        meta_title_tr: values.meta_title_tr || null,
+        meta_description_ru: values.meta_description_ru || null,
+        meta_description_uz: values.meta_description_uz || null,
+        meta_description_en: values.meta_description_en || null,
+        meta_description_tr: values.meta_description_tr || null,
       };
       if (initial) {
         await api.updatePage(initial.id, payload);
@@ -248,11 +312,25 @@ function PageFormModal({
     }
   };
 
-  const LANG_FIELDS: { name: "title_ru" | "title_uz" | "title_en" | "title_tr"; label: string; placeholder: string }[] = [
+  const TITLE_LANG_FIELDS: { name: "title_ru" | "title_uz" | "title_en" | "title_tr"; label: string; placeholder: string }[] = [
     { name: "title_ru", label: "Заголовок RU", placeholder: "Главная" },
     { name: "title_uz", label: "Заголовок UZ", placeholder: "Bosh sahifa" },
     { name: "title_en", label: "Заголовок EN", placeholder: "Home" },
     { name: "title_tr", label: "Заголовок TR", placeholder: "Ana Sayfa" },
+  ];
+
+  const META_TITLE_LANG_FIELDS: { name: "meta_title_ru" | "meta_title_uz" | "meta_title_en" | "meta_title_tr"; lang: string }[] = [
+    { name: "meta_title_ru", lang: "RU" },
+    { name: "meta_title_uz", lang: "UZ" },
+    { name: "meta_title_en", lang: "EN" },
+    { name: "meta_title_tr", lang: "TR" },
+  ];
+
+  const META_DESC_LANG_FIELDS: { name: "meta_description_ru" | "meta_description_uz" | "meta_description_en" | "meta_description_tr"; lang: string }[] = [
+    { name: "meta_description_ru", lang: "RU" },
+    { name: "meta_description_uz", lang: "UZ" },
+    { name: "meta_description_en", lang: "EN" },
+    { name: "meta_description_tr", lang: "TR" },
   ];
 
   return (
@@ -271,19 +349,19 @@ function PageFormModal({
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-border px-6">
-          {(["basic", "seo"] as const).map((t) => (
+        <div className="flex border-b border-border px-6 overflow-x-auto">
+          {(["basic", "seo", "seo_lang"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={cn(
-                "px-4 py-3 text-sm font-medium border-b-2 transition-colors capitalize cursor-pointer",
+                "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer",
                 tab === t
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              {t === "basic" ? "Основная информация" : "SEO и мета"}
+              {t === "basic" ? "Основная" : t === "seo" ? "SEO (общий)" : "SEO (по языкам)"}
             </button>
           ))}
         </div>
@@ -347,10 +425,10 @@ function PageFormModal({
 
                   <div className="pt-2">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Многоязычные заголовки
+                      Многоязычные заголовки страницы (h1)
                     </p>
                     <div className="grid grid-cols-2 gap-3">
-                      {LANG_FIELDS.map(({ name, label, placeholder }) => (
+                      {TITLE_LANG_FIELDS.map(({ name, label, placeholder }) => (
                         <FormField
                           key={name}
                           control={form.control}
@@ -374,7 +452,7 @@ function PageFormModal({
                 <>
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-xl text-xs text-muted-foreground">
                     <Globe className="w-4 h-4 shrink-0" />
-                    <span>Эти поля определяют отображение страницы в поисковых системах и социальных сетях.</span>
+                    <span>Общие SEO-поля — используются как запасные, если поля по языкам не заполнены.</span>
                   </div>
 
                   <FormField
@@ -382,7 +460,7 @@ function PageFormModal({
                     name="meta_title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Мета-заголовок</FormLabel>
+                        <FormLabel>Мета-заголовок (по умолчанию)</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="MADO — Главная | Ресторан турецкой кухни"
@@ -405,7 +483,7 @@ function PageFormModal({
                     name="meta_description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Мета-описание</FormLabel>
+                        <FormLabel>Мета-описание (по умолчанию)</FormLabel>
                         <FormControl>
                           <Textarea
                             rows={3}
@@ -453,6 +531,76 @@ function PageFormModal({
                   />
                 </>
               )}
+
+              {tab === "seo_lang" && (
+                <>
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-xl text-xs text-muted-foreground">
+                    <Globe className="w-4 h-4 shrink-0" />
+                    <span>SEO по языкам: используются в первую очередь. Если пусто — берётся общее поле.</span>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Мета-заголовок по языкам
+                    </p>
+                    <div className="space-y-3">
+                      {META_TITLE_LANG_FIELDS.map(({ name, lang }) => (
+                        <FormField
+                          key={name}
+                          control={form.control}
+                          name={name}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Meta Title — {lang}</FormLabel>
+                              <FormControl>
+                                <Input placeholder={`Мета-заголовок на ${lang}`} {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground">
+                                <span className={(field.value ?? "").length > 60 ? "text-destructive font-semibold" : ""}>
+                                  {(field.value ?? "").length}/60
+                                </span>
+                              </p>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Мета-описание по языкам
+                    </p>
+                    <div className="space-y-3">
+                      {META_DESC_LANG_FIELDS.map(({ name, lang }) => (
+                        <FormField
+                          key={name}
+                          control={form.control}
+                          name={name}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Meta Description — {lang}</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  rows={2}
+                                  placeholder={`Мета-описание на ${lang}`}
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground">
+                                <span className={(field.value ?? "").length > 160 ? "text-destructive font-semibold" : ""}>
+                                  {(field.value ?? "").length}/160
+                                </span>
+                              </p>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Footer */}
@@ -498,8 +646,8 @@ function SeedConfirmModal({
 
         <p className="text-sm text-muted-foreground mb-3">
           Будет создано <strong className="text-foreground">{DEFAULT_PAGES.length} страниц</strong> на основе
-          маршрутов сайта — с заголовками на{" "}
-          <strong className="text-foreground">4 языках (RU / UZ / EN / TR)</strong> и SEO-метаданными:
+          маршрутов сайта — с заголовками и SEO-мета на{" "}
+          <strong className="text-foreground">4 языках (RU / UZ / EN / TR)</strong>:
         </p>
 
         <ul className="text-sm space-y-1 mb-4">
@@ -517,7 +665,7 @@ function SeedConfirmModal({
           <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-400 mb-4">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
-              В базе уже есть {existingCount} страниц. Дубликаты могут появиться, если slug совпадёт — проверьте после добавления.
+              В базе уже есть {existingCount} страниц. Дубликаты появятся при совпадении slug — проверьте после добавления.
             </span>
           </div>
         )}
@@ -564,7 +712,6 @@ export default function PagesPage() {
 
   useEffect(() => { void loadPages(); }, [loadPages]);
 
-  // ── Seed default pages ──────────────────────────────────────────────────────
   const handleSeed = async () => {
     setSeeding(true);
     let created = 0;
@@ -583,6 +730,14 @@ export default function PagesPage() {
             meta_title: def.meta_title,
             meta_description: def.meta_description,
             og_image: null,
+            meta_title_ru: def.meta_title_ru ?? null,
+            meta_title_uz: def.meta_title_uz ?? null,
+            meta_title_en: def.meta_title_en ?? null,
+            meta_title_tr: def.meta_title_tr ?? null,
+            meta_description_ru: def.meta_description_ru ?? null,
+            meta_description_uz: def.meta_description_uz ?? null,
+            meta_description_en: def.meta_description_en ?? null,
+            meta_description_tr: def.meta_description_tr ?? null,
           });
           created++;
         } catch {
@@ -740,7 +895,7 @@ export default function PagesPage() {
             <div className="divide-y divide-border">
               {filtered.map((page) => {
                 const sm = STATUS_META[page.status] ?? STATUS_META.draft;
-                const hasSeo = !!(page.meta_title || page.meta_description);
+                const hasSeo = !!(page.meta_title || page.meta_description || page.meta_title_ru);
                 const langs = [
                   page.title_ru && "RU",
                   page.title_uz && "UZ",
