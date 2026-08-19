@@ -311,7 +311,7 @@ const initDb = async () => {
       )
     `);
 
-    // Safe migrations for pages: multilingual titles + SEO fields
+    // Safe migrations for pages: multilingual titles + base SEO fields
     const pageCols = [
       'title_ru VARCHAR(255)',
       'title_uz VARCHAR(255)',
@@ -322,6 +322,23 @@ const initDb = async () => {
       'og_image VARCHAR(500)',
     ];
     for (const col of pageCols) {
+      const colName = col.split(' ')[0];
+      const colType = col.split(' ').slice(1).join(' ');
+      await pool.query(`ALTER TABLE pages ADD COLUMN IF NOT EXISTS ${colName} ${colType}`);
+    }
+
+    // Safe migrations for pages: multilingual meta_title + meta_description (8 new columns)
+    const pageMetaLangCols = [
+      'meta_title_ru VARCHAR(255)',
+      'meta_title_uz VARCHAR(255)',
+      'meta_title_en VARCHAR(255)',
+      'meta_title_tr VARCHAR(255)',
+      'meta_description_ru TEXT',
+      'meta_description_uz TEXT',
+      'meta_description_en TEXT',
+      'meta_description_tr TEXT',
+    ];
+    for (const col of pageMetaLangCols) {
       const colName = col.split(' ')[0];
       const colType = col.split(' ').slice(1).join(' ');
       await pool.query(`ALTER TABLE pages ADD COLUMN IF NOT EXISTS ${colName} ${colType}`);
