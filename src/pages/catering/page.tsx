@@ -5,6 +5,8 @@ import Footer from "../_components/footer.tsx";
 import HowItWorks from "./_components/how-it-works.tsx";
 import FaqAccordion from "./_components/faq-accordion.tsx";
 import QuoteForm from "./_components/quote-form.tsx";
+import PageMeta from "@/components/page-meta.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
 
 const OCCASIONS = [
   {
@@ -30,8 +32,10 @@ const OCCASIONS = [
 ] as const;
 
 export default function Catering() {
+  const { lang } = useLanguage();
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta slug="catering" lang={lang} />
       <Navbar />
 
       {/* Hero */}
