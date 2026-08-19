@@ -6,6 +6,8 @@ import Navbar from "../_components/navbar.tsx";
 import Footer from "../_components/footer.tsx";
 import { MENU_CATEGORIES, TABS } from "./data.ts";
 import type { Dish, TabId } from "./data.ts";
+import PageMeta from "@/components/page-meta.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
 
 function DishCard({ dish, index }: { dish: Dish; index: number }) {
   return (
@@ -64,6 +66,7 @@ export default function MenuPage() {
   const [activeTab, setActiveTab] = useState<TabId>("food");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { lang } = useLanguage();
 
   const tabCategories = useMemo(
     () => MENU_CATEGORIES.filter((c) => c.tab === activeTab),
@@ -105,6 +108,7 @@ export default function MenuPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta slug="menu" lang={lang} />
       <Navbar />
 
       {/* Hero */}
