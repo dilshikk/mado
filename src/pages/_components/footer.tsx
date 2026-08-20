@@ -15,6 +15,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { footerText } from "@/lib/i18n/home.ts";
 
 const contactSchema = z.object({
   name: z.string().min(1, "Введите ваше имя"),
@@ -24,30 +26,23 @@ const contactSchema = z.object({
 
 type ContactFormValues = z.infer<typeof contactSchema>;
 
-const QUICK_LINKS = [
-  { label: "Главная", href: "/" },
-  { label: "Наша история", href: "/story" },
-  { label: "Меню", href: "/#menu" },
-  { label: "Кейтеринг", href: "/catering" },
-  { label: "Рестораны", href: "/locations" },
-  { label: "Карьера", href: "/careers" },
-  { label: "Контакты", href: "/contact" },
-] as const;
-
 const SOCIALS = [
   { icon: SiInstagram, href: "https://www.instagram.com/madotashkent", label: "Instagram" },
   { icon: SiTelegram, href: "https://t.me/madotashkent", label: "Telegram" },
 ] as const;
 
 export default function Footer() {
+  const { lang } = useLanguage();
+  const t = footerText[lang];
+
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
     defaultValues: { name: "", email: "", message: "" },
   });
 
   const onSubmit = (values: ContactFormValues) => {
-    toast.success("Сообщение отправлено!", {
-      description: `Спасибо, ${values.name}! Наша команда свяжется с вами в ближайшее время.`,
+    toast.success(t.toastTitle, {
+      description: t.toastDesc(values.name),
     });
     form.reset();
   };
@@ -69,7 +64,7 @@ export default function Footer() {
               <span className="font-serif text-2xl font-bold">MADO</span>
             </div>
             <p className="mt-4 text-sm text-primary-foreground/75">
-              Официальный сайт MADO Ташкент, Узбекистан.
+              {t.description}
             </p>
             <div className="mt-4 flex items-start gap-2 text-sm text-primary-foreground/75">
               <Mail className="mt-0.5 size-4 shrink-0 text-accent" />
@@ -88,9 +83,9 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="font-serif text-lg font-bold">Навигация</h3>
+            <h3 className="font-serif text-lg font-bold">{t.navTitle}</h3>
             <nav className="mt-4 flex flex-col gap-2">
-              {QUICK_LINKS.map((link) => (
+              {t.quickLinks.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
@@ -103,7 +98,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="font-serif text-lg font-bold">Связаться с нами</h3>
+            <h3 className="font-serif text-lg font-bold">{t.contactTitle}</h3>
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
@@ -115,11 +110,11 @@ export default function Footer() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-primary-foreground/80">
-                        Имя
+                        {t.nameLabel}
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Иван Иванов"
+                          placeholder={t.namePlaceholder}
                           className="border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground placeholder:text-primary-foreground/40"
                           {...field}
                         />
@@ -134,7 +129,7 @@ export default function Footer() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-primary-foreground/80">
-                        Email
+                        {t.emailLabel}
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -153,7 +148,7 @@ export default function Footer() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-primary-foreground/80">
-                        Сообщение
+                        {t.messageLabel}
                       </FormLabel>
                       <FormControl>
                         <Textarea
@@ -170,7 +165,7 @@ export default function Footer() {
                   type="submit"
                   className="w-full cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90"
                 >
-                  Отправить
+                  {t.sendBtn}
                 </Button>
               </form>
             </Form>
