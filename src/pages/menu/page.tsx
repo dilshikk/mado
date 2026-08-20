@@ -8,8 +8,10 @@ import { MENU_CATEGORIES, TABS } from "./data.ts";
 import type { Dish, TabId } from "./data.ts";
 import PageMeta from "@/components/page-meta.tsx";
 import { useLanguage } from "@/hooks/use-language.ts";
+import { menuPageText } from "@/lib/i18n/menu.ts";
+import type { LangCode } from "@/hooks/use-language.ts";
 
-function DishCard({ dish, index }: { dish: Dish; index: number }) {
+function DishCard({ dish, index, lang, t }: { dish: Dish; index: number; lang: LangCode; t: typeof menuPageText[LangCode] }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -21,39 +23,39 @@ function DishCard({ dish, index }: { dish: Dish; index: number }) {
       <div className="overflow-hidden">
         <img
           src={dish.image}
-          alt={dish.name}
+          alt={dish.name[lang]}
           className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h4 className="font-serif text-base font-bold leading-tight text-foreground">
-            {dish.name}
+            {dish.name[lang]}
           </h4>
           <span className="shrink-0 text-sm font-semibold text-accent">
             {dish.price}
           </span>
         </div>
         <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-          {dish.description}
+          {dish.description[lang]}
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {dish.isSignature && (
             <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
               <Star className="size-2.5" />
-              {"\u0424\u0438\u0440\u043c\u0435\u043d\u043d\u043e\u0435"}
+              {t.signatureBadge}
             </span>
           )}
           {dish.isNew && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
               <Sparkles className="size-2.5" />
-              {"\u041d\u043e\u0432\u0438\u043d\u043a\u0430"}
+              {t.newBadge}
             </span>
           )}
           {dish.isVeg && (
             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
               <Leaf className="size-2.5" />
-              {"\u0412\u0435\u0433\u0435\u0442\u0430\u0440\u0438\u0430\u043d\u0441\u043a\u043e\u0435"}
+              {t.vegBadge}
             </span>
           )}
         </div>
@@ -67,6 +69,7 @@ export default function MenuPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { lang } = useLanguage();
+  const t = menuPageText[lang];
 
   const tabCategories = useMemo(
     () => MENU_CATEGORIES.filter((c) => c.tab === activeTab),
@@ -85,12 +88,12 @@ export default function MenuPage() {
       cat.dishes
         .filter(
           (d) =>
-            d.name.toLowerCase().includes(q) ||
-            d.description.toLowerCase().includes(q),
+            d.name[lang].toLowerCase().includes(q) ||
+            d.description[lang].toLowerCase().includes(q),
         )
-        .map((d) => ({ dish: d, categoryLabel: cat.label })),
+        .map((d) => ({ dish: d, categoryLabel: cat.label[lang] })),
     );
-  }, [search]);
+  }, [search, lang]);
 
   const isSearching = search.trim().length > 0;
 
@@ -127,7 +130,7 @@ export default function MenuPage() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="text-xs font-semibold tracking-[0.3em] text-accent uppercase"
           >
-            {"\u0410\u0443\u0442\u0435\u043d\u0442\u0438\u0447\u043d\u0430\u044f \u0442\u0443\u0440\u0435\u0446\u043a\u0430\u044f \u043a\u0443\u0445\u043d\u044f"}
+            {t.eyebrow}
           </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 24 }}
@@ -135,7 +138,7 @@ export default function MenuPage() {
             transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
             className="mt-3 text-balance font-serif text-4xl font-bold text-primary-foreground sm:text-5xl"
           >
-            {"\u041d\u0430\u0448\u0435 \u043c\u0435\u043d\u044e"}
+            {t.title}
           </motion.h1>
         </div>
       </section>
@@ -156,7 +159,7 @@ export default function MenuPage() {
                     : "text-foreground/60 hover:text-foreground",
                 )}
               >
-                {tab.label.toUpperCase()}
+                {tab.label[lang].toUpperCase()}
                 {activeTab === tab.id && (
                   <motion.span
                     layoutId="tab-underline"
@@ -180,7 +183,7 @@ export default function MenuPage() {
                     : "border-border/60 bg-background text-foreground/70 hover:bg-secondary hover:text-foreground",
                 )}
               >
-                {"\u0412\u0441\u0435"}
+                {t.allLabel}
               </button>
               {tabCategories.map((cat) => (
                 <button
@@ -198,7 +201,7 @@ export default function MenuPage() {
                       : "border-border/60 bg-background text-foreground/70 hover:bg-secondary hover:text-foreground",
                   )}
                 >
-                  {cat.label}
+                  {cat.label[lang]}
                 </button>
               ))}
             </div>
@@ -215,7 +218,7 @@ export default function MenuPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={"\u041f\u043e\u0438\u0441\u043a \u043f\u043e \u043c\u0435\u043d\u044e..."}
+              placeholder={t.searchPlaceholder}
               className="w-full rounded-lg border border-border/60 bg-background py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
             />
           </div>
@@ -228,14 +231,14 @@ export default function MenuPage() {
           <div className="mx-auto max-w-[1140px] px-6">
             <p className="mb-6 text-sm text-muted-foreground">
               {searchResults.length > 0
-                ? `${"\u041d\u0430\u0439\u0434\u0435\u043d\u043e"} ${searchResults.length} ${"\u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u043e\u0432 \u0434\u043b\u044f"} \u00ab${search}\u00bb`
-                : `${"\u041d\u0438\u0447\u0435\u0433\u043e \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e \u043f\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u0443"} \u00ab${search}\u00bb`}
+                ? t.foundResults(searchResults.length, search)
+                : t.noResults(search)}
             </p>
             {searchResults.length > 0 && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {searchResults.map(({ dish, categoryLabel }, i) => (
-                  <div key={`${dish.name}-${i}`} className="relative">
-                    <DishCard dish={dish} index={i} />
+                  <div key={`${dish.name[lang]}-${i}`} className="relative">
+                    <DishCard dish={dish} index={i} lang={lang} t={t} />
                     <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold text-foreground/70 backdrop-blur-sm">
                       {categoryLabel}
                     </span>
@@ -269,27 +272,27 @@ export default function MenuPage() {
                   <div className="overflow-hidden rounded-xl">
                     <img
                       src={cat.image}
-                      alt={cat.label}
+                      alt={cat.label[lang]}
                       className="h-[180px] w-full object-cover sm:h-[240px]"
                     />
                   </div>
                   <div className="mt-5 flex items-end justify-between">
                     <div>
                       <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">
-                        {TABS.find((t) => t.id === cat.tab)?.label}
+                        {TABS.find((tb) => tb.id === cat.tab)?.label[lang]}
                       </p>
                       <h2 className="mt-1 font-serif text-2xl font-bold text-primary sm:text-3xl">
-                        {cat.label}
+                        {cat.label[lang]}
                       </h2>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {cat.dishes.length} {"\u043f\u043e\u0437\u0438\u0446\u0438\u0439"}
+                      {cat.dishes.length} {t.itemsCount}
                     </span>
                   </div>
                 </motion.div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {cat.dishes.map((dish, dishIdx) => (
-                    <DishCard key={dish.name} dish={dish} index={dishIdx} />
+                    <DishCard key={dish.name[lang]} dish={dish} index={dishIdx} lang={lang} t={t} />
                   ))}
                 </div>
               </div>
