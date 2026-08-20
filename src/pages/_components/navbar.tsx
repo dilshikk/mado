@@ -1,10 +1,8 @@
-import { useState } from "react";
-import { motion } from "motion/react";
-import { Menu, X, IceCreamCone } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Menu, X, IceCreamCone, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button.tsx";
-import { toast } from "sonner";
-import { useLanguage, LANG_OPTIONS } from "@/hooks/use-language.ts";
+import { useLanguage, LANG_OPTIONS, type LangCode } from "@/hooks/use-language.ts";
 
 // ─── Nav labels per language ──────────────────────────────────────────────────
 
@@ -51,27 +49,80 @@ const NAV_LABELS: Record<"ru" | "uz" | "en" | "tr", readonly { label: string; hr
   ],
 };
 
-const ORDER_LABEL: Record<"ru" | "uz" | "en" | "tr", string> = {
-  ru: "Заказать",
-  uz: "Buyurtma",
-  en: "Order",
-  tr: "Sipariş",
-};
+// ─── Language dropdown ─────────────────────────────────────────────────────────
 
-const ORDER_TOAST: Record<"ru" | "uz" | "en" | "tr", { title: string; desc: string }> = {
-  ru: { title: "Скоро будет доступно!", desc: "Онлайн-заказ уже в пути." },
-  uz: { title: "Tez orada bo'ladi!", desc: "Online buyurtma yo'lda." },
-  en: { title: "Coming soon!", desc: "Online ordering is on the way." },
-  tr: { title: "Yakında kullanıma açılacak!", desc: "Online sipariş yolda." },
-};
+function LanguageDropdown({ align = "right" }: { align?: "left" | "right" }) {
+  const { lang, setLang } = useLanguage();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const current = LANG_OPTIONS.find((opt) => opt.code === lang) ?? LANG_OPTIONS[0];
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
+  const handleSelect = (code: LangCode) => {
+    setLang(code);
+    setMenuOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setMenuOpen((v) => !v)}
+        aria-label="Выбрать язык"
+        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:text-primary"
+      >
+        <span>{current.flag}</span>
+        <span>{current.label}</span>
+        <ChevronDown className={`size-3.5 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className={`absolute top-full z-50 mt-2 w-36 overflow-hidden rounded-xl border border-border/60 bg-popover shadow-lg ${
+              align === "right" ? "right-0" : "left-0"
+            }`}
+          >
+            {LANG_OPTIONS.map((opt) => (
+              <button
+                key={opt.code}
+                type="button"
+                onClick={() => handleSelect(opt.code)}
+                className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                  lang === opt.code
+                    ? "bg-primary/10 font-semibold text-primary"
+                    : "text-foreground/80 hover:bg-secondary"
+                }`}
+              >
+                <span>{opt.flag}</span>
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
-  const { lang, setLang } = useLanguage();
+  const { lang } = useLanguage();
 
   const navLinks = NAV_LABELS[lang];
-  const orderLabel = ORDER_LABEL[lang];
-  const orderToast = ORDER_TOAST[lang];
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-md">
@@ -96,28 +147,7 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
-          {/* Language switcher */}
-          <div className="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-1">
-            {LANG_OPTIONS.map((opt) => (
-              <button
-                key={opt.code}
-                onClick={() => setLang(opt.code)}
-                className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  lang === opt.code
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <Button
-            className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-            onClick={() => toast(orderToast.title, { description: orderToast.desc })}
-          >
-            {orderLabel}
-          </Button>
+          <LanguageDropdown align="right" />
         </div>
 
         <button
@@ -148,30 +178,9 @@ export default function Navbar() {
               </a>
             ))}
             {/* Language switcher (mobile) */}
-            <div className="flex gap-2 mt-2 px-1">
-              {LANG_OPTIONS.map((opt) => (
-                <button
-                  key={opt.code}
-                  onClick={() => setLang(opt.code)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
-                    lang === opt.code
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {opt.flag} {opt.label}
-                </button>
-              ))}
+            <div className="mt-2 px-1">
+              <LanguageDropdown align="left" />
             </div>
-            <Button
-              className="mt-2 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => {
-                setOpen(false);
-                toast(orderToast.title, { description: orderToast.desc });
-              }}
-            >
-              {orderLabel}
-            </Button>
           </nav>
         </motion.div>
       )}
