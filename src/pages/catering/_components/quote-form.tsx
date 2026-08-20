@@ -16,22 +16,35 @@ import {
   FormMessage,
 } from "@/components/ui/form.tsx";
 import api from "@/lib/api.ts";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { quoteFormText } from "@/lib/i18n/catering.ts";
 
-const quoteSchema = z.object({
-  fullName:   z.string().min(1, "Введите ваше имя"),
-  email:      z.string().email("Введите корректный email"),
-  phone:      z.string().min(1, "Введите номер телефона"),
-  eventType:  z.string().min(1, "Укажите тип мероприятия"),
-  eventDate:  z.string().min(1, "Укажите дату мероприятия"),
-  guestCount: z.string().min(1, "Укажите количество гостей"),
-  budget:     z.string().optional(),
-  message:    z.string().optional(),
-});
-
-type QuoteFormValues = z.infer<typeof quoteSchema>;
+type QuoteFormValues = {
+  fullName: string;
+  email: string;
+  phone: string;
+  eventType: string;
+  eventDate: string;
+  guestCount: string;
+  budget?: string;
+  message?: string;
+};
 
 export default function QuoteForm() {
   const [submitting, setSubmitting] = useState(false);
+  const { lang } = useLanguage();
+  const t = quoteFormText[lang];
+
+  const quoteSchema = z.object({
+    fullName: z.string().min(1, t.nameRequired),
+    email: z.string().email(t.emailInvalid),
+    phone: z.string().min(1, t.phoneRequired),
+    eventType: z.string().min(1, t.eventTypeRequired),
+    eventDate: z.string().min(1, t.eventDateRequired),
+    guestCount: z.string().min(1, t.guestCountRequired),
+    budget: z.string().optional(),
+    message: z.string().optional(),
+  });
 
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema),
@@ -55,12 +68,12 @@ export default function QuoteForm() {
         budget:      values.budget || null,
         message:     values.message || null,
       });
-      toast.success("Заявка отправлена!", {
-        description: `Спасибо, ${values.fullName}! Мы свяжемся с вами для обсуждения деталей мероприятия.`,
+      toast.success(t.successTitle, {
+        description: t.successDesc(values.fullName),
       });
       form.reset();
     } catch {
-      toast.error("Не удалось отправить заявку. Попробуйте ещё раз.");
+      toast.error(t.errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -77,9 +90,9 @@ export default function QuoteForm() {
           name="fullName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Полное имя</FormLabel>
+              <FormLabel>{t.fullName}</FormLabel>
               <FormControl>
-                <Input placeholder="Иван Иванов" {...field} />
+                <Input placeholder={t.fullNamePlaceholder} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -90,7 +103,7 @@ export default function QuoteForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>{t.email}</FormLabel>
               <FormControl>
                 <Input placeholder="example@gmail.com" {...field} />
               </FormControl>
@@ -103,9 +116,9 @@ export default function QuoteForm() {
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Номер телефона</FormLabel>
+              <FormLabel>{t.phone}</FormLabel>
               <FormControl>
-                <Input placeholder="+998 90 000 00 00" {...field} />
+                <Input placeholder={t.phonePlaceholder} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -116,9 +129,9 @@ export default function QuoteForm() {
           name="eventType"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Тип мероприятия</FormLabel>
+              <FormLabel>{t.eventType}</FormLabel>
               <FormControl>
-                <Input placeholder="Свадьба, юбилей, корпоратив..." {...field} />
+                <Input placeholder={t.eventTypePlaceholder} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -129,7 +142,7 @@ export default function QuoteForm() {
           name="eventDate"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Дата мероприятия</FormLabel>
+              <FormLabel>{t.eventDate}</FormLabel>
               <FormControl>
                 <Input type="date" {...field} />
               </FormControl>
@@ -142,9 +155,9 @@ export default function QuoteForm() {
           name="guestCount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Количество гостей</FormLabel>
+              <FormLabel>{t.guestCount}</FormLabel>
               <FormControl>
-                <Input placeholder="Например, 50" {...field} />
+                <Input placeholder={t.guestCountPlaceholder} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -155,9 +168,9 @@ export default function QuoteForm() {
           name="budget"
           render={({ field }) => (
             <FormItem className="sm:col-span-2">
-              <FormLabel>Бюджет (необязательно)</FormLabel>
+              <FormLabel>{t.budget}</FormLabel>
               <FormControl>
-                <Input placeholder="Например, 5 000 000 UZS" {...field} />
+                <Input placeholder={t.budgetPlaceholder} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -168,11 +181,11 @@ export default function QuoteForm() {
           name="message"
           render={({ field }) => (
             <FormItem className="sm:col-span-2">
-              <FormLabel>Сообщение</FormLabel>
+              <FormLabel>{t.message}</FormLabel>
               <FormControl>
                 <Textarea
                   rows={4}
-                  placeholder="Расскажите подробнее о вашем мероприятии..."
+                  placeholder={t.messagePlaceholder}
                   {...field}
                 />
               </FormControl>
@@ -187,8 +200,8 @@ export default function QuoteForm() {
           className="cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 sm:col-span-2 disabled:opacity-70"
         >
           {submitting
-            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Отправка…</>
-            : "Запросить предложение"}
+            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t.sendingBtn}</>
+            : t.submitBtn}
         </Button>
       </form>
     </Form>
