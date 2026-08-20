@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import { Button } from "@/components/ui/button.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { reviewsPreviewText } from "@/lib/i18n/home.ts";
 
 type ApiReviewItem = {
   id: string | number;
@@ -37,6 +39,8 @@ function randomPick<T>(arr: T[], n: number): T[] {
 export default function ReviewsPreview() {
   const [allReviews, setAllReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const { lang } = useLanguage();
+  const t = reviewsPreviewText[lang];
 
   useEffect(() => {
     api
@@ -75,13 +79,13 @@ export default function ReviewsPreview() {
           className="mx-auto max-w-2xl text-center mb-14"
         >
           <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-accent uppercase">
-            Что говорят гости
+            {t.eyebrow}
           </p>
           <h2 className="text-balance font-serif text-4xl font-bold sm:text-5xl">
-            Отзывы наших гостей
+            {t.title}
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Мы гордимся каждым гостем — читайте, что они говорят о нас.
+            {t.subtitle}
           </p>
         </motion.div>
 
@@ -149,7 +153,7 @@ export default function ReviewsPreview() {
             asChild
           >
             <Link to="/reviews">
-              Все отзывы <ArrowRight className="w-4 h-4" />
+              {t.allBtn} <ArrowRight className="w-4 h-4" />
             </Link>
           </Button>
         </div>
