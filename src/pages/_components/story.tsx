@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { storyText } from "@/lib/i18n/home.ts";
 
 type Slide = {
   src: string;
@@ -86,6 +88,9 @@ function Slider({ slides, borderSide }: { slides: Slide[]; borderSide: "left" | 
 }
 
 export default function Story() {
+  const { lang } = useLanguage();
+  const t = storyText[lang];
+
   return (
     <section id="story" className="overflow-hidden bg-background py-24">
       <div className="mx-auto grid max-w-[1140px] grid-cols-1 items-center gap-16 px-6 lg:grid-cols-2">
@@ -105,18 +110,15 @@ export default function Story() {
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-accent uppercase">
-            Наша история
+            {t.storyLabel}
           </p>
           <h2 className="text-balance font-serif text-4xl font-bold text-foreground sm:text-5xl">
-            Попробуйте настоящую
+            {t.storyTitleL1}
             <br />
-            турецкую кухню!
+            {t.storyTitleL2}
           </h2>
           <p className="mt-6 text-lg text-muted-foreground">
-            Откройте для себя многовековые вкусы, десерты ручной
-            работы и культовые турецкие блюда, приготовленные с
-            любовью и традицией. Почувствуйте неповторимый вкус MADO в
-            каждом кусочке.
+            {t.storyText}
           </p>
           <Button
             size="lg"
@@ -124,7 +126,7 @@ export default function Story() {
             asChild
           >
             <a href="#menu">
-              Посмотреть меню <ArrowRight className="size-4" />
+              {t.storyBtn} <ArrowRight className="size-4" />
             </a>
           </Button>
         </motion.div>
@@ -139,22 +141,15 @@ export default function Story() {
           className="order-2 lg:order-1"
         >
           <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-accent uppercase">
-            Наследие MADO
+            {t.heritageLabel}
           </p>
           <h2 className="text-balance font-serif text-4xl font-bold text-foreground sm:text-5xl">
-            300 лет традиций.
+            {t.heritageTitleL1}
             <br />
-            Один мир вкуса.
+            {t.heritageTitleL2}
           </h2>
           <p className="mt-6 text-lg text-muted-foreground">
-            MADO, обладающий более чем 300-летней историей и более
-            чем 300 заведениями по всему миру, предлагает аутентичный
-            вкус турецкой кухни каждому посетителю. MADO — это не
-            просто место, где можно купить мороженое, это полноценный
-            гастрономический опыт: от фирменных десертов и
-            насыщенного мороженого до тортов-мороженого,
-            профитролей с начинкой и освежающих напитков — все
-            приготовлено с любовью и вниманием к деталям.
+            {t.heritageText}
           </p>
           <Button
             size="lg"
@@ -162,7 +157,7 @@ export default function Story() {
             asChild
           >
             <a href="#locations">
-              Узнать больше <ArrowRight className="size-4" />
+              {t.heritageBtn} <ArrowRight className="size-4" />
             </a>
           </Button>
         </motion.div>
