@@ -5,9 +5,13 @@ import { IceCreamCone, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import Navbar from "./_components/navbar.tsx";
 import Footer from "./_components/footer.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { notFoundText } from "@/lib/i18n/home.ts";
 
 export default function NotFound() {
   const location = useLocation();
+  const { lang } = useLanguage();
+  const t = notFoundText[lang];
 
   useEffect(() => {
     console.error(
@@ -41,7 +45,7 @@ export default function NotFound() {
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
             className="text-xs font-semibold tracking-[0.3em] text-accent uppercase"
           >
-            {"\u041e\u0448\u0438\u0431\u043a\u0430 404"}
+            {t.errorLabel}
           </motion.p>
 
           <motion.h1
@@ -50,7 +54,7 @@ export default function NotFound() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
             className="mt-4 font-serif text-5xl font-bold text-primary sm:text-6xl"
           >
-            {"\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430"}
+            {t.title}
           </motion.h1>
 
           <motion.p
@@ -59,7 +63,7 @@ export default function NotFound() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
             className="mt-4 text-base leading-relaxed text-muted-foreground"
           >
-            {"\u041a \u0441\u043e\u0436\u0430\u043b\u0435\u043d\u0438\u044e, \u0442\u0430\u043a\u043e\u0439 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u044b \u043d\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442. \u0412\u043e\u0437\u043c\u043e\u0436\u043d\u043e, \u043e\u043d\u0430 \u0431\u044b\u043b\u0430 \u043f\u0435\u0440\u0435\u043c\u0435\u0449\u0435\u043d\u0430 \u0438\u043b\u0438 \u0443\u0434\u0430\u043b\u0435\u043d\u0430 \u2014 \u0432\u0435\u0440\u043d\u0438\u0442\u0435\u0441\u044c \u043d\u0430 \u0433\u043b\u0430\u0432\u043d\u0443\u044e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443."}
+            {t.description}
           </motion.p>
 
           <motion.div
@@ -74,7 +78,7 @@ export default function NotFound() {
             >
               <Link to="/">
                 <ArrowLeft className="mr-2 size-4" />
-                {"\u041d\u0430 \u0433\u043b\u0430\u0432\u043d\u0443\u044e"}
+                {t.homeBtn}
               </Link>
             </Button>
             <Button
@@ -82,7 +86,7 @@ export default function NotFound() {
               variant="ghost"
               className="cursor-pointer text-foreground/70 hover:text-primary"
             >
-              <Link to="/menu">{"\u041f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u043c\u0435\u043d\u044e"}</Link>
+              <Link to="/menu">{t.menuBtn}</Link>
             </Button>
           </motion.div>
         </div>
