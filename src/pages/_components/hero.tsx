@@ -1,8 +1,13 @@
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { heroText } from "@/lib/i18n/home.ts";
 
 export default function Hero() {
+  const { lang } = useLanguage();
+  const t = heroText[lang];
+
   return (
     <section className="relative flex min-h-[92vh] items-center overflow-hidden bg-primary">
       <video
@@ -23,7 +28,7 @@ export default function Hero() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="mb-4 text-sm font-semibold tracking-[0.3em] text-accent uppercase"
         >
-          Настоящий праздник вкуса
+          {t.eyebrow}
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 24 }}
@@ -31,7 +36,7 @@ export default function Hero() {
           transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
           className="max-w-3xl text-balance font-serif text-5xl font-bold leading-tight text-primary-foreground sm:text-6xl md:text-7xl"
         >
-          Аутентичная турецкая кухня
+          {t.title}
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 24 }}
@@ -39,9 +44,7 @@ export default function Hero() {
           transition={{ duration: 0.7, ease: "easeOut", delay: 0.22 }}
           className="mt-6 max-w-xl text-balance text-lg text-primary-foreground/85"
         >
-          Настоящий праздник вкуса. Откройте для себя вековые традиции,
-          десерты, приготовленные вручную, и легендарные турецкие блюда,
-          созданные с любовью и уважением к традициям.
+          {t.subtitle}
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -55,7 +58,7 @@ export default function Hero() {
             asChild
           >
             <a href="#menu">
-              Смотреть меню <ArrowRight className="size-4" />
+              {t.menuBtn} <ArrowRight className="size-4" />
             </a>
           </Button>
           <Button
@@ -63,7 +66,7 @@ export default function Hero() {
             className="cursor-pointer border border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
             asChild
           >
-            <a href="#locations">Наши рестораны</a>
+            <a href="#locations">{t.locationsBtn}</a>
           </Button>
         </motion.div>
       </div>
