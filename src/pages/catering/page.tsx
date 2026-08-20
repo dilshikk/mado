@@ -7,32 +7,14 @@ import FaqAccordion from "./_components/faq-accordion.tsx";
 import QuoteForm from "./_components/quote-form.tsx";
 import PageMeta from "@/components/page-meta.tsx";
 import { useLanguage } from "@/hooks/use-language.ts";
+import { cateringPageText } from "@/lib/i18n/catering.ts";
 
-const OCCASIONS = [
-  {
-    icon: Users,
-    title: "Корпоративные мероприятия",
-    text: "Профессиональный кейтеринг для встреч, конференций и корпоративных праздников с изысканными вкусами и элегантной подачей.",
-  },
-  {
-    icon: PartyPopper,
-    title: "Частные торжества",
-    text: "Идеально для дней рождения, юбилеев и семейных встреч — аутентичные блюда и тёплая, гостеприимная атмосфера.",
-  },
-  {
-    icon: Gem,
-    title: "Особые случаи",
-    text: "От свадеб до эксклюзивных празднований — MADO создаёт незабываемые кулинарные впечатления для вашего события.",
-  },
-  {
-    icon: IceCreamCone,
-    title: "Десертные и мороженое станции",
-    text: "Фирменная дондурма MADO и сладости, поданные свежими и красиво оформленными для ваших гостей.",
-  },
-] as const;
+const OCCASION_ICONS = [Users, PartyPopper, Gem, IceCreamCone];
 
 export default function Catering() {
   const { lang } = useLanguage();
+  const t = cateringPageText[lang];
+
   return (
     <div className="min-h-screen bg-background">
       <PageMeta slug="catering" lang={lang} />
@@ -54,7 +36,7 @@ export default function Catering() {
             transition={{ duration: 0.7, ease: "easeOut" }}
             className="text-balance font-serif text-4xl font-bold text-primary-foreground sm:text-5xl"
           >
-            Кейтеринг с аутентичными турецкими вкусами
+            {t.heroTitle}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 16 }}
@@ -62,8 +44,7 @@ export default function Catering() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
             className="mt-4 text-sm text-primary-foreground/80 sm:text-base"
           >
-            От душевных встреч до грандиозных торжеств — MADO приносит богатство
-            турецкой кухни на ваше особое мероприятие.
+            {t.heroSub}
           </motion.p>
         </div>
       </section>
@@ -87,14 +68,10 @@ export default function Catering() {
             </div>
             <div>
               <h2 className="max-w-md text-balance font-serif text-3xl font-bold text-primary sm:text-4xl">
-                Незабываемые вкусы для каждого случая
+                {t.introTitle}
               </h2>
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                Кейтеринг MADO объединяет вековые традиции турецкой кухни с
-                современной подачей и сервисом. Мы создаём незабываемые
-                кулинарные впечатления для любого мероприятия в Ташкенте —
-                от небольших встреч до масштабных праздников, уделяя внимание
-                каждой детали.
+                {t.introText}
               </p>
             </div>
           </motion.div>
@@ -111,7 +88,7 @@ export default function Catering() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="text-center font-serif text-3xl font-bold text-primary sm:text-4xl"
           >
-            Как это работает?
+            {t.howItWorksTitle}
           </motion.h2>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -135,27 +112,30 @@ export default function Catering() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="text-center font-serif text-3xl font-bold text-primary sm:text-4xl"
           >
-            Кейтеринг для разных мероприятий
+            {t.occasionsTitle}
           </motion.h2>
           <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {OCCASIONS.map((occasion, i) => (
-              <motion.div
-                key={occasion.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
-                className="flex flex-col items-center rounded-xl border border-border/60 bg-background px-5 py-8 text-center shadow-sm"
-              >
-                <occasion.icon className="size-8 text-accent" />
-                <h3 className="mt-4 font-serif text-lg font-bold text-foreground">
-                  {occasion.title}
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {occasion.text}
-                </p>
-              </motion.div>
-            ))}
+            {t.occasions.map((occasion, i) => {
+              const Icon = OCCASION_ICONS[i];
+              return (
+                <motion.div
+                  key={occasion.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
+                  className="flex flex-col items-center rounded-xl border border-border/60 bg-background px-5 py-8 text-center shadow-sm"
+                >
+                  <Icon className="size-8 text-accent" />
+                  <h3 className="mt-4 font-serif text-lg font-bold text-foreground">
+                    {occasion.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {occasion.text}
+                  </p>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -171,11 +151,10 @@ export default function Catering() {
               transition={{ duration: 0.6, ease: "easeOut" }}
             >
               <h2 className="font-serif text-3xl font-bold text-primary sm:text-4xl">
-                Нужно больше деталей?
+                {t.faqTitle}
               </h2>
               <p className="mt-3 text-sm text-muted-foreground">
-                Свяжитесь с нашей командой, чтобы получить персональную
-                консультацию по кейтерингу.
+                {t.faqSub}
               </p>
             </motion.div>
             <motion.div
@@ -201,13 +180,10 @@ export default function Catering() {
             className="text-center"
           >
             <h2 className="font-serif text-3xl font-bold text-primary sm:text-4xl">
-              Свяжитесь с MADO Catering
+              {t.quoteTitle}
             </h2>
             <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-              Мы верим, что каждое мероприятие заслуживает исключительной еды и
-              безупречного сервиса. Поделитесь деталями вашего мероприятия, и
-              наша команда поможет создать кейтеринг, который идеально
-              соответствует вашему случаю, предпочтениям и бюджету.
+              {t.quoteSub}
             </p>
           </motion.div>
           <motion.div
