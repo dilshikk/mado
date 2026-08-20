@@ -1,41 +1,21 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils.ts";
+import { useLanguage } from "@/hooks/use-language.ts";
+import { howItWorksText } from "@/lib/i18n/catering.ts";
 
-const STEPS = [
-  {
-    step: "Шаг 1",
-    title: "Расскажите нам о своём мероприятии",
-    text: "Каждое торжество начинается с идеи. Поделитесь своим видением, и мы подготовим план кейтеринга, который воплотит его в жизнь.",
-    image:
-      "https://images.unsplash.com/photo-1573497620053-ea5300f94f21?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    step: "Шаг 2",
-    title: "Меню, созданное для вас",
-    text: "Наши шеф-повара составят индивидуальное меню из блюд MADO, учитывая тематику мероприятия, количество гостей и ваши предпочтения.",
-    image:
-      "https://images.unsplash.com/photo-1543352634-a1c51d9f1fa7?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    step: "Шаг 3",
-    title: "Готовится нашей командой",
-    text: "Каждое блюдо готовится вручную нашей опытной командой с использованием традиционных рецептов и свежих ингредиентов.",
-    image:
-      "https://images.unsplash.com/photo-1566554273541-37a9ca77b91f?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    step: "Шаг 4",
-    title: "Мы берём всё на себя",
-    text: "От доставки и сервировки до обслуживания гостей — наша команда позаботится обо всех деталях, чтобы вы могли расслабиться и наслаждаться праздником.",
-    image:
-      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80",
-  },
-] as const;
+const IMAGES = [
+  "https://images.unsplash.com/photo-1573497620053-ea5300f94f21?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1543352634-a1c51d9f1fa7?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1566554273541-37a9ca77b91f?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80",
+];
 
 export default function HowItWorks() {
   const [active, setActive] = useState(0);
-  const current = STEPS[active];
+  const { lang } = useLanguage();
+  const { steps } = howItWorksText[lang];
+  const current = steps[active];
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:gap-4">
@@ -51,7 +31,7 @@ export default function HowItWorks() {
             className="relative h-[320px] sm:h-[420px]"
           >
             <img
-              src={current.image}
+              src={IMAGES[active]}
               alt={current.title}
               className="h-full w-full object-cover"
             />
@@ -73,7 +53,7 @@ export default function HowItWorks() {
 
       {/* Thumbnails */}
       <div className="flex gap-3 overflow-x-auto sm:w-16 sm:flex-col sm:overflow-visible">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <button
             key={s.step}
             type="button"
@@ -87,7 +67,7 @@ export default function HowItWorks() {
             )}
             aria-label={s.title}
           >
-            <img src={s.image} alt="" className="h-full w-full object-cover" />
+            <img src={IMAGES[i]} alt="" className="h-full w-full object-cover" />
             <span className="absolute inset-0 flex items-center justify-center bg-primary/40 font-serif text-sm font-bold text-primary-foreground">
               {i + 1}
             </span>
