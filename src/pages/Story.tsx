@@ -5,6 +5,7 @@ import Navbar from "./_components/navbar.tsx";
 import Footer from "./_components/footer.tsx";
 import PageMeta from "@/components/page-meta.tsx";
 import { useLanguage } from "@/hooks/use-language.ts";
+import { storyPageText } from "@/lib/i18n/story.ts";
 
 const HISTORY_PHOTOS = [
   {
@@ -25,28 +26,7 @@ const HISTORY_PHOTOS = [
   },
 ] as const;
 
-const FEATURES = [
-  {
-    icon: UtensilsCrossed,
-    title: "Аутентичная турецкая кухня",
-    text: "Почувствуйте настоящий вкус Турции благодаря проверенным временем рецептам и тщательно отобранным ингредиентам.",
-  },
-  {
-    icon: Bike,
-    title: "Доставка",
-    text: "Насладитесь фирменными блюдами и десертами MADO у себя дома. Каждый заказ приезжает свежим и приготовленным с той же заботой.",
-  },
-  {
-    icon: Wine,
-    title: "Кейтеринг",
-    text: "Сделайте ваше торжество незабываемым с кейтерингом от MADO — для корпоративных мероприятий, праздников и частных случаев.",
-  },
-  {
-    icon: IceCreamCone,
-    title: "Обеды весь день",
-    text: "Наслаждайтесь атмосферой, где традиция встречается с современной элегантностью, в любое время дня.",
-  },
-] as const;
+const FEATURE_ICONS = [UtensilsCrossed, Bike, Wine, IceCreamCone];
 
 const GALLERY_STRIP = [
   {
@@ -69,6 +49,7 @@ const GALLERY_STRIP = [
 
 export default function Story() {
   const { lang } = useLanguage();
+  const t = storyPageText[lang];
 
   return (
     <div>
@@ -90,7 +71,7 @@ export default function Story() {
             transition={{ duration: 0.7, ease: "easeOut" }}
             className="font-serif text-4xl font-bold tracking-wide text-primary-foreground sm:text-5xl"
           >
-            НАША ИСТОРИЯ
+            {t.heroTitle}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 16 }}
@@ -98,7 +79,7 @@ export default function Story() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
             className="mt-3 text-xs font-semibold tracking-[0.3em] text-primary-foreground/85 uppercase sm:text-sm"
           >
-            Настоящий турецкий опыт. Настоящий праздник вкуса.
+            {t.heroSub}
           </motion.p>
         </div>
       </section>
@@ -120,37 +101,11 @@ export default function Story() {
             className="grid grid-cols-1 gap-12 rounded-2xl bg-background/80 p-8 shadow-sm lg:grid-cols-2 lg:p-12"
           >
             <div className="space-y-4 text-muted-foreground">
-              <p>
-                MADO означает <strong className="text-foreground">Maraş Dondurması</strong> —
-                «Мараш» это регион Кахраманмараш, а «Дондурма» — мороженое,
-                приготовленное из трёх главных ингредиентов: сахара, козьего
-                молока и салепа.
-              </p>
-              <p>
-                История MADO началась с Османа Аги, предка семьи Канбур,
-                который собирал снег с горы Ахир в Кахраманмараше и смешивал
-                его с ароматной патокой, превращая его в освежающий десерт.
-                Опыт и секреты передавались из поколения в поколение, а вкус
-                совершенствовался и раскрывался всё глубже с каждым новым
-                поколением.
-              </p>
-              <p>
-                В какой-то момент MADO пришлось модернизироваться и перейти от
-                традиционного мороженого ручной работы к машинному
-                производству, чтобы предлагать десерт круглый год и в больших
-                объёмах. Команда MADO работала день и ночь, чтобы внести
-                необходимые изменения и при этом сохранить тот самый
-                неповторимый вкус.
-              </p>
-              <p>
-                Сегодня MADO — это сеть турецких ресторанов с более чем 300
-                филиалами по всему миру. MADO — это история успеха бренда,
-                который начинался с простой цели — подарить как можно
-                большему числу людей традиционную мараш-дондурму, а вырос до
-                целой фабрики, рынка и международной ресторанной сети.
-              </p>
+              {t.paragraphs.map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
               <p className="font-serif text-xl font-bold text-foreground">
-                — С 1850 года
+                {t.sinceLabel}
               </p>
             </div>
 
@@ -165,18 +120,21 @@ export default function Story() {
           </motion.div>
 
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((feature, i) => (
-              <motion.div key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
-                className="rounded-xl border border-border/60 bg-background px-5 py-8 text-center shadow-sm">
-                <feature.icon className="mx-auto size-7 text-accent" />
-                <h3 className="mt-4 font-serif text-lg font-bold text-foreground">{feature.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{feature.text}</p>
-              </motion.div>
-            ))}
+            {t.features.map((feature, i) => {
+              const Icon = FEATURE_ICONS[i];
+              return (
+                <motion.div key={feature.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
+                  className="rounded-xl border border-border/60 bg-background px-5 py-8 text-center shadow-sm">
+                  <Icon className="mx-auto size-7 text-accent" />
+                  <h3 className="mt-4 font-serif text-lg font-bold text-foreground">{feature.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{feature.text}</p>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -188,15 +146,15 @@ export default function Story() {
         <div className="absolute inset-0 bg-primary/75" />
         <div className="relative mx-auto grid max-w-[1140px] grid-cols-1 items-center gap-10 px-6 lg:grid-cols-2">
           <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: "easeOut" }}>
-            <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">Восхитительный опыт</p>
+            <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">{t.ctaLabel}</p>
             <h2 className="mt-3 text-balance font-serif text-3xl font-bold text-primary-foreground sm:text-4xl">
-              Ужин, мероприятие или праздник?
+              {t.ctaTitle}
             </h2>
             <p className="mt-4 max-w-md text-primary-foreground/80">
-              Планируете уютный ужин, корпоративное мероприятие или особое торжество — MADO предлагает элегантную атмосферу в сочетании с аутентичными турецкими вкусами.
+              {t.ctaSub}
             </p>
             <Button className="mt-6 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90" asChild>
-              <a href="#contact">Узнать больше <ArrowRight className="size-4" /></a>
+              <a href="#contact">{t.ctaBtn} <ArrowRight className="size-4" /></a>
             </Button>
           </motion.div>
 
