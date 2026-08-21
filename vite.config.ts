@@ -23,6 +23,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Proxy /uploads so browser can load backend images via the Vite port
+      // instead of trying to reach 127.0.0.1:3000 directly (which fails remotely).
+      "/uploads": {
+        target: "http://127.0.0.1:3000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });
