@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
-import { Upload, X, ZoomIn, ZoomOut, RotateCcw, Check, ImageOff, Loader2 } from "lucide-react";
+import { Upload, X, Check, Loader2 } from "lucide-react";
 import api from "@/lib/api.ts";
 
 const MAX_FILE_SIZE_MB = 50;
@@ -72,6 +72,7 @@ function CropModal({
   const imgRef = useRef<HTMLImageElement>(null);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [processing, setProcessing] = useState(false);
 
   const onImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -81,10 +82,16 @@ function CropModal({
     [aspect]
   );
 
+  // IMPORTANT: this must be type="button" so it does NOT submit any parent <form>
   const handleConfirm = async () => {
-    if (!imgRef.current || !completedCrop) return;
-    const file = await getCroppedBlob(imgRef.current, completedCrop, fileName);
-    onConfirm(file);
+    if (!imgRef.current || !completedCrop || processing) return;
+    setProcessing(true);
+    try {
+      const file = await getCroppedBlob(imgRef.current, completedCrop, fileName);
+      onConfirm(file);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -96,7 +103,8 @@ function CropModal({
             <h2 className="font-bold text-gray-900">Обрезать фото</h2>
             <p className="text-xs text-gray-500 mt-0.5">Выберите нужную область и нажмите «Готово»</p>
           </div>
-          <button onClick={onCancel} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+          {/* type="button" prevents accidental form submit */}
+          <button type="button" onClick={onCancel} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -122,21 +130,27 @@ function CropModal({
           </ReactCrop>
         </div>
 
-        {/* Footer */}
+        {/* Footer — BOTH buttons must be type="button" so they never submit the parent form */}
         <div className="flex gap-3 px-5 py-4 border-t border-gray-200">
           <button
+            type="button"
             onClick={onCancel}
-            className="flex-1 px-4 py-2.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+            disabled={processing}
+            className="flex-1 px-4 py-2.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
           >
             Отмена
           </button>
           <button
-            onClick={handleConfirm}
-            disabled={!completedCrop}
+            type="button"
+            onClick={() => { void handleConfirm(); }}
+            disabled={!completedCrop || processing}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
-            <Check className="w-4 h-4" />
-            Готово — использовать
+            {processing ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Обработка...</>
+            ) : (
+              <><Check className="w-4 h-4" /> Готово — использовать</>
+            )}
           </button>
         </div>
       </div>
@@ -277,7 +291,7 @@ export default function ImageUploadCrop({
           src={cropSrc}
           fileName={cropFileName}
           aspect={aspect}
-          onConfirm={handleCropConfirm}
+          onConfirm={(file) => { void handleCropConfirm(file); }}
           onCancel={handleCropCancel}
         />
       )}
