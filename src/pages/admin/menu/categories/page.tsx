@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, AlertCircle, Loader2, Upload, ImageOff } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, Upload, ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 
@@ -34,8 +34,8 @@ const TAB_COLORS: Record<string, string> = {
 const TAB_LABELS: Record<string, string> = {
   food: "ЕДА",
   beverage: "НАПИТКИ",
-  dessert: "ДЕСЕРТы",
-  takeaway: "НАВыНОС",
+  dessert: "ДЕСЕРТЫ",
+  takeaway: "НАВЫНОС",
 };
 
 const TABS = ["all", "food", "beverage", "dessert", "takeaway"];
