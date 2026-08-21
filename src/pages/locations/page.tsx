@@ -162,14 +162,12 @@ export default function Locations() {
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState("all");
 
-  // Use global language instead of local state
   const { lang, setLang } = useLanguage();
-
   const t = UI_TEXT[lang];
 
   useEffect(() => {
     api.getLocations()
-      .then((data: ApiLocation[]) => { setLocations(data); setLoading(false); })
+      .then((data) => { setLocations(data as ApiLocation[]); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, []);
 
