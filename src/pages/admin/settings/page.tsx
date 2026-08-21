@@ -62,12 +62,12 @@ export default function SettingsPage() {
     const loadSettings = async () => {
       try {
         const data = await api.getSettings();
-        setSettings((prev) => ({ ...prev, ...data }));
+        setSettings((prev) => ({ ...prev, ...(data as Partial<Settings>) }));
       } catch (err) {
         console.error("Failed to load settings:", err);
       }
     };
-    loadSettings();
+    void loadSettings();
   }, []);
 
   const handleSave = async () => {
