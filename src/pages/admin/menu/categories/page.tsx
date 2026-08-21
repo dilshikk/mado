@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, Upload, ImageOff } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
+import ImageUploadCrop from "@/components/image-upload-crop.tsx";
 
 type Category = {
   id: string | number;
@@ -57,7 +58,7 @@ function getDisplayLabel(cat: Category): string {
   ) ?? cat.label ?? "Без названия";
 }
 
-// ─── Category form (add/edit) ───────────────────────────────────────────────────────────────────
+// ─── Category form ─────────────────────────────────────────────────────────────
 
 function CategoryForm({
   initialData, onSubmit, onCancel, saving,
@@ -69,41 +70,20 @@ function CategoryForm({
 }) {
   const [form, setForm] = useState<CategoryFormData>({ ...DEFAULT_FORM, ...initialData });
   const [activeLang, setActiveLang] = useState<"ru" | "uz" | "en" | "tr">("ru");
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof CategoryFormData, value: string) => setForm((f) => ({ ...f, [key]: value }));
-
   const hasAnyLabel = [form.label_ru, form.label_uz, form.label_en, form.label_tr].some((v) => v.trim() !== "");
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setUploading(true);
-      const url = await api.uploadDishImage(file);
-      set("image_url", url);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Не удалось загрузить изображение");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
+  const labelKey = `label_${activeLang}` as keyof CategoryFormData;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasAnyLabel) {
-      alert("Заполните название хотя бы на одном языке");
-      return;
-    }
+    if (!hasAnyLabel) { alert("Заполните название хотя бы на одном языке"); return; }
     onSubmit(form);
   };
 
-  const labelKey = `label_${activeLang}` as keyof CategoryFormData;
-
   return (
     <form onSubmit={handleSubmit} className="bg-card border border-accent/50 rounded-xl p-4 space-y-4">
+      {/* Language tabs */}
       <div className="flex items-center gap-2 flex-wrap">
         {LANGS.map((l) => (
           <button
@@ -121,13 +101,14 @@ function CategoryForm({
         ))}
       </div>
 
+      {/* Name input */}
       <div>
         <label className="text-xs text-muted-foreground mb-1 block">
           Название категории ({activeLang.toUpperCase()})
         </label>
         <input
           autoFocus
-          value={form[labelKey]}
+          value={form[labelKey] as string}
           onChange={(e) => set(labelKey, e.target.value)}
           placeholder="например, Салаты"
           disabled={saving}
@@ -135,51 +116,42 @@ function CategoryForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Раздел</label>
-          <select
-            value={form.tab}
-            onChange={(e) => set("tab", e.target.value)}
-            disabled={saving}
-            className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none disabled:opacity-50"
-          >
-            {["food", "beverage", "dessert", "takeaway"].map((t) => (
-              <option key={t} value={t}>{TAB_LABELS[t]}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Изображение</label>
-          <div className="flex items-center gap-2">
-            {form.image_url ? (
-              <img src={form.image_url} alt="" className="w-9 h-9 rounded-lg object-cover border border-border shrink-0" />
-            ) : (
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <ImageOff className="w-4 h-4 text-muted-foreground/40" />
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={saving || uploading}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs border border-input rounded-lg bg-background hover:bg-muted disabled:opacity-50"
-            >
-              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-              {uploading ? "загрузка..." : "загрузить фото"}
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
-          </div>
-        </div>
+      {/* Tab selector */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Раздел</label>
+        <select
+          value={form.tab}
+          onChange={(e) => set("tab", e.target.value)}
+          disabled={saving}
+          className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none disabled:opacity-50"
+        >
+          {["food", "beverage", "dessert", "takeaway"].map((t) => (
+            <option key={t} value={t}>{TAB_LABELS[t]}</option>
+          ))}
+        </select>
       </div>
 
+      {/* Image upload with crop */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-2 block">Изображение категории</label>
+        <ImageUploadCrop
+          value={form.image_url}
+          onChange={(url) => set("image_url", url)}
+          aspect={1}
+          disabled={saving}
+          previewClass="w-20 h-20"
+          label="Выбрать фото"
+        />
+      </div>
+
+      {/* Actions */}
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={saving || uploading}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          disabled={saving}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
         >
-          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+          {saving && <Loader2 className="w-3 h-3 animate-spin" />}
           Сохранить
         </button>
         <button
@@ -195,7 +167,7 @@ function CategoryForm({
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────────────────────
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -207,19 +179,16 @@ export default function CategoriesPage() {
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
+  useEffect(() => { loadCategories(); }, []);
 
   const loadCategories = async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await api.getCategories();
-      setCategories(Array.isArray(data) ? data as Category[] : []);
+      setCategories(Array.isArray(data) ? (data as Category[]) : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить категории");
-      console.error("Load categories error:", err);
     } finally {
       setLoading(false);
     }
@@ -240,7 +209,6 @@ export default function CategoriesPage() {
       await loadCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось создать категорию");
-      console.error("Add category error:", err);
     } finally {
       setSavingId(null);
     }
@@ -248,14 +216,12 @@ export default function CategoriesPage() {
 
   const handleDelete = async (id: string | number) => {
     if (!confirm("Удалить категорию? Блюда в этой категории удалены не будут.")) return;
-
     try {
       setDeletingId(id);
       await api.deleteCategory(id);
       await loadCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось удалить категорию");
-      console.error("Delete category error:", err);
     } finally {
       setDeletingId(null);
     }
@@ -269,7 +235,6 @@ export default function CategoriesPage() {
       await loadCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось обновить категорию");
-      console.error("Update category error:", err);
     } finally {
       setSavingId(null);
     }
@@ -285,7 +250,7 @@ export default function CategoriesPage() {
         <button
           onClick={() => { setEditingId(null); setAdding(true); }}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
         >
           <Plus className="w-4 h-4" /> Добавить категорию
         </button>
@@ -293,18 +258,15 @@ export default function CategoriesPage() {
 
       {error && (
         <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl">
-          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-          <span className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</span>
+          <AlertCircle className="w-4 h-4 text-red-600" />
+          <span className="text-sm text-red-700 font-medium">{error}</span>
           <button onClick={() => setError(null)} className="ml-auto text-sm underline">Закрыть</button>
         </div>
       )}
 
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-3" />
-            <p className="text-sm text-muted-foreground">Загрузка...</p>
-          </div>
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       )}
 
@@ -329,11 +291,7 @@ export default function CategoriesPage() {
           </div>
 
           {adding && (
-            <CategoryForm
-              onSubmit={handleAdd}
-              onCancel={() => setAdding(false)}
-              saving={savingId === "new"}
-            />
+            <CategoryForm onSubmit={handleAdd} onCancel={() => setAdding(false)} saving={savingId === "new"} />
           )}
 
           {activeTab === "all" ? (
@@ -390,9 +348,7 @@ type ListProps = {
   deletingId: string | number | null;
 };
 
-function TabGroup({
-  tab, categories, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
-}: { tab: string } & ListProps) {
+function TabGroup({ tab, categories, ...rest }: { tab: string } & ListProps) {
   const [open, setOpen] = useState(true);
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -404,18 +360,7 @@ function TabGroup({
         <span className={cn("text-xs font-bold px-2 py-0.5 rounded", TAB_COLORS[tab])}>{TAB_LABELS[tab]}</span>
         <span className="text-sm text-muted-foreground">{categories.length} категорий</span>
       </button>
-      {open && (
-        <CategoryList
-          categories={categories}
-          editingId={editingId}
-          onStartEdit={onStartEdit}
-          onSaveEdit={onSaveEdit}
-          onCancelEdit={onCancelEdit}
-          onDelete={onDelete}
-          savingId={savingId}
-          deletingId={deletingId}
-        />
-      )}
+      {open && <CategoryList categories={categories} {...rest} />}
     </div>
   );
 }
@@ -446,9 +391,9 @@ function CategoryList({
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30">
               {cat.image_url ? (
-                <img src={cat.image_url} alt="" className="w-9 h-9 rounded-lg object-cover border border-border shrink-0" />
+                <img src={cat.image_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-border shrink-0" />
               ) : (
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
                   <ImageOff className="w-4 h-4 text-muted-foreground/40" />
                 </div>
               )}
@@ -458,7 +403,9 @@ function CategoryList({
                   <p className="text-xs text-muted-foreground">{cat.dishCount} блюд</p>
                 )}
               </div>
-              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0", TAB_COLORS[cat.tab])}>{TAB_LABELS[cat.tab]}</span>
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0", TAB_COLORS[cat.tab])}>
+                {TAB_LABELS[cat.tab]}
+              </span>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => onStartEdit(cat.id)}
@@ -470,9 +417,11 @@ function CategoryList({
                 <button
                   onClick={() => onDelete(cat.id)}
                   disabled={deletingId === cat.id || savingId !== null}
-                  className="p-1.5 rounded hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  className="p-1.5 rounded hover:bg-destructive/10 disabled:opacity-50 flex items-center gap-1"
                 >
-                  {deletingId === cat.id ? <Loader2 className="w-3.5 h-3.5 text-destructive animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />}
+                  {deletingId === cat.id
+                    ? <Loader2 className="w-3.5 h-3.5 text-destructive animate-spin" />
+                    : <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />}
                 </button>
               </div>
             </div>
