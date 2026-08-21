@@ -59,7 +59,7 @@ export default function CateringRequestsPage() {
   const loadRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const data: CateringRequest[] = await api.getCateringRequests();
+      const data = await api.getCateringRequests() as CateringRequest[];
       setRequests(data);
     } catch {
       toast.error("Не удалось загрузить заявки кейтеринга");
@@ -323,7 +323,7 @@ export default function CateringRequestsPage() {
                   className="w-full px-3 py-2.5 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
                 <button
-                  onClick={saveNote}
+                  onClick={() => { void saveNote(); }}
                   disabled={savingNote || note === (viewing.note ?? "")}
                   className="mt-2 px-4 py-1.5 text-xs font-medium bg-muted text-muted-foreground rounded-lg disabled:opacity-40 hover:bg-muted/80 flex items-center gap-1.5"
                 >
@@ -339,7 +339,7 @@ export default function CateringRequestsPage() {
                     <button
                       key={s}
                       disabled={updatingStatus}
-                      onClick={() => updateStatus(viewing.id, s)}
+                      onClick={() => { void updateStatus(viewing.id, s); }}
                       className={cn(
                         "px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50",
                         viewing.status === s
@@ -362,7 +362,7 @@ export default function CateringRequestsPage() {
                 Закрыть
               </button>
               <button
-                onClick={saveNoteAndClose}
+                onClick={() => { void saveNoteAndClose(); }}
                 disabled={savingNote}
                 className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg flex items-center justify-center gap-2 disabled:opacity-70"
               >
