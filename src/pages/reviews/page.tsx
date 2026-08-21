@@ -29,7 +29,30 @@ const LANGUAGES: { code: Lang; label: string }[] = [
   { code: "tr", label: "TR" },
 ];
 
-const T: Record<Lang, Record<string, string>> = {
+type LangStrings = {
+  title: string;
+  subtitle: string;
+  listTitle: string;
+  noReviews: string;
+  loadMore: string;
+  formTitle: string;
+  name: string;
+  namePlaceholder: string;
+  rating: string;
+  ratingRequired: string;
+  review: string;
+  reviewPlaceholder: string;
+  reviewMin: string;
+  submit: string;
+  sending: string;
+  successTitle: string;
+  successDesc: string;
+  sendAnother: string;
+  nameMin: string;
+  ratingLabels: string[];
+};
+
+const T: Record<Lang, LangStrings> = {
   ru: {
     title: "Отзывы гостей",
     subtitle: "Ваше мнение помогает нам становиться лучше. Оставьте отзыв — это займёт всего минуту.",
@@ -50,7 +73,7 @@ const T: Record<Lang, Record<string, string>> = {
     successDesc: "Ваш отзыв получен и будет опубликован после проверки модератором.",
     sendAnother: "Оставить ещё один отзыв",
     nameMin: "Введите ваше имя",
-    ratingLabel: (n: number) => ["", "Очень плохо", "Плохо", "Нормально", "Хорошо", "Отлично"][n] ?? "",
+    ratingLabels: ["", "Очень плохо", "Плохо", "Нормально", "Хорошо", "Отлично"],
   },
   uz: {
     title: "Mehmonlar sharhlari",
@@ -72,7 +95,7 @@ const T: Record<Lang, Record<string, string>> = {
     successDesc: "Sharhingiz qabul qilindi va moderator tekshiruvidan so'ng e'lon qilinadi.",
     sendAnother: "Yana sharh qoldirish",
     nameMin: "Ismingizni kiriting",
-    ratingLabel: (n: number) => ["", "Juda yomon", "Yomon", "O'rtacha", "Yaxshi", "A'lo"][n] ?? "",
+    ratingLabels: ["", "Juda yomon", "Yomon", "O'rtacha", "Yaxshi", "A'lo"],
   },
   en: {
     title: "Guest Reviews",
@@ -94,7 +117,7 @@ const T: Record<Lang, Record<string, string>> = {
     successDesc: "Your review has been received and will be published after moderation.",
     sendAnother: "Leave another review",
     nameMin: "Please enter your name",
-    ratingLabel: (n: number) => ["", "Terrible", "Poor", "Average", "Good", "Excellent"][n] ?? "",
+    ratingLabels: ["", "Terrible", "Poor", "Average", "Good", "Excellent"],
   },
   tr: {
     title: "Misafir Yorumları",
@@ -116,7 +139,7 @@ const T: Record<Lang, Record<string, string>> = {
     successDesc: "Yorumunuz alındı ve moderasyon sonrasında yayınlanacak.",
     sendAnother: "Başka bir yorum bırak",
     nameMin: "Lütfen adınızı girin",
-    ratingLabel: (n: number) => ["", "Korkunç", "Kötü", "Ortalama", "İyi", "Mükemmel"][n] ?? "",
+    ratingLabels: ["", "Korkunç", "Kötü", "Ortalama", "İyi", "Mükemmel"],
   },
 };
 
@@ -170,7 +193,7 @@ function StarSelector({ value, onChange, lang }: { value: number; onChange: (v: 
           </button>
         ))}
       </div>
-      {active > 0 && <p className="text-xs text-muted-foreground">{(T[lang].ratingLabel as (n: number) => string)(active)}</p>}
+      {active > 0 && <p className="text-xs text-muted-foreground">{T[lang].ratingLabels[active] ?? ""}</p>}
     </div>
   );
 }
@@ -212,15 +235,12 @@ function ReviewCard({ rev, index }: { rev: Review; index: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReviewsPublicPage() {
-  // Use global lang — synced with navbar switcher
   const { lang, setLang } = useLanguage();
 
-  // ── List state ──
   const [reviews, setReviews] = useState<Review[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [visible, setVisible] = useState(PAGE_SIZE);
 
-  // ── Form state ──
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
