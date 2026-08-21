@@ -1,17 +1,103 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { Search, Leaf, Star, Sparkles } from "lucide-react";
+import { Search, Leaf, Star, Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import Navbar from "../_components/navbar.tsx";
 import Footer from "../_components/footer.tsx";
-import { MENU_CATEGORIES, TABS } from "./data.ts";
-import type { Dish, TabId } from "./data.ts";
 import PageMeta from "@/components/page-meta.tsx";
 import { useLanguage } from "@/hooks/use-language.ts";
 import { menuPageText } from "@/lib/i18n/menu.ts";
 import type { LangCode } from "@/hooks/use-language.ts";
+import { publicApi, getPublicFileUrl } from "@/lib/public-api.ts";
+import type { PublicCategory, PublicDish } from "@/lib/public-api.ts";
+import { useQuery } from "@tanstack/react-query";
 
-function DishCard({ dish, index, lang, t }: { dish: Dish; index: number; lang: LangCode; t: typeof menuPageText[LangCode] }) {
+// ─── Types ───────────────────────────────────────────────────────────────────────────
+
+type TabId = "food" | "beverage" | "dessert" | "takeaway";
+type LocalizedText = Record<LangCode, string>;
+
+// UI chrome only — not menu data, so this stays static.
+const TABS: { id: TabId; label: LocalizedText }[] = [
+  { id: "food", label: { ru: "Еда", uz: "Taomlar", en: "Food", tr: "Yemekler" } },
+  { id: "beverage", label: { ru: "Напитки", uz: "Ichimliklar", en: "Beverages", tr: "İçecekler" } },
+  { id: "dessert", label: { ru: "Десерты", uz: "Shirinliklar", en: "Desserts", tr: "Tatlılar" } },
+  { id: "takeaway", label: { ru: "С собой", uz: "Olib ketish", en: "Takeaway", tr: "Paket" } },
+];
+
+type ViewDish = {
+  id: number;
+  categoryId: number;
+  name: LocalizedText;
+  description: LocalizedText;
+  price: string;
+  image: string;
+  isNew: boolean;
+  isSignature: boolean;
+  isVeg: boolean;
+};
+
+type ViewCategory = {
+  id: number;
+  label: LocalizedText;
+  tab: TabId;
+  image: string;
+  dishes: ViewDish[];
+};
+
+function pickLocalized(fallback: string, ru: string | null, uz: string | null, en: string | null, tr: string | null): LocalizedText {
+  return {
+    ru: ru?.trim() || fallback,
+    uz: uz?.trim() || ru?.trim() || fallback,
+    en: en?.trim() || ru?.trim() || fallback,
+    tr: tr?.trim() || ru?.trim() || fallback,
+  };
+}
+
+function formatPrice(price: string | number): string {
+  const numeric = typeof price === "number" ? price : parseFloat(price);
+  if (Number.isNaN(numeric)) return String(price);
+  return `${Math.round(numeric).toLocaleString("ru-RU")}\u00a0сум`;
+}
+
+function isTabId(value: string): value is TabId {
+  return value === "food" || value === "beverage" || value === "dessert" || value === "takeaway";
+}
+
+function buildViewCategories(categories: PublicCategory[], dishes: PublicDish[]): ViewCategory[] {
+  const publishedDishes = dishes.filter((d) => d.status === "published");
+
+  return categories
+    .filter((cat) => isTabId(cat.tab))
+    .map((cat) => {
+      const catDishes = publishedDishes
+        .filter((d) => d.category_id === cat.id)
+        .map((d): ViewDish => ({
+          id: d.id,
+          categoryId: d.category_id,
+          name: pickLocalized("Без названия", d.name_ru, d.name_uz, d.name_en, d.name_tr),
+          description: pickLocalized("", d.description_ru, d.description_uz, d.description_en, d.description_tr),
+          price: formatPrice(d.price),
+          image: getPublicFileUrl(d.image_url) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+          isNew: d.is_new,
+          isSignature: d.is_signature,
+          isVeg: d.is_vegetarian,
+        }));
+
+      return {
+        id: cat.id,
+        label: pickLocalized("Без названия", cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr),
+        tab: cat.tab,
+        image: getPublicFileUrl(cat.image_url) || "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
+        dishes: catDishes,
+      } satisfies ViewCategory;
+    })
+    .filter((cat) => cat.dishes.length > 0);
+}
+
+// ─── Dish card ───────────────────────────────────────────────────────────────────────────────
+
+function DishCard({ dish, index, lang, t }: { dish: ViewDish; index: number; lang: LangCode; t: typeof menuPageText[LangCode] }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -36,9 +122,11 @@ function DishCard({ dish, index, lang, t }: { dish: Dish; index: number; lang: L
             {dish.price}
           </span>
         </div>
-        <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-          {dish.description[lang]}
-        </p>
+        {dish.description[lang] && (
+          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            {dish.description[lang]}
+          </p>
+        )}
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {dish.isSignature && (
             <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
@@ -64,16 +152,35 @@ function DishCard({ dish, index, lang, t }: { dish: Dish; index: number; lang: L
   );
 }
 
+// ─── Page ───────────────────────────────────────────────────────────────────────────────────
+
 export default function MenuPage() {
   const [activeTab, setActiveTab] = useState<TabId>("food");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const { lang } = useLanguage();
   const t = menuPageText[lang];
 
+  const categoriesQuery = useQuery({
+    queryKey: ["public-categories"],
+    queryFn: () => publicApi.getCategories(),
+  });
+  const dishesQuery = useQuery({
+    queryKey: ["public-dishes"],
+    queryFn: () => publicApi.getDishes(),
+  });
+
+  const isLoading = categoriesQuery.isLoading || dishesQuery.isLoading;
+  const isError = categoriesQuery.isError || dishesQuery.isError;
+
+  const allCategories = useMemo(
+    () => buildViewCategories(categoriesQuery.data ?? [], dishesQuery.data ?? []),
+    [categoriesQuery.data, dishesQuery.data],
+  );
+
   const tabCategories = useMemo(
-    () => MENU_CATEGORIES.filter((c) => c.tab === activeTab),
-    [activeTab],
+    () => allCategories.filter((c) => c.tab === activeTab),
+    [allCategories, activeTab],
   );
 
   const activeCategoryData = useMemo(
@@ -84,7 +191,7 @@ export default function MenuPage() {
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return MENU_CATEGORIES.flatMap((cat) =>
+    return allCategories.flatMap((cat) =>
       cat.dishes
         .filter(
           (d) =>
@@ -93,7 +200,7 @@ export default function MenuPage() {
         )
         .map((d) => ({ dish: d, categoryLabel: cat.label[lang] })),
     );
-  }, [search, lang]);
+  }, [search, lang, allCategories]);
 
   const isSearching = search.trim().length > 0;
 
@@ -225,8 +332,25 @@ export default function MenuPage() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Error state */}
+      {!isLoading && isError && (
+        <div className="flex flex-col items-center gap-3 py-24 text-center">
+          <AlertCircle className="size-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            {lang === "ru" ? "Не удалось загрузить меню. Попробуйте позже." : "Failed to load the menu. Please try again later."}
+          </p>
+        </div>
+      )}
+
       {/* Search results */}
-      {isSearching && (
+      {!isLoading && !isError && isSearching && (
         <section className="bg-background py-12">
           <div className="mx-auto max-w-[1140px] px-6">
             <p className="mb-6 text-sm text-muted-foreground">
@@ -237,7 +361,7 @@ export default function MenuPage() {
             {searchResults.length > 0 && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {searchResults.map(({ dish, categoryLabel }, i) => (
-                  <div key={`${dish.name[lang]}-${i}`} className="relative">
+                  <div key={`${dish.id}-${i}`} className="relative">
                     <DishCard dish={dish} index={i} lang={lang} t={t} />
                     <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold text-foreground/70 backdrop-blur-sm">
                       {categoryLabel}
@@ -250,8 +374,17 @@ export default function MenuPage() {
         </section>
       )}
 
+      {/* Empty state (no data yet) */}
+      {!isLoading && !isError && !isSearching && allCategories.length === 0 && (
+        <div className="py-24 text-center">
+          <p className="text-sm text-muted-foreground">
+            {lang === "ru" ? "Меню скоро появится." : "The menu is coming soon."}
+          </p>
+        </div>
+      )}
+
       {/* Categories */}
-      {!isSearching && (
+      {!isLoading && !isError && !isSearching && allCategories.length > 0 && (
         <div className="bg-background">
           {displayCategories.map((cat, catIdx) => (
             <section
@@ -292,7 +425,7 @@ export default function MenuPage() {
                 </motion.div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {cat.dishes.map((dish, dishIdx) => (
-                    <DishCard key={dish.name[lang]} dish={dish} index={dishIdx} lang={lang} t={t} />
+                    <DishCard key={dish.id} dish={dish} index={dishIdx} lang={lang} t={t} />
                   ))}
                 </div>
               </div>
