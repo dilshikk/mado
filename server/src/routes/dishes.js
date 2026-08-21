@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../db/pool.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { runSeedBeverages } from '../db/seed-beverages.js';
 
 const router = express.Router();
 
@@ -44,6 +45,12 @@ router.get('/', async (req, res) => {
 
   const result = await pool.query(query, params);
   res.json(result.rows);
+});
+
+// Seed beverages — one-time import endpoint (admin only)
+router.post('/seed-beverages', authenticate, authorize(['admin']), async (req, res) => {
+  const result = await runSeedBeverages();
+  res.json(result);
 });
 
 // Get single dish
