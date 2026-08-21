@@ -44,7 +44,7 @@ export default function CateringContentPage() {
     const load = async () => {
       try {
         setLoadingLang(true);
-        const data: LangContent = await api.getCateringContent(activeLang);
+        const data = await api.getCateringContent(activeLang) as LangContent;
         setContent((c) => ({ ...c, [activeLang]: data }));
         setLoadedLangs((s) => new Set(s).add(activeLang));
       } catch {
