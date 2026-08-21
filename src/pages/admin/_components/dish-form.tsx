@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { X, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import ImageUploadCrop from "@/components/image-upload-crop.tsx";
-import api from "@/lib/api.ts";
 
 type Category = {
   id: number;
