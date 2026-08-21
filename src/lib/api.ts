@@ -124,6 +124,15 @@ class ApiClient {
     return result as { avatar_url: string };
   }
 
+  /** Upload a single dish/category image via the media library. Returns the absolute file URL. */
+  async uploadDishImage(file: File): Promise<string> {
+    const result = await this.uploadMedia([file]);
+    const files = result as { full_url: string; file_url: string }[];
+    const uploaded = files[0];
+    if (!uploaded) throw new Error('Upload failed: no file returned');
+    return uploaded.full_url ?? this.getFileUrl(uploaded.file_url);
+  }
+
   // ── Dashboard ───────────────────────────────────────────────────────────────
 
   getDashboardStats(): Promise<unknown> {
@@ -154,12 +163,12 @@ class ApiClient {
     return this.request(`/categories/${id}`);
   }
 
-  createCategory(label: string, tab: string): Promise<unknown> {
-    return this.request('/categories', { method: 'POST', body: JSON.stringify({ label, tab }) });
+  createCategory(category: Record<string, unknown>): Promise<unknown> {
+    return this.request('/categories', { method: 'POST', body: JSON.stringify(category) });
   }
 
-  updateCategory(id: string | number, label: string): Promise<unknown> {
-    return this.request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify({ label }) });
+  updateCategory(id: string | number, category: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(category) });
   }
 
   deleteCategory(id: string | number): Promise<unknown> {
