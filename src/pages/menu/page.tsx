@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Search, Leaf, Star, Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
@@ -10,6 +10,7 @@ import { menuPageText } from "@/lib/i18n/menu.ts";
 import type { LangCode } from "@/hooks/use-language.ts";
 import { publicApi, getPublicFileUrl } from "@/lib/public-api.ts";
 import type { PublicCategory, PublicDish } from "@/lib/public-api.ts";
+import { useQuery } from "@tanstack/react-query";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -110,33 +111,6 @@ function buildViewCategories(
     .filter((cat) => cat.dishes.length > 0);
 }
 
-// ─── Simple fetch hook (no external deps) ─────────────────────────────────────
-
-type FetchState<T> =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; data: T }
-  | { status: "error"; error: string };
-
-function useFetch<T>(fetcher: () => Promise<T>): FetchState<T> {
-  const [state, setState] = useState<FetchState<T>>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    setState({ status: "loading" });
-    fetcher()
-      .then((data) => { if (!cancelled) setState({ status: "success", data }); })
-      .catch((err: unknown) => {
-        if (!cancelled)
-          setState({ status: "error", error: err instanceof Error ? err.message : "Ошибка загрузки" });
-      });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return state;
-}
-
 // ─── Dish card ────────────────────────────────────────────────────────────────
 
 function DishCard({
@@ -211,21 +185,25 @@ export default function MenuPage() {
   const { lang } = useLanguage();
   const t = menuPageText[lang];
 
-  const categoriesState = useFetch<PublicCategory[]>(() => publicApi.getCategories());
-  const dishesState = useFetch<PublicDish[]>(() => publicApi.getDishes());
+  const categoriesQuery = useQuery({
+    queryKey: ["public-categories"],
+    queryFn: () => publicApi.getCategories(),
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
+  const dishesQuery = useQuery({
+    queryKey: ["public-dishes"],
+    queryFn: () => publicApi.getDishes(),
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
 
-  const isLoading =
-    categoriesState.status === "loading" || dishesState.status === "loading";
-  const isError =
-    categoriesState.status === "error" || dishesState.status === "error";
+  const isLoading = categoriesQuery.isLoading || dishesQuery.isLoading;
+  const isError = categoriesQuery.isError || dishesQuery.isError;
 
   const allCategories = useMemo(
-    () =>
-      buildViewCategories(
-        categoriesState.status === "success" ? categoriesState.data : [],
-        dishesState.status === "success" ? dishesState.data : [],
-      ),
-    [categoriesState, dishesState],
+    () => buildViewCategories(categoriesQuery.data ?? [], dishesQuery.data ?? []),
+    [categoriesQuery.data, dishesQuery.data],
   );
 
   const tabCategories = useMemo(
