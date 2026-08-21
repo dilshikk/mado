@@ -108,7 +108,7 @@ export default function LocationsPage() {
   const loadLocations = useCallback(async () => {
     try {
       setLoading(true);
-      const data: ApiLocation[] = await api.getLocations();
+      const data = await api.getLocations() as ApiLocation[];
       setLocations(data.map(fromApi));
     } catch {
       toast.error("Не удалось загрузить филиалы");
@@ -225,67 +225,65 @@ export default function LocationsPage() {
                 )}
 
                 <div className="p-5 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0 pr-3">
-                      <h3 className="font-semibold text-foreground truncate">{displayName}</h3>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" /> {displayDistrict}
-                      </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-serif font-bold text-lg text-foreground truncate">{displayName}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{displayDistrict}</p>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full",
-                        loc.status === "open" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400")}>
-                        {loc.status === "open" ? "● Открыт" : "○ Отключён"}
-                      </span>
-                      <div className="flex gap-0.5 text-xs">{filledLangs.join(" ")}</div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {filledLangs.map((flag, i) => <span key={i} className="text-sm">{flag}</span>)}
+                      <button
+                        onClick={() => toggle(loc)}
+                        disabled={toggling === loc.id}
+                        className="ml-2"
+                        title={loc.status === "open" ? "Закрыть" : "Открыть"}
+                      >
+                        {toggling === loc.id
+                          ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                          : loc.status === "open"
+                            ? <ToggleRight className="w-6 h-6 text-emerald-600" />
+                            : <ToggleLeft className="w-6 h-6 text-muted-foreground" />}
+                      </button>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex items-start gap-2 text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span className="text-xs">{displayAddress}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5 shrink-0" /> {loc.phone}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-xs">
-                        {(() => {
-                          const open = loc.hours.filter((h) => !h.closed);
-                          if (open.length === 0) return "Закрыто всю неделю";
-                          const first = open[0];
-                          const allSame = open.every((h) => h.open === first.open && h.close === first.close);
-                          return allSame ? `${first.open} – ${first.close} ежедневно` : "Зависит от дня";
-                        })()}
-                      </span>
-                    </div>
+                  <div className="space-y-1.5 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" /><span className="truncate">{displayAddress}</span></div>
+                    <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 shrink-0 text-accent" /><span>{loc.phone}</span></div>
+                    {loc.hours.length > 0 && (
+                      <button
+                        onClick={() => setHoursModal(loc)}
+                        className="flex items-center gap-2 hover:text-foreground transition-colors"
+                      >
+                        <Clock className="w-3.5 h-3.5 shrink-0 text-accent" />
+                        <span>{loc.hours.find((h) => !h.closed)?.open ?? "—"} – {loc.hours.find((h) => !h.closed)?.close ?? "—"}</span>
+                      </button>
+                    )}
                     {loc.mapsUrl && (
-                      <a href={loc.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline">
-                        <Globe className="w-3.5 h-3.5 shrink-0" /><span className="text-xs">Посмотреть на Google Maps</span>
+                      <a href={loc.mapsUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 hover:text-foreground transition-colors">
+                        <Globe className="w-3.5 h-3.5 shrink-0 text-accent" />
+                        <span className="text-xs">Посмотреть на карте</span>
                       </a>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-1">
-                    {loc.services.map((s) => (
-                      <span key={s} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">{s}</span>
-                    ))}
-                  </div>
+                  {loc.services.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {loc.services.map((s) => (
+                        <span key={s} className="text-[10px] font-medium px-2 py-0.5 bg-muted text-muted-foreground rounded-full">{s}</span>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex gap-2 pt-1">
-                    <button onClick={() => openEdit(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
+                    <button onClick={() => openEdit(loc)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-border rounded-lg hover:bg-muted transition-colors">
                       <Edit2 className="w-3.5 h-3.5" /> Редактировать
                     </button>
-                    <button onClick={() => setHoursModal(loc)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors">
-                      <Clock className="w-3.5 h-3.5" /> Часы
-                    </button>
-                    <button onClick={() => toggle(loc)} disabled={toggling === loc.id}
-                      className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50" title={loc.status === "open" ? "Отключить" : "Включить"}>
-                      {toggling === loc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : loc.status === "open" ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-500" />}
-                    </button>
-                    <button onClick={() => setDeleteConfirm(loc)} className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="w-4 h-4" />
+                    <button onClick={() => setDeleteConfirm(loc)}
+                      className="p-2 border border-border rounded-lg hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -295,22 +293,45 @@ export default function LocationsPage() {
         </div>
       )}
 
+      {/* Edit/Add modal */}
       {(modalMode === "add" || modalMode === "edit") && editTarget && (
-        <LocationFormModal mode={modalMode} location={editTarget} saving={saving} onChange={setEditTarget} onSave={handleSave} onClose={() => { setModalMode(null); setEditTarget(null); }} />
+        <LocationModal
+          mode={modalMode}
+          location={editTarget}
+          onChange={setEditTarget}
+          onSave={() => { void handleSave(); }}
+          onClose={() => { setModalMode(null); setEditTarget(null); }}
+          saving={saving}
+        />
       )}
-      {hoursModal && <HoursModal location={hoursModal} onSave={(hours) => handleSaveHours(hoursModal, hours)} onClose={() => setHoursModal(null)} />}
+
+      {/* Hours modal */}
+      {hoursModal && (
+        <HoursModal
+          location={hoursModal}
+          onSave={(hours) => { void handleSaveHours(hoursModal, hours); }}
+          onClose={() => setHoursModal(null)}
+        />
+      )}
+
+      {/* Delete confirm */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
-          <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
-            <h2 className="font-serif font-bold text-lg">Удалить филиал?</h2>
-            <p className="text-sm text-muted-foreground">
-              Вы уверены, что хотите удалить{" "}
-              <span className="font-semibold text-foreground">"{deleteConfirm.langs.ru.name || deleteConfirm.langs.en.name}"</span>? Это действие нельзя отменить.
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative z-10 bg-card border border-border rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
+            <h2 className="font-serif font-bold text-lg mb-2">Удалить филиал?</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              «{deleteConfirm.langs.ru.name || deleteConfirm.langs.en.name}» будет удалён безвозвратно.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">Отмена</button>
-              <button onClick={handleDelete} className="flex-1 py-2.5 text-sm font-medium bg-destructive text-white rounded-lg hover:bg-destructive/90">Удалить</button>
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2.5 text-sm font-medium bg-muted text-muted-foreground rounded-lg">
+                Отмена
+              </button>
+              <button onClick={() => { void handleDelete(); }}
+                className="flex-1 py-2.5 text-sm font-medium bg-destructive text-white rounded-lg hover:bg-destructive/90">
+                Удалить
+              </button>
             </div>
           </div>
         </div>
@@ -319,24 +340,32 @@ export default function LocationsPage() {
   );
 }
 
-// ─── Form Modal ───────────────────────────────────────────────────────────────
+// ─── Location Modal ───────────────────────────────────────────────────────────
 
-function LocationFormModal({ mode, location, saving, onChange, onSave, onClose }: {
-  mode: "add" | "edit"; location: Location; saving: boolean;
-  onChange: (l: Location) => void; onSave: () => void; onClose: () => void;
+function LocationModal({
+  mode, location, onChange, onSave, onClose, saving,
+}: {
+  mode: "add" | "edit";
+  location: Location;
+  onChange: (loc: Location) => void;
+  onSave: () => void;
+  onClose: () => void;
+  saving: boolean;
 }) {
   const [activeLang, setActiveLang] = useState<LangCode>("ru");
 
+  const cur = location.langs[activeLang];
+  const photoValid = location.photoUrl.startsWith("http");
+
   const setLangField = (field: keyof LangFields, value: string) =>
-    onChange({ ...location, langs: { ...location.langs, [activeLang]: { ...location.langs[activeLang], [field]: value } } });
+    onChange({ ...location, langs: { ...location.langs, [activeLang]: { ...cur, [field]: value } } });
 
   const toggleService = (s: string) => {
-    const has = location.services.includes(s);
-    onChange({ ...location, services: has ? location.services.filter((x) => x !== s) : [...location.services, s] });
+    const services = location.services.includes(s)
+      ? location.services.filter((x) => x !== s)
+      : [...location.services, s];
+    onChange({ ...location, services });
   };
-
-  const cur = location.langs[activeLang];
-  const photoValid = !!location.photoUrl && location.photoUrl.startsWith("http");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
