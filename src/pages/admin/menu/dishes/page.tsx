@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X, DatabaseZap } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X, DatabaseZap, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import DishForm from "../../_components/dish-form.tsx";
@@ -70,6 +70,8 @@ type SeedResult = {
   log: string[];
 };
 
+type SeedKey = "beverages" | "kitchen";
+
 export default function DishesPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -88,16 +90,16 @@ export default function DishesPage() {
   const [showBulkStatus, setShowBulkStatus] = useState(false);
 
   // ── Seed state ──────────────────────────────────────────────────────────────
-  const [seeding, setSeeding] = useState(false);
+  const [seeding, setSeeding] = useState<SeedKey | null>(null);
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
+  const [seedLabel, setSeedLabel] = useState("");
   const [showSeedLog, setShowSeedLog] = useState(false);
 
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const data = await api.getCategories();
-        const cats = Array.isArray(data) ? data : [];
-        setCategories(cats && cats.length > 0 ? cats : []);
+        setCategories(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Failed to load categories:", err);
         setCategories([]);
@@ -123,19 +125,25 @@ export default function DishesPage() {
     loadDishes();
   }, []);
 
-  const handleSeedBeverages = async () => {
-    if (!confirm("Загрузить ~100 напитков из базового меню? Повторный запуск безопасен — дубликаты не создаются.")) return;
+  const handleSeed = async (key: SeedKey) => {
+    const labels: Record<SeedKey, string> = {
+      beverages: "напитков (~100 позиций)",
+      kitchen: "кухни (~120 позиций, 18 категорий)",
+    };
+    if (!confirm(`Загрузить меню ${labels[key]}? Повторный запуск безопасен — дубликаты не создаются.`)) return;
     try {
-      setSeeding(true);
+      setSeeding(key);
       setSeedResult(null);
-      const result = await api.request("/dishes/seed-beverages", { method: "POST" }) as SeedResult;
+      const endpoint = key === "beverages" ? "/dishes/seed-beverages" : "/dishes/seed-kitchen";
+      const result = await api.request(endpoint, { method: "POST" }) as SeedResult;
       setSeedResult(result);
+      setSeedLabel(key === "beverages" ? "Напитки" : "Кухня");
       setShowSeedLog(true);
       await loadDishes();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка импорта");
     } finally {
-      setSeeding(false);
+      setSeeding(null);
     }
   };
 
@@ -226,7 +234,7 @@ export default function DishesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Блюда меню</h1>
           <p className="text-gray-500">{filtered.length} блюд</p>
@@ -240,33 +248,45 @@ export default function DishesPage() {
             <Plus className="w-4 h-4" />
             Добавить блюдо
           </button>
-          {/* ── Temporary seed button ── */}
-          <button
-            onClick={handleSeedBeverages}
-            disabled={seeding}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
-            title="Импорт готового меню напитков (~100 позиций, 4 языка)"
-          >
-            {seeding
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <DatabaseZap className="w-4 h-4" />}
-            {seeding ? "Импорт..." : "Импорт напитков"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSeed("kitchen")}
+              disabled={seeding !== null}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              title="Импорт готового меню кухни (~120 позиций, 18 категорий)"
+            >
+              {seeding === "kitchen"
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <UtensilsCrossed className="w-4 h-4" />}
+              {seeding === "kitchen" ? "Импорт..." : "Импорт кухни"}
+            </button>
+            <button
+              onClick={() => handleSeed("beverages")}
+              disabled={seeding !== null}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
+              title="Импорт готового меню напитков (~100 позиций, 4 языка)"
+            >
+              {seeding === "beverages"
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <DatabaseZap className="w-4 h-4" />}
+              {seeding === "beverages" ? "Импорт..." : "Импорт напитков"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Seed result */}
       {seedResult && showSeedLog && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <p className="font-semibold text-amber-800">
-              ✅ Импорт завершён — новых категорий: {seedResult.newCategories}, блюд в базе: {seedResult.totalDishes}
+            <p className="font-semibold text-orange-800">
+              ✅ {seedLabel} — новых категорий: {seedResult.newCategories}, блюд в базе: {seedResult.totalDishes}
             </p>
-            <button onClick={() => setShowSeedLog(false)} className="text-amber-600 hover:text-amber-800">
+            <button onClick={() => setShowSeedLog(false)} className="text-orange-600 hover:text-orange-800">
               <X className="w-4 h-4" />
             </button>
           </div>
-          <details className="text-xs text-amber-700">
+          <details className="text-xs text-orange-700">
             <summary className="cursor-pointer select-none">Показать лог</summary>
             <pre className="mt-2 whitespace-pre-wrap">{seedResult.log.join("\n")}</pre>
           </details>
