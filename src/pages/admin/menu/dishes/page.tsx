@@ -1,5 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
-import { Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X, DatabaseZap, UtensilsCrossed } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X,
+  DatabaseZap, UtensilsCrossed, ChevronDown, CheckSquare,
+  Square, Eye, EyeOff, Archive, FileText, FolderInput,
+  CheckCircle2, ChevronUp,
+} from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import DishForm from "../../_components/dish-form.tsx";
@@ -37,45 +42,262 @@ type Category = {
 };
 
 function getCategoryLabel(cat: Category): string {
-  return [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
-    (v): v is string => typeof v === "string" && v.trim() !== ""
-  ) ?? cat.label ?? "Без названия";
+  return (
+    [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
+      (v): v is string => typeof v === "string" && v.trim() !== ""
+    ) ??
+    cat.label ??
+    "Без названия"
+  );
 }
 
-const STATUS_META: Record<DishStatus, { label: string; color: string }> = {
-  published: { label: "Опубликовано", color: "text-emerald-700 bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400" },
-  draft: { label: "Черновик", color: "text-yellow-700 bg-yellow-50 dark:bg-yellow-950 dark:text-yellow-400" },
-  hidden: { label: "Скрыто", color: "text-gray-500 bg-gray-100 dark:bg-gray-800" },
-  archived: { label: "Архивировано", color: "text-red-500 bg-red-50 dark:bg-red-950 dark:text-red-400" },
+const STATUS_META: Record<DishStatus, { label: string; color: string; icon: React.ReactNode }> = {
+  published: {
+    label: "Опубликовано",
+    color: "text-emerald-700 bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400",
+    icon: <Eye className="w-4 h-4" />,
+  },
+  draft: {
+    label: "Черновик",
+    color: "text-yellow-700 bg-yellow-50 dark:bg-yellow-950 dark:text-yellow-400",
+    icon: <FileText className="w-4 h-4" />,
+  },
+  hidden: {
+    label: "Скрыто",
+    color: "text-gray-500 bg-gray-100 dark:bg-gray-800",
+    icon: <EyeOff className="w-4 h-4" />,
+  },
+  archived: {
+    label: "Архивировано",
+    color: "text-red-500 bg-red-50 dark:bg-red-950 dark:text-red-400",
+    icon: <Archive className="w-4 h-4" />,
+  },
 };
 
 const getDishDisplayName = (dish: Dish) => {
   const name = [dish.name_ru, dish.name_uz, dish.name_en, dish.name_tr].find(
-    (value) => typeof value === "string" && value.trim() !== ""
+    (v) => typeof v === "string" && v.trim() !== ""
   );
   return name?.trim() || "Нет перевода";
 };
 
 const getDishTranslationPreview = (dish: Dish) => {
   const values = [dish.name_ru, dish.name_uz, dish.name_en, dish.name_tr].filter(
-    (value): value is string => typeof value === "string" && value.trim() !== ""
+    (v): v is string => typeof v === "string" && v.trim() !== ""
   );
   return values.length > 0 ? values.slice(0, 3).join(" • ") : "Нет перевода";
 };
 
-type SeedResult = {
-  ok: boolean;
-  newCategories: number;
-  totalDishes: number;
-  log: string[];
-};
-
+type SeedResult = { ok: boolean; newCategories: number; totalDishes: number; log: string[] };
 type SeedKey = "beverages" | "kitchen";
+
+// ── Dropdown component ────────────────────────────────────────────────────────
+
+type DropdownItem =
+  | { type: "item"; label: string; icon?: React.ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }
+  | { type: "separator" }
+  | { type: "header"; label: string };
+
+function Dropdown({
+  trigger,
+  items,
+  align = "right",
+}: {
+  trigger: React.ReactNode;
+  items: DropdownItem[];
+  align?: "left" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
+      {open && (
+        <div
+          className={cn(
+            "absolute top-full mt-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden",
+            align === "right" ? "right-0" : "left-0"
+          )}
+        >
+          {items.map((item, i) => {
+            if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
+            if (item.type === "header")
+              return (
+                <div key={i} className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  {item.label}
+                </div>
+              );
+            return (
+              <button
+                key={i}
+                disabled={item.disabled}
+                onClick={() => {
+                  item.onClick();
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm transition-colors",
+                  item.danger
+                    ? "text-red-600 hover:bg-red-50"
+                    : "text-gray-700 hover:bg-gray-50",
+                  item.disabled && "opacity-40 cursor-not-allowed pointer-events-none"
+                )}
+              >
+                {item.icon && <span className="flex-shrink-0 text-gray-400">{item.icon}</span>}
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Bulk action bar ───────────────────────────────────────────────────────────
+
+function BulkActionBar({
+  count,
+  total,
+  categories,
+  onSelectAll,
+  onDeselectAll,
+  onStatus,
+  onMove,
+  onDelete,
+  loading,
+}: {
+  count: number;
+  total: number;
+  categories: Category[];
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onStatus: (s: DishStatus) => void;
+  onMove: (catId: number) => void;
+  onDelete: () => void;
+  loading: boolean;
+}) {
+  const statusItems: DropdownItem[] = [
+    { type: "header", label: "Изменить статус" },
+    {
+      type: "item", label: "Опубликовать", icon: <Eye className="w-4 h-4" />,
+      onClick: () => onStatus("published"),
+    },
+    {
+      type: "item", label: "В черновик", icon: <FileText className="w-4 h-4" />,
+      onClick: () => onStatus("draft"),
+    },
+    {
+      type: "item", label: "Скрыть", icon: <EyeOff className="w-4 h-4" />,
+      onClick: () => onStatus("hidden"),
+    },
+    {
+      type: "item", label: "Архивировать", icon: <Archive className="w-4 h-4" />,
+      onClick: () => onStatus("archived"),
+    },
+  ];
+
+  const moveItems: DropdownItem[] = [
+    { type: "header", label: "Переместить в категорию" },
+    ...categories.map<DropdownItem>((cat) => ({
+      type: "item",
+      label: getCategoryLabel(cat),
+      onClick: () => onMove(cat.id),
+    })),
+  ];
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-700 animate-in slide-in-from-bottom-4 duration-200">
+      {/* Count + select controls */}
+      <div className="flex items-center gap-2 pr-3 border-r border-gray-700">
+        <button
+          onClick={count === total ? onDeselectAll : onSelectAll}
+          className="flex items-center gap-1.5 text-sm font-medium hover:text-gray-300 transition-colors"
+          title={count === total ? "Снять выделение" : "Выбрать все"}
+        >
+          {count === total ? (
+            <CheckSquare className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <Square className="w-4 h-4 text-gray-400" />
+          )}
+          <span className="text-emerald-400 font-bold">{count}</span>
+          <span className="text-gray-400">/ {total}</span>
+        </button>
+      </div>
+
+      {/* Status dropdown */}
+      <Dropdown
+        align="left"
+        trigger={
+          <button
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-4 h-4 text-blue-400" />
+            Статус
+            <ChevronUp className="w-3 h-3 text-gray-400" />
+          </button>
+        }
+        items={statusItems}
+      />
+
+      {/* Move dropdown */}
+      <Dropdown
+        align="left"
+        trigger={
+          <button
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <FolderInput className="w-4 h-4 text-amber-400" />
+            Переместить
+            <ChevronUp className="w-3 h-3 text-gray-400" />
+          </button>
+        }
+        items={moveItems}
+      />
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-gray-700" />
+
+      {/* Delete */}
+      <button
+        disabled={loading}
+        onClick={onDelete}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors disabled:opacity-50"
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        Удалить
+      </button>
+
+      {/* Close / deselect */}
+      <button
+        onClick={onDeselectAll}
+        className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
+        title="Снять выделение"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DishesPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
@@ -87,26 +309,36 @@ export default function DishesPage() {
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
-  const [showBulkStatus, setShowBulkStatus] = useState(false);
+  // Row-level dropdown state
+  const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
+  const rowMenuRef = useRef<HTMLDivElement>(null);
 
-  // ── Seed state ──────────────────────────────────────────────────────────────
+  // Seed state
   const [seeding, setSeeding] = useState<SeedKey | null>(null);
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const [seedLabel, setSeedLabel] = useState("");
   const [showSeedLog, setShowSeedLog] = useState(false);
 
+  // Close row menu on outside click
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const data = await api.getCategories();
-        setCategories(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to load categories:", err);
-        setCategories([]);
+    const handler = (e: MouseEvent) => {
+      if (rowMenuRef.current && !rowMenuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
       }
     };
-    loadCategories();
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await api.getCategories();
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+      setCategories([]);
+    }
+  };
 
   const loadDishes = async () => {
     try {
@@ -122,24 +354,26 @@ export default function DishesPage() {
   };
 
   useEffect(() => {
+    loadCategories();
     loadDishes();
   }, []);
 
   const handleSeed = async (key: SeedKey) => {
     const labels: Record<SeedKey, string> = {
       beverages: "напитков (~100 позиций)",
-      kitchen: "кухни (~120 позиций, 18 категорий)",
+      kitchen: "кухни (~120 позиций)",
     };
     if (!confirm(`Загрузить меню ${labels[key]}? Повторный запуск безопасен — дубликаты не создаются.`)) return;
     try {
       setSeeding(key);
       setSeedResult(null);
       const endpoint = key === "beverages" ? "/dishes/seed-beverages" : "/dishes/seed-kitchen";
-      const result = await api.request(endpoint, { method: "POST" }) as SeedResult;
+      const result = (await api.request(endpoint, { method: "POST" })) as SeedResult;
       setSeedResult(result);
       setSeedLabel(key === "beverages" ? "Напитки" : "Кухня");
       setShowSeedLog(true);
       await loadDishes();
+      await loadCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка импорта");
     } finally {
@@ -151,7 +385,7 @@ export default function DishesPage() {
     return dishes.filter((dish) => {
       const q = search.toLowerCase();
       const searchable = [dish.name_ru, dish.name_uz, dish.name_en, dish.name_tr]
-        .filter((value): value is string => typeof value === "string")
+        .filter((v): v is string => typeof v === "string")
         .join(" ")
         .toLowerCase();
       const matchSearch = searchable.includes(q);
@@ -160,6 +394,8 @@ export default function DishesPage() {
       return matchSearch && matchCategory && matchStatus;
     });
   }, [dishes, search, categoryFilter, statusFilter]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
@@ -181,7 +417,7 @@ export default function DishesPage() {
   };
 
   const handleDelete = async (id: string | number) => {
-    if (!confirm("удалить это блюдо?")) return;
+    if (!confirm("Удалить это блюдо?")) return;
     try {
       setDeletingId(id);
       await api.deleteDish(id);
@@ -193,18 +429,74 @@ export default function DishesPage() {
     }
   };
 
-  const handleBulkStatusUpdate = async (newStatus: DishStatus) => {
-    if (selected.size === 0) return;
+  const handleQuickStatus = async (id: string | number, status: DishStatus) => {
     try {
-      setSavingId("bulk");
-      await api.bulkUpdateDishStatus(Array.from(selected), newStatus);
+      setSavingId(id);
+      await api.updateDish(id, { status });
       await loadDishes();
-      setSelected(new Set());
-      setShowBulkStatus(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить");
+      setError(err instanceof Error ? err.message : "Не удалось обновить статус");
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const handleQuickMove = async (id: string | number, categoryId: number) => {
+    try {
+      setSavingId(id);
+      await api.updateDish(id, { category_id: categoryId });
+      await loadDishes();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось переместить");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // ── Bulk handlers ──────────────────────────────────────────────────────────
+
+  const handleBulkStatus = async (status: DishStatus) => {
+    if (selected.size === 0) return;
+    try {
+      setBulkLoading(true);
+      await api.bulkUpdateDishStatus(Array.from(selected), status);
+      await loadDishes();
+      setSelected(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обновить статус");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkMove = async (categoryId: number) => {
+    if (selected.size === 0) return;
+    try {
+      setBulkLoading(true);
+      await Promise.all(
+        Array.from(selected).map((id) => api.updateDish(id, { category_id: categoryId }))
+      );
+      await loadDishes();
+      setSelected(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось переместить");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Удалить ${selected.size} блюд? Это действие нельзя отменить.`)) return;
+    try {
+      setBulkLoading(true);
+      await Promise.all(Array.from(selected).map((id) => api.deleteDish(id)));
+      await loadDishes();
+      setSelected(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось удалить");
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -215,13 +507,49 @@ export default function DishesPage() {
     setSelected(next);
   };
 
-  const toggleAll = () => {
-    if (selected.size === filtered.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filtered.map((d) => d.id)));
-    }
-  };
+  const selectAll = () => setSelected(new Set(filtered.map((d) => d.id)));
+  const deselectAll = () => setSelected(new Set());
+
+  // ── Row context menu items ─────────────────────────────────────────────────
+
+  const rowMenuItems = (dish: Dish): DropdownItem[] => [
+    {
+      type: "item", label: "Редактировать", icon: <Edit2 className="w-4 h-4" />,
+      onClick: () => { setEditingId(dish.id); setShowForm(true); },
+    },
+    { type: "separator" },
+    { type: "header", label: "Статус" },
+    ...(["published", "draft", "hidden", "archived"] as DishStatus[])
+      .filter((s) => s !== dish.status)
+      .map<DropdownItem>((s) => ({
+        type: "item",
+        label: STATUS_META[s].label,
+        icon: STATUS_META[s].icon,
+        onClick: () => handleQuickStatus(dish.id, s),
+        disabled: savingId === dish.id,
+      })),
+    { type: "separator" },
+    { type: "header", label: "Переместить в" },
+    ...categories
+      .filter((c) => c.id !== dish.category_id)
+      .slice(0, 8)
+      .map<DropdownItem>((cat) => ({
+        type: "item",
+        label: getCategoryLabel(cat),
+        icon: <FolderInput className="w-4 h-4" />,
+        onClick: () => handleQuickMove(dish.id, cat.id),
+        disabled: savingId === dish.id,
+      })),
+    { type: "separator" },
+    {
+      type: "item", label: "Удалить", icon: <Trash2 className="w-4 h-4" />,
+      onClick: () => handleDelete(dish.id),
+      danger: true,
+      disabled: deletingId === dish.id,
+    },
+  ];
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading && dishes.length === 0) {
     return (
@@ -232,7 +560,7 @@ export default function DishesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -252,24 +580,18 @@ export default function DishesPage() {
             <button
               onClick={() => handleSeed("kitchen")}
               disabled={seeding !== null}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              title="Импорт готового меню кухни (~120 позиций, 18 категорий)"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
             >
-              {seeding === "kitchen"
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <UtensilsCrossed className="w-4 h-4" />}
-              {seeding === "kitchen" ? "Импорт..." : "Импорт кухни"}
+              {seeding === "kitchen" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UtensilsCrossed className="w-3.5 h-3.5" />}
+              Кухня
             </button>
             <button
               onClick={() => handleSeed("beverages")}
               disabled={seeding !== null}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
-              title="Импорт готового меню напитков (~100 позиций, 4 языка)"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
             >
-              {seeding === "beverages"
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <DatabaseZap className="w-4 h-4" />}
-              {seeding === "beverages" ? "Импорт..." : "Импорт напитков"}
+              {seeding === "beverages" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DatabaseZap className="w-3.5 h-3.5" />}
+              Напитки
             </button>
           </div>
         </div>
@@ -280,7 +602,7 @@ export default function DishesPage() {
         <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-center justify-between mb-2">
             <p className="font-semibold text-orange-800">
-              ✅ {seedLabel} — новых категорий: {seedResult.newCategories}, блюд в базе: {seedResult.totalDishes}
+              ✅ {seedLabel} — новых категорий: {seedResult.newCategories}, блюд: {seedResult.totalDishes}
             </p>
             <button onClick={() => setShowSeedLog(false)} className="text-orange-600 hover:text-orange-800">
               <X className="w-4 h-4" />
@@ -307,33 +629,31 @@ export default function DishesPage() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 min-w-64">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-56">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Поиск по названию..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
           />
         </div>
-
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value === "all" ? "all" : parseInt(e.target.value))}
-          className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
         >
           <option value="all">Все категории</option>
           {categories.map((cat) => (
             <option key={cat.id} value={cat.id}>{getCategoryLabel(cat)}</option>
           ))}
         </select>
-
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as "all" | DishStatus)}
-          className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
         >
           <option value="all">Все статусы</option>
           <option value="published">Опубликовано</option>
@@ -341,96 +661,150 @@ export default function DishesPage() {
           <option value="hidden">Скрыто</option>
           <option value="archived">Архивировано</option>
         </select>
+        {/* Select all toggle in filter row */}
+        {filtered.length > 0 && (
+          <button
+            onClick={selected.size === filtered.length ? deselectAll : selectAll}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+          >
+            {selected.size === filtered.length ? (
+              <CheckSquare className="w-4 h-4 text-emerald-600" />
+            ) : (
+              <Square className="w-4 h-4" />
+            )}
+            {selected.size === filtered.length ? "Снять всё" : "Выбрать всё"}
+          </button>
+        )}
       </div>
 
-      {/* Bulk actions */}
-      {selected.size > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <input type="checkbox" checked={selected.size === filtered.length} onChange={toggleAll} className="w-4 h-4" />
-          <span className="text-sm">{selected.size} выбрано</span>
-          <div className="flex-1" />
-          <div className="relative">
-            <button
-              onClick={() => setShowBulkStatus(!showBulkStatus)}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              disabled={savingId === "bulk"}
-            >
-              {savingId === "bulk" ? "Обновление..." : "Изменить статус"}
-            </button>
-            {showBulkStatus && (
-              <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-10">
-                {Object.entries(STATUS_META).map(([key, meta]) => (
+      {/* Dishes list */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-gray-400 text-lg">Блюда не найдены</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((dish) => {
+            const isSelected = selected.has(dish.id);
+            const isMenuOpen = openMenuId === dish.id;
+
+            return (
+              <div
+                key={dish.id}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 border rounded-xl transition-all",
+                  isSelected
+                    ? "border-emerald-300 bg-emerald-50/50"
+                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
+                )}
+              >
+                {/* Checkbox */}
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelect(dish.id)}
+                  className="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"
+                />
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-sm truncate">{getDishDisplayName(dish)}</p>
+                    {dish.is_new && (
+                      <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Новое</span>
+                    )}
+                    {dish.is_signature && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">⭐</span>
+                    )}
+                    {dish.is_vegetarian && (
+                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Вег</span>
+                    )}
+                    {dish.is_spicy && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">🌶</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{getDishTranslationPreview(dish)}</p>
+                </div>
+
+                {/* Price */}
+                <div className="text-sm font-semibold text-gray-700 min-w-fit tabular-nums">
+                  {Number(dish.price).toLocaleString("ru-RU")} сум
+                </div>
+
+                {/* Status badge */}
+                <div className={cn("text-xs px-2 py-1 rounded-full font-medium min-w-fit hidden sm:flex items-center gap-1", STATUS_META[dish.status].color)}>
+                  {STATUS_META[dish.status].icon}
+                  {STATUS_META[dish.status].label}
+                </div>
+
+                {/* Row action menu */}
+                <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
                   <button
-                    key={key}
-                    onClick={() => handleBulkStatusUpdate(key as DishStatus)}
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+                    onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
+                    disabled={savingId === dish.id || deletingId === dish.id}
+                    className={cn(
+                      "flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50",
+                      isMenuOpen
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                    )}
                   >
-                    {meta.label}
+                    {savingId === dish.id || deletingId === dish.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <>Действия <ChevronDown className="w-3 h-3" /></>}
                   </button>
-                ))}
+
+                  {isMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-96 overflow-y-auto">
+                      {rowMenuItems(dish).map((item, i) => {
+                        if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
+                        if (item.type === "header")
+                          return (
+                            <div key={i} className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                              {item.label}
+                            </div>
+                          );
+                        return (
+                          <button
+                            key={i}
+                            disabled={item.disabled}
+                            onClick={() => {
+                              item.onClick();
+                              setOpenMenuId(null);
+                            }}
+                            className={cn(
+                              "flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm transition-colors",
+                              item.danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50",
+                              item.disabled && "opacity-40 cursor-not-allowed"
+                            )}
+                          >
+                            {item.icon && <span className="text-gray-400 flex-shrink-0">{item.icon}</span>}
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Dishes table */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Блюда не найдены</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((dish) => (
-            <div
-              key={dish.id}
-              className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(dish.id)}
-                onChange={() => toggleSelect(dish.id)}
-                className="w-4 h-4"
-              />
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium truncate">{getDishDisplayName(dish)}</p>
-                  {dish.is_new && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">🆕 Новое</span>}
-                  {dish.is_signature && <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">⭐ Фирм.</span>}
-                  {dish.is_vegetarian && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">🥗 Вег</span>}
-                  {dish.is_spicy && <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌶️ Остр</span>}
-                </div>
-                <p className="text-xs text-gray-500 truncate">{getDishTranslationPreview(dish)}</p>
-              </div>
-
-              <div className="text-sm font-medium min-w-fit">{Number(dish.price).toLocaleString()} сум</div>
-
-              <div className={cn("text-xs px-2 py-1 rounded-full font-medium", STATUS_META[dish.status].color)}>
-                {STATUS_META[dish.status].label}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setEditingId(dish.id); setShowForm(true); }}
-                  className="p-2 hover:bg-blue-100 rounded-lg disabled:opacity-50"
-                  disabled={savingId === dish.id}
-                >
-                  <Edit2 className="w-4 h-4 text-blue-600" />
-                </button>
-                <button
-                  onClick={() => handleDelete(dish.id)}
-                  className="p-2 hover:bg-red-100 rounded-lg disabled:opacity-50"
-                  disabled={deletingId === dish.id}
-                >
-                  {deletingId === dish.id
-                    ? <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
-                    : <Trash2 className="w-4 h-4 text-red-600" />}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Floating bulk action bar */}
+      {selected.size > 0 && (
+        <BulkActionBar
+          count={selected.size}
+          total={filtered.length}
+          categories={categories}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          onStatus={handleBulkStatus}
+          onMove={handleBulkMove}
+          onDelete={handleBulkDelete}
+          loading={bulkLoading}
+        />
       )}
 
       {/* Form modal */}
@@ -441,11 +815,16 @@ export default function DishesPage() {
             <DishForm
               onClose={() => setShowForm(false)}
               onSubmit={handleSubmit}
-              initialData={editingId
-                ? dishes.find((d) => d.id === editingId)
-                  ? { ...dishes.find((d) => d.id === editingId)!, price: String(dishes.find((d) => d.id === editingId)!.price) }
+              initialData={
+                editingId
+                  ? dishes.find((d) => d.id === editingId)
+                    ? {
+                        ...dishes.find((d) => d.id === editingId)!,
+                        price: String(dishes.find((d) => d.id === editingId)!.price),
+                      }
+                    : undefined
                   : undefined
-                : undefined}
+              }
               categories={categories}
               loading={savingId !== null}
             />
