@@ -77,38 +77,45 @@ function buildViewCategories(
 ): ViewCategory[] {
   const published = dishes.filter((d) => d.status === "published");
 
-  return categories
-    .filter((cat) => isTabId(cat.tab))
-    .map((cat) => {
-      const catDishes = published
-        .filter((d) => d.category_id === cat.id)
-        .map(
-          (d): ViewDish => ({
-            id: d.id,
-            categoryId: d.category_id,
-            name: pickLocalized("Без названия", d.name_ru, d.name_uz, d.name_en, d.name_tr),
-            description: pickLocalized("", d.description_ru, d.description_uz, d.description_en, d.description_tr),
-            price: formatPrice(d.price),
-            image:
-              getPublicFileUrl(d.image_url) ||
-              "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
-            isNew: d.is_new,
-            isSignature: d.is_signature,
-            isVeg: d.is_vegetarian,
-          }),
-        );
+  const result: ViewCategory[] = [];
 
-      return {
-        id: cat.id,
-        label: pickLocalized("Без названия", cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr),
-        tab: cat.tab,
-        image:
-          getPublicFileUrl(cat.image_url) ||
-          "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
-        dishes: catDishes,
-      } satisfies ViewCategory;
-    })
-    .filter((cat) => cat.dishes.length > 0);
+  for (const cat of categories) {
+    if (!isTabId(cat.tab)) continue;
+
+    const tabId: TabId = cat.tab;
+
+    const catDishes = published
+      .filter((d) => d.category_id === cat.id)
+      .map(
+        (d): ViewDish => ({
+          id: d.id,
+          categoryId: d.category_id,
+          name: pickLocalized("Без названия", d.name_ru, d.name_uz, d.name_en, d.name_tr),
+          description: pickLocalized("", d.description_ru, d.description_uz, d.description_en, d.description_tr),
+          price: formatPrice(d.price),
+          image:
+            getPublicFileUrl(d.image_url) ||
+            "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+          isNew: d.is_new,
+          isSignature: d.is_signature,
+          isVeg: d.is_vegetarian,
+        }),
+      );
+
+    if (catDishes.length === 0) continue;
+
+    result.push({
+      id: cat.id,
+      label: pickLocalized("Без названия", cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr),
+      tab: tabId,
+      image:
+        getPublicFileUrl(cat.image_url) ||
+        "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
+      dishes: catDishes,
+    });
+  }
+
+  return result;
 }
 
 // ─── Dish card ────────────────────────────────────────────────────────────────
