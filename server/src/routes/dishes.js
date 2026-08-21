@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../db/pool.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { runSeedBeverages } from '../db/seed-beverages.js';
+import { runSeedKitchen } from '../db/seed-kitchen.js';
 
 const router = express.Router();
 
@@ -50,6 +51,12 @@ router.get('/', async (req, res) => {
 // Seed beverages — one-time import endpoint (admin only)
 router.post('/seed-beverages', authenticate, authorize(['admin']), async (req, res) => {
   const result = await runSeedBeverages();
+  res.json(result);
+});
+
+// Seed kitchen — one-time import endpoint (admin only)
+router.post('/seed-kitchen', authenticate, authorize(['admin']), async (req, res) => {
+  const result = await runSeedKitchen();
   res.json(result);
 });
 
