@@ -43,6 +43,20 @@ const initDb = async () => {
       )
     `);
 
+    // Safe migrations for menu_categories: multilingual labels + image
+    const categoryCols = [
+      'label_ru VARCHAR(255)',
+      'label_uz VARCHAR(255)',
+      'label_en VARCHAR(255)',
+      'label_tr VARCHAR(255)',
+      'image_url VARCHAR(500)',
+    ];
+    for (const col of categoryCols) {
+      const colName = col.split(' ')[0];
+      const colType = col.split(' ').slice(1).join(' ');
+      await pool.query(`ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS ${colName} ${colType}`);
+    }
+
     // Dishes table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dishes (

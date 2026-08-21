@@ -9,10 +9,12 @@ router.get('/', async (req, res) => {
   const { category, tab, status } = req.query;
 
   let query = `
-    SELECT d.id, d.name_ru, d.name_uz, d.name_en, d.name_tr, 
-           d.description_ru, d.price, d.image_url, d.status,
+    SELECT d.id, d.category_id, d.name_ru, d.name_uz, d.name_en, d.name_tr,
+           d.description_ru, d.description_uz, d.description_en, d.description_tr,
+           d.price, d.image_url, d.status,
            d.is_new, d.is_signature, d.is_vegetarian, d.is_spicy,
-           c.label as category, c.tab
+           c.label as category, c.label_ru as category_label_ru, c.label_uz as category_label_uz,
+           c.label_en as category_label_en, c.label_tr as category_label_tr, c.tab
     FROM dishes d
     JOIN menu_categories c ON d.category_id = c.id
     WHERE 1=1
@@ -97,7 +99,7 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
   // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-    [req.user.id, 'create', 'dish', result.rows[0].id, `Created dish: ${name_ru}`]
+    [req.user.id, 'create', 'dish', result.rows[0].id, `Created dish: ${fallbackNameRu}`]
   );
 
   res.status(201).json(result.rows[0]);
@@ -182,7 +184,6 @@ router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager'])
     return res.status(400).json({ error: 'IDs array and status required' });
   }
 
-  const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
   const result = await pool.query(
     `UPDATE dishes SET status = $${ids.length + 1}, updated_at = NOW() WHERE id = ANY($${ids.length + 2}) RETURNING id`,
     [...ids, status, ids]
