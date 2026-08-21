@@ -1,10 +1,21 @@
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Upload, ImageOff, Loader2 } from "lucide-react";
+import api from "@/lib/api.ts";
 
 type Category = {
   id: number;
   label: string;
+  label_ru?: string | null;
+  label_uz?: string | null;
+  label_en?: string | null;
+  label_tr?: string | null;
 };
+
+function getCategoryLabel(cat: Category): string {
+  return [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
+    (v): v is string => typeof v === "string" && v.trim() !== ""
+  ) ?? cat.label ?? "Без названия";
+}
 
 type DishFormData = {
   category_id: number;
@@ -62,6 +73,8 @@ const DEFAULT_DATA: DishFormData = {
 export default function DishForm({ onClose, onSubmit, initialData, categories, loading }: Props) {
   const [activeLang, setActiveLang] = useState("ru");
   const [form, setForm] = useState<DishFormData>({ ...DEFAULT_DATA, ...initialData });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const preferredLang = LANGS.find(({ code }) => {
@@ -82,6 +95,21 @@ export default function DishForm({ onClose, onSubmit, initialData, categories, l
     form.name_en,
     form.name_tr,
   ].some((value) => typeof value === "string" && value.trim() !== "");
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      const url = await api.uploadDishImage(file);
+      set("image_url", url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось загрузить изображение");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +157,7 @@ export default function DishForm({ onClose, onSubmit, initialData, categories, l
                 >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.label}
+                      {getCategoryLabel(c)}
                     </option>
                   ))}
                 </select>
@@ -208,13 +236,35 @@ export default function DishForm({ onClose, onSubmit, initialData, categories, l
             <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
               Изображение
             </h3>
-            <input
-              value={form.image_url}
-              onChange={(e) => set("image_url", e.target.value)}
-              placeholder="https://..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              disabled={loading}
-            />
+            <div className="flex items-center gap-3">
+              {form.image_url ? (
+                <img
+                  src={form.image_url}
+                  alt=""
+                  className="w-16 h-16 rounded-lg object-cover border border-gray-300 shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center border border-gray-300 shrink-0">
+                  <ImageOff className="w-5 h-5 text-gray-300" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading || uploading}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                {uploading ? "загрузка..." : "загрузить фото"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleFileChange}
+              />
+            </div>
           </section>
 
           <div className="border-t border-gray-200" />
@@ -257,7 +307,7 @@ export default function DishForm({ onClose, onSubmit, initialData, categories, l
             </h3>
             <select
               value={form.status}
-              onChange={(e) => set("status", e.target.value as any)}
+              onChange={(e) => set("status", e.target.value as DishFormData["status"])}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               disabled={loading}
             >
@@ -284,7 +334,7 @@ export default function DishForm({ onClose, onSubmit, initialData, categories, l
               form_elem?.dispatchEvent(new Event("submit", { bubbles: true }));
             }}
             className="flex-1 px-4 py-2.5 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            disabled={loading}
+            disabled={loading || uploading}
           >
             {loading ? "⏳ Сохранение..." : "💾 Сохранить"}
           </button>

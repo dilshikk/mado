@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
-import { mockApiClient as api } from "@/lib/mock-api.ts";
+import api from "@/lib/api.ts";
 import DishForm from "../../_components/dish-form.tsx";
 
 type DishStatus = "published" | "draft" | "hidden" | "archived";
@@ -29,8 +29,18 @@ type Dish = {
 type Category = {
   id: number;
   label: string;
+  label_ru?: string | null;
+  label_uz?: string | null;
+  label_en?: string | null;
+  label_tr?: string | null;
   tab: string;
 };
+
+function getCategoryLabel(cat: Category): string {
+  return [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
+    (v): v is string => typeof v === "string" && v.trim() !== ""
+  ) ?? cat.label ?? "Без названия";
+}
 
 const STATUS_META: Record<DishStatus, { label: string; color: string }> = {
   published: { label: "Опубликовано", color: "text-emerald-700 bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400" },
@@ -90,7 +100,7 @@ export default function DishesPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getDishes();
+      const data = await api.getDishes({});
       setDishes(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить блюда");
@@ -143,7 +153,7 @@ export default function DishesPage() {
   };
 
   const handleDelete = async (id: string | number) => {
-    if (!confirm("Удалить это блюдо?")) return;
+    if (!confirm("удалить это блюдо?")) return;
     try {
       setDeletingId(id);
       await api.deleteDish(id);
@@ -244,7 +254,7 @@ export default function DishesPage() {
         >
           <option value="all">Все категории</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>{cat.label}</option>
+            <option key={cat.id} value={cat.id}>{getCategoryLabel(cat)}</option>
           ))}
         </select>
 
