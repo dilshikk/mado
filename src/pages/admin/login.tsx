@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
         return;
       }
 
-      const response = await api.login(email, password);
+      const response = await api.login(email, password) as { token?: string };
 
       if (!response.token) {
         setError('Неверные данные для входа');
