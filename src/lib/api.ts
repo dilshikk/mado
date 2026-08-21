@@ -49,10 +49,45 @@ class ApiClient {
     localStorage.removeItem('token');
   }
 
+  /**
+   * Converts a backend file URL to a browser-safe URL.
+   *
+   * The backend returns absolute URLs like `http://127.0.0.1:3000/uploads/file.jpg`.
+   * When accessed remotely (e.g. via ftp.mado.uz:5173) the browser cannot reach
+   * 127.0.0.1:3000 directly — it would look for that port on the visitor's own machine.
+   *
+   * Instead, we return a root-relative path (/uploads/file.jpg) so the browser
+   * requests it through the same host/port the page was loaded from.
+   * Vite's dev-server proxy then forwards /uploads/* to http://127.0.0.1:3000.
+   *
+   * External URLs (https://...) and already-relative paths are returned as-is.
+   */
   getFileUrl(fileUrl: string): string {
     if (!fileUrl) return '';
-    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
-    return `${SERVER_ORIGIN}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+
+    // Already an external URL (Unsplash, placehold.co, etc.) — use as-is.
+    if (/^https?:\/\//i.test(fileUrl)) {
+      // But if it points to the local backend origin, strip the origin so the
+      // browser uses the Vite proxy instead of connecting directly.
+      try {
+        const parsed = new URL(fileUrl);
+        const serverParsed = new URL(SERVER_ORIGIN);
+        if (
+          parsed.hostname === serverParsed.hostname ||
+          parsed.hostname === '127.0.0.1' ||
+          parsed.hostname === 'localhost'
+        ) {
+          // Return just the path — Vite proxy will handle it.
+          return parsed.pathname + parsed.search + parsed.hash;
+        }
+      } catch {
+        // Not a valid URL, fall through.
+      }
+      return fileUrl;
+    }
+
+    // Relative path — return with leading slash if missing.
+    return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
   }
 
   async request(endpoint: string, options: RequestOptions = {}): Promise<unknown> {
