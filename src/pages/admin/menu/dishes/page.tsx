@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X, DatabaseZap } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import DishForm from "../../_components/dish-form.tsx";
@@ -53,7 +53,6 @@ const getDishDisplayName = (dish: Dish) => {
   const name = [dish.name_ru, dish.name_uz, dish.name_en, dish.name_tr].find(
     (value) => typeof value === "string" && value.trim() !== ""
   );
-
   return name?.trim() || "Нет перевода";
 };
 
@@ -61,8 +60,14 @@ const getDishTranslationPreview = (dish: Dish) => {
   const values = [dish.name_ru, dish.name_uz, dish.name_en, dish.name_tr].filter(
     (value): value is string => typeof value === "string" && value.trim() !== ""
   );
-
   return values.length > 0 ? values.slice(0, 3).join(" • ") : "Нет перевода";
+};
+
+type SeedResult = {
+  ok: boolean;
+  newCategories: number;
+  totalDishes: number;
+  log: string[];
 };
 
 export default function DishesPage() {
@@ -81,6 +86,11 @@ export default function DishesPage() {
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   const [showBulkStatus, setShowBulkStatus] = useState(false);
+
+  // ── Seed state ──────────────────────────────────────────────────────────────
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
+  const [showSeedLog, setShowSeedLog] = useState(false);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -113,16 +123,29 @@ export default function DishesPage() {
     loadDishes();
   }, []);
 
+  const handleSeedBeverages = async () => {
+    if (!confirm("Загрузить ~100 напитков из базового меню? Повторный запуск безопасен — дубликаты не создаются.")) return;
+    try {
+      setSeeding(true);
+      setSeedResult(null);
+      const result = await api.request("/dishes/seed-beverages", { method: "POST" }) as SeedResult;
+      setSeedResult(result);
+      setShowSeedLog(true);
+      await loadDishes();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка импорта");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     return dishes.filter((dish) => {
       const q = search.toLowerCase();
-      const searchable = [
-        dish.name_ru,
-        dish.name_uz,
-        dish.name_en,
-        dish.name_tr,
-      ].filter((value): value is string => typeof value === "string").join(" ").toLowerCase();
-
+      const searchable = [dish.name_ru, dish.name_uz, dish.name_en, dish.name_tr]
+        .filter((value): value is string => typeof value === "string")
+        .join(" ")
+        .toLowerCase();
       const matchSearch = searchable.includes(q);
       const matchCategory = categoryFilter === "all" || dish.category_id === categoryFilter;
       const matchStatus = statusFilter === "all" || dish.status === statusFilter;
@@ -133,10 +156,7 @@ export default function DishesPage() {
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
       setSavingId(editingId || "new");
-      const dataToSend = {
-        ...formData,
-        price: String(formData.price),
-      };
+      const dataToSend = { ...formData, price: String(formData.price) };
       if (editingId) {
         await api.updateDish(editingId, dataToSend);
       } else {
@@ -211,15 +231,47 @@ export default function DishesPage() {
           <h1 className="text-3xl font-bold">Блюда меню</h1>
           <p className="text-gray-500">{filtered.length} блюд</p>
         </div>
-        <button
-          onClick={() => { setEditingId(null); setShowForm(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-          disabled={savingId === "new"}
-        >
-          <Plus className="w-4 h-4" />
-          Добавить блюдо
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            onClick={() => { setEditingId(null); setShowForm(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            disabled={savingId === "new"}
+          >
+            <Plus className="w-4 h-4" />
+            Добавить блюдо
+          </button>
+          {/* ── Temporary seed button ── */}
+          <button
+            onClick={handleSeedBeverages}
+            disabled={seeding}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
+            title="Импорт готового меню напитков (~100 позиций, 4 языка)"
+          >
+            {seeding
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <DatabaseZap className="w-4 h-4" />}
+            {seeding ? "Импорт..." : "Импорт напитков"}
+          </button>
+        </div>
       </div>
+
+      {/* Seed result */}
+      {seedResult && showSeedLog && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-semibold text-amber-800">
+              ✅ Импорт завершён — новых категорий: {seedResult.newCategories}, блюд в базе: {seedResult.totalDishes}
+            </p>
+            <button onClick={() => setShowSeedLog(false)} className="text-amber-600 hover:text-amber-800">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <details className="text-xs text-amber-700">
+            <summary className="cursor-pointer select-none">Показать лог</summary>
+            <pre className="mt-2 whitespace-pre-wrap">{seedResult.log.join("\n")}</pre>
+          </details>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -274,12 +326,7 @@ export default function DishesPage() {
       {/* Bulk actions */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <input
-            type="checkbox"
-            checked={selected.size === filtered.length}
-            onChange={toggleAll}
-            className="w-4 h-4"
-          />
+          <input type="checkbox" checked={selected.size === filtered.length} onChange={toggleAll} className="w-4 h-4" />
           <span className="text-sm">{selected.size} выбрано</span>
           <div className="flex-1" />
           <div className="relative">
@@ -334,9 +381,7 @@ export default function DishesPage() {
                   {dish.is_vegetarian && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">🥗 Вег</span>}
                   {dish.is_spicy && <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌶️ Остр</span>}
                 </div>
-                <p className="text-xs text-gray-500 truncate">
-                  {getDishTranslationPreview(dish)}
-                </p>
+                <p className="text-xs text-gray-500 truncate">{getDishTranslationPreview(dish)}</p>
               </div>
 
               <div className="text-sm font-medium min-w-fit">{Number(dish.price).toLocaleString()} сум</div>
@@ -347,10 +392,7 @@ export default function DishesPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    setEditingId(dish.id);
-                    setShowForm(true);
-                  }}
+                  onClick={() => { setEditingId(dish.id); setShowForm(true); }}
                   className="p-2 hover:bg-blue-100 rounded-lg disabled:opacity-50"
                   disabled={savingId === dish.id}
                 >
@@ -361,11 +403,9 @@ export default function DishesPage() {
                   className="p-2 hover:bg-red-100 rounded-lg disabled:opacity-50"
                   disabled={deletingId === dish.id}
                 >
-                  {deletingId === dish.id ? (
-                    <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  )}
+                  {deletingId === dish.id
+                    ? <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
+                    : <Trash2 className="w-4 h-4 text-red-600" />}
                 </button>
               </div>
             </div>
@@ -381,10 +421,11 @@ export default function DishesPage() {
             <DishForm
               onClose={() => setShowForm(false)}
               onSubmit={handleSubmit}
-              initialData={editingId ? dishes.find((d) => d.id === editingId) ? {
-                ...dishes.find((d) => d.id === editingId)!,
-                price: String(dishes.find((d) => d.id === editingId)!.price),
-              } : undefined : undefined}
+              initialData={editingId
+                ? dishes.find((d) => d.id === editingId)
+                  ? { ...dishes.find((d) => d.id === editingId)!, price: String(dishes.find((d) => d.id === editingId)!.price) }
+                  : undefined
+                : undefined}
               categories={categories}
               loading={savingId !== null}
             />
