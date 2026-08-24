@@ -27,8 +27,8 @@ const contactSchema = z.object({
 type ContactFormValues = z.infer<typeof contactSchema>;
 
 const SOCIALS = [
-  { icon: SiInstagram, href: "https://www.instagram.com/madotashkent", label: "Instagram" },
-  { icon: SiTelegram, href: "https://t.me/madotashkent", label: "Telegram" },
+  { icon: SiInstagram, href: "https://instagr.am/mado_uzbekistan", label: "Instagram" },
+  { icon: SiTelegram, href: "https://t.me/mado_tcm", label: "Telegram" },
 ] as const;
 
 export default function Footer() {
