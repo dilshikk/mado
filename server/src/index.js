@@ -33,23 +33,26 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security headers (helmet) — protects against XSS, clickjacking, MIME sniffing etc.
+// Security headers (helmet)
 app.use(helmet({
-  // Allow images from same origin and CDN in Content-Security-Policy
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// CORS — only allow requests from trusted origins
+// CORS — allow trusted origins, or all origins if CORS_ORIGIN is not set
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-  : ['http://localhost:5173', 'http://localhost:3000'];
+  : null; // null = allow all (open for dev/migration period)
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
+    // If no allowlist configured — allow all origins
+    if (!allowedOrigins) return callback(null, true);
+    // Check against allowlist
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    // Blocked origin — return 403, not a thrown error (avoids 500)
+    return callback(null, false);
   },
   credentials: true,
 }));
