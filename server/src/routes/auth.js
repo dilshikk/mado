@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { authenticate, authorize, VALID_ROLES, JWT_SECRET } from '../middleware/auth.js';
 
@@ -16,6 +17,15 @@ const avatarDir = path.resolve(process.cwd(), 'uploads', 'avatars');
 if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
 const router = express.Router();
+
+// Rate limiter: max 10 login attempts per IP per 15 minutes
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { error: 'Слишком много попыток входа. Попробуйте через 15 минут.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Avatar upload: store in memory, then process with sharp
 const avatarUpload = multer({
@@ -69,8 +79,8 @@ async function getUserById(req, id) {
   }
 }
 
-// Login
-router.post('/login', async (req, res) => {
+// Login (protected against brute force: max 10 attempts per IP per 15 min)
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
