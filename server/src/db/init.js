@@ -409,13 +409,15 @@ const initDb = async () => {
     console.log('✓ Database tables created successfully');
 
     // Insert default admin user
+    // NOTE: This is a placeholder hash. Run `node reset-password.js` after init
+    // to set a real password for the admin account.
     await pool.query(`
       INSERT INTO users (name, email, password_hash, role, status)
       VALUES ('Admin', 'admin@madouz.uz', '$2a$10$YmTj7Gy9u1.5S8Z5O0Dkz.5dZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5', 'admin', 'active')
       ON CONFLICT (email) DO NOTHING
     `);
 
-    console.log('✓ Default admin user inserted');
+    console.log('✓ Default admin user inserted (run reset-password.js to set a real password!)');
 
     // Insert default settings
     const defaultSettings = {
@@ -436,7 +438,49 @@ const initDb = async () => {
     }
 
     console.log('✓ Default settings inserted');
+
+    // ── Catering content seed (stored in settings table) ──────────────────────
+    // The catering route reads keys: catering_content_ru, catering_content_uz,
+    // catering_content_en, catering_content_tr from the settings table.
+    // Without these rows the admin content editor shows a blank form on first load.
+    const cateringContentDefaults = {
+      catering_content_ru: {
+        headline: 'Кейтеринг MADO',
+        subheadline: 'Для любых мероприятий',
+        description: 'Мы организуем кейтеринг для корпоративных мероприятий, свадеб, дней рождения и частных вечеринок.',
+        cta: 'Оставить заявку',
+      },
+      catering_content_uz: {
+        headline: 'MADO Keytring',
+        subheadline: 'Har qanday tadbir uchun',
+        description: "Biz korporativ tadbirlar, to'ylar, tug'ilgan kunlar va xususiy partiyalar uchun keytering tashkil qilamiz.",
+        cta: 'Ariza qoldirish',
+      },
+      catering_content_en: {
+        headline: 'MADO Catering',
+        subheadline: 'For any occasion',
+        description: 'We organise catering for corporate events, weddings, birthdays and private parties.',
+        cta: 'Send a request',
+      },
+      catering_content_tr: {
+        headline: 'MADO Catering',
+        subheadline: 'Her etkinlik için',
+        description: 'Kurumsal etkinlikler, düğünler, doğum günleri ve özel partiler için catering organize ediyoruz.',
+        cta: 'Talep gönderin',
+      },
+    };
+
+    for (const [key, value] of Object.entries(cateringContentDefaults)) {
+      await pool.query(
+        'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',
+        [key, JSON.stringify(value)]
+      );
+    }
+
+    console.log('✓ Catering content defaults inserted');
     console.log('Database initialization complete!');
+    console.log('');
+    console.log('IMPORTANT: Run `node reset-password.js` to set a real admin password.');
     process.exit(0);
   } catch (error) {
     console.error('Database initialization error:', error);
