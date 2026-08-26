@@ -4,8 +4,11 @@ import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all catering requests
-router.get('/requests', async (req, res) => {
+// Allowed statuses for catering requests
+const VALID_CATERING_STATUSES = ['new', 'confirmed', 'in_progress', 'completed', 'rejected', 'cancelled'];
+
+// Get all catering requests (requires auth — contains sensitive client data)
+router.get('/requests', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { status } = req.query;
 
   let query = `
@@ -25,8 +28,8 @@ router.get('/requests', async (req, res) => {
   res.json(result.rows);
 });
 
-// Get single catering request
-router.get('/requests/:id', async (req, res) => {
+// Get single catering request (requires auth)
+router.get('/requests/:id', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query(`
@@ -42,7 +45,7 @@ router.get('/requests/:id', async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// Create catering request (public)
+// Create catering request (public — clients submit from website)
 router.post('/requests', async (req, res) => {
   const { name, phone, email, event_type, event_date, guest_count, budget, message } = req.body;
 
@@ -65,13 +68,19 @@ router.post('/requests', async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-// Update catering request status
+// Update catering request status (validate against whitelist)
 router.patch('/requests/:id/status', authenticate, authorize(['admin', 'restaurant_manager']), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
   if (!status) {
     return res.status(400).json({ error: 'Status required' });
+  }
+
+  if (!VALID_CATERING_STATUSES.includes(status)) {
+    return res.status(400).json({
+      error: `Invalid status. Allowed values: ${VALID_CATERING_STATUSES.join(', ')}`
+    });
   }
 
   const result = await pool.query(
@@ -113,7 +122,7 @@ router.patch('/requests/:id/note', authenticate, authorize(['admin', 'restaurant
   res.json(result.rows[0]);
 });
 
-// Get catering page content
+// Get catering page content (public)
 router.get('/content', async (req, res) => {
   const lang = req.query.lang || 'ru';
   const result = await pool.query('SELECT value FROM settings WHERE key = $1', [`catering_content_${lang}`]);

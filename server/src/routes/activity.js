@@ -83,12 +83,14 @@ router.delete('/clear', authenticate, authorize(['admin']), async (req, res) => 
 });
 
 // ── DELETE /api/activity/prune — remove entries older than N days (default 30)
-// Called by the cron job. Also available manually for admins.
+// Fixed: use parameterized query to prevent SQL injection via `days` param.
 router.delete('/prune', authenticate, authorize(['admin']), async (req, res) => {
   const days = Math.max(1, parseInt(req.query.days) || 30);
 
+  // Use parameterized interval to avoid SQL injection
   const result = await pool.query(
-    `DELETE FROM activity_log WHERE created_at < NOW() - INTERVAL '${days} days' RETURNING id`
+    `DELETE FROM activity_log WHERE created_at < NOW() - ($1 * INTERVAL '1 day') RETURNING id`,
+    [days]
   );
 
   const deleted = result.rowCount ?? 0;

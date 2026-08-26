@@ -4,8 +4,11 @@ import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all requests
-router.get('/', async (req, res) => {
+// Allowed statuses for requests
+const VALID_REQUEST_STATUSES = ['new', 'in_progress', 'completed', 'rejected'];
+
+// Get all requests (requires auth — contains sensitive client data)
+router.get('/', authenticate, authorize(['admin', 'marketing']), async (req, res) => {
   const { type, status } = req.query;
 
   let query = 'SELECT id, type, name, phone, email, message, status, created_at FROM requests';
@@ -33,8 +36,8 @@ router.get('/', async (req, res) => {
   res.json(result.rows);
 });
 
-// Get request stats
-router.get('/stats/summary', async (req, res) => {
+// Get request stats (requires auth)
+router.get('/stats/summary', authenticate, authorize(['admin', 'marketing']), async (req, res) => {
   const typeStats = await pool.query(`
     SELECT type, COUNT(*) as total, COUNT(CASE WHEN status = 'new' THEN 1 END) as new
     FROM requests
@@ -44,7 +47,7 @@ router.get('/stats/summary', async (req, res) => {
   res.json(typeStats.rows);
 });
 
-// Create request
+// Create request (public — clients submit from website)
 router.post('/', async (req, res) => {
   const { type, name, phone, email, message } = req.body;
 
@@ -67,13 +70,19 @@ router.post('/', async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-// Update request status
+// Update request status (validate against whitelist)
 router.patch('/:id/status', authenticate, authorize(['admin', 'marketing']), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
   if (!status) {
     return res.status(400).json({ error: 'Status required' });
+  }
+
+  if (!VALID_REQUEST_STATUSES.includes(status)) {
+    return res.status(400).json({
+      error: `Invalid status. Allowed values: ${VALID_REQUEST_STATUSES.join(', ')}`
+    });
   }
 
   const result = await pool.query(
