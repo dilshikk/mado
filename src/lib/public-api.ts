@@ -1,9 +1,12 @@
 /**
  * Public API client — no auth token required.
  * Used by public-facing pages to fetch page metadata and live menu data.
+ *
+ * Default base URL is '/api' (relative) so requests go through the same
+ * host the page was loaded from — Vite proxy in dev, Nginx in prod.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:3000/api";
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
 
 async function publicFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`);
@@ -15,19 +18,39 @@ async function publicFetch<T>(path: string): Promise<T> {
 
 export const publicApi = {
   getPage: (slug: string) => publicFetch<PageData>(`/pages/${encodeURIComponent(slug)}`),
-  getCategories: () => publicFetch<PublicCategory[]>("/categories"),
+  getCategories: () => publicFetch<PublicCategory[]>('/categories'),
   getDishes: (params?: Record<string, string>) => {
-    const query = params ? new URLSearchParams(params).toString() : "";
-    return publicFetch<PublicDish[]>(`/dishes${query ? `?${query}` : ""}`);
+    const query = params ? new URLSearchParams(params).toString() : '';
+    return publicFetch<PublicDish[]>(`/dishes${query ? `?${query}` : ''}`);
   },
 };
 
-/** Resolve a possibly-relative file URL (e.g. `/uploads/x.jpg`) to an absolute one. */
+/**
+ * Resolve a possibly-relative file URL (e.g. `/uploads/x.jpg`) to an absolute one.
+ * Loopback/localhost URLs are stripped to a root-relative path so Nginx or
+ * Vite proxy serves them correctly regardless of who is accessing the page.
+ */
 export function getPublicFileUrl(fileUrl: string | null | undefined): string {
-  if (!fileUrl) return "";
-  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
-  const serverOrigin = BASE_URL.replace(/\/api\/?$/, "");
-  return `${serverOrigin}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+  if (!fileUrl) return '';
+
+  if (/^https?:\/\//i.test(fileUrl)) {
+    try {
+      const parsed = new URL(fileUrl);
+      const isLocal =
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname === 'localhost' ||
+        (typeof window !== 'undefined' && parsed.hostname === window.location.hostname);
+      if (isLocal) {
+        return parsed.pathname + parsed.search + parsed.hash;
+      }
+    } catch {
+      // Not a valid URL
+    }
+    return fileUrl;
+  }
+
+  // Relative path — ensure leading slash
+  return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,7 +67,6 @@ export type PageData = {
   meta_title: string | null;
   meta_description: string | null;
   og_image: string | null;
-  // Multilingual meta fields (added via migration)
   meta_title_ru: string | null;
   meta_title_uz: string | null;
   meta_title_en: string | null;
