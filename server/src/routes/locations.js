@@ -4,41 +4,40 @@ import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all locations
+// Get all locations — single query with json_agg (fixes N+1 problem)
 router.get('/', async (req, res) => {
   const result = await pool.query(`
     SELECT
-      id, name,
-      name_ru, name_uz, name_en, name_tr,
-      district,
-      district_ru, district_uz, district_en, district_tr,
-      address,
-      address_ru, address_uz, address_en, address_tr,
-      phone, email, maps_url, photo_url, status, created_at
-    FROM locations
-    ORDER BY COALESCE(name_ru, name)
+      l.id, l.name,
+      l.name_ru, l.name_uz, l.name_en, l.name_tr,
+      l.district,
+      l.district_ru, l.district_uz, l.district_en, l.district_tr,
+      l.address,
+      l.address_ru, l.address_uz, l.address_en, l.address_tr,
+      l.phone, l.email, l.maps_url, l.photo_url, l.status, l.created_at,
+      COALESCE(
+        json_agg(
+          DISTINCT jsonb_build_object(
+            'day_of_week', h.day_of_week,
+            'open_time',   h.open_time,
+            'close_time',  h.close_time,
+            'is_closed',   h.is_closed
+          )
+        ) FILTER (WHERE h.id IS NOT NULL),
+        '[]'
+      ) AS hours,
+      COALESCE(
+        json_agg(DISTINCT s.service) FILTER (WHERE s.service IS NOT NULL),
+        '[]'
+      ) AS services
+    FROM locations l
+    LEFT JOIN location_hours    h ON h.location_id = l.id
+    LEFT JOIN location_services s ON s.location_id = l.id
+    GROUP BY l.id
+    ORDER BY COALESCE(l.name_ru, l.name)
   `);
 
-  const locationsWithDetails = await Promise.all(result.rows.map(async (loc) => {
-    const hoursResult = await pool.query(`
-      SELECT day_of_week, open_time, close_time, is_closed
-      FROM location_hours
-      WHERE location_id = $1
-      ORDER BY day_of_week
-    `, [loc.id]);
-
-    const servicesResult = await pool.query(`
-      SELECT service FROM location_services WHERE location_id = $1
-    `, [loc.id]);
-
-    return {
-      ...loc,
-      hours: hoursResult.rows,
-      services: servicesResult.rows.map(s => s.service)
-    };
-  }));
-
-  res.json(locationsWithDetails);
+  res.json(result.rows);
 });
 
 // Get single location
@@ -47,37 +46,40 @@ router.get('/:id', async (req, res) => {
 
   const result = await pool.query(`
     SELECT
-      id, name,
-      name_ru, name_uz, name_en, name_tr,
-      district,
-      district_ru, district_uz, district_en, district_tr,
-      address,
-      address_ru, address_uz, address_en, address_tr,
-      phone, email, maps_url, photo_url, status
-    FROM locations
-    WHERE id = $1
+      l.id, l.name,
+      l.name_ru, l.name_uz, l.name_en, l.name_tr,
+      l.district,
+      l.district_ru, l.district_uz, l.district_en, l.district_tr,
+      l.address,
+      l.address_ru, l.address_uz, l.address_en, l.address_tr,
+      l.phone, l.email, l.maps_url, l.photo_url, l.status,
+      COALESCE(
+        json_agg(
+          DISTINCT jsonb_build_object(
+            'day_of_week', h.day_of_week,
+            'open_time',   h.open_time,
+            'close_time',  h.close_time,
+            'is_closed',   h.is_closed
+          )
+        ) FILTER (WHERE h.id IS NOT NULL),
+        '[]'
+      ) AS hours,
+      COALESCE(
+        json_agg(DISTINCT s.service) FILTER (WHERE s.service IS NOT NULL),
+        '[]'
+      ) AS services
+    FROM locations l
+    LEFT JOIN location_hours    h ON h.location_id = l.id
+    LEFT JOIN location_services s ON s.location_id = l.id
+    WHERE l.id = $1
+    GROUP BY l.id
   `, [id]);
 
   if (result.rows.length === 0) {
     return res.status(404).json({ error: 'Location not found' });
   }
 
-  const hoursResult = await pool.query(`
-    SELECT day_of_week, open_time, close_time, is_closed
-    FROM location_hours
-    WHERE location_id = $1
-    ORDER BY day_of_week
-  `, [id]);
-
-  const servicesResult = await pool.query(`
-    SELECT service FROM location_services WHERE location_id = $1
-  `, [id]);
-
-  res.json({
-    ...result.rows[0],
-    hours: hoursResult.rows,
-    services: servicesResult.rows.map(s => s.service)
-  });
+  res.json(result.rows[0]);
 });
 
 // Create location
