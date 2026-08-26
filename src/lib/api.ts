@@ -1,12 +1,27 @@
 /**
  * API Client for MADO Admin Frontend
  * Handles all HTTP requests to the backend server
+ *
+ * Default base URL is '/api' (relative) so requests go through the same
+ * host the page was loaded from — Vite proxy in dev, Nginx in prod.
+ * Override with VITE_API_URL env var only if the API is on a different domain.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-// Server origin — strip trailing /api (or /api/) to get the base server URL.
-const SERVER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
+/**
+ * Derive the server origin for resolving relative upload URLs.
+ * When API_BASE_URL is a relative path ('/api') we use window.location.origin
+ * so that /uploads/... URLs resolve to the correct host.
+ */
+function getServerOrigin(): string {
+  if (!API_BASE_URL.startsWith('/')) {
+    // Absolute URL like https://api.example.com/api → strip the path
+    return API_BASE_URL.replace(/\/api\/?$/, '');
+  }
+  // Relative path → same origin as the page
+  return typeof window !== 'undefined' ? window.location.origin : '';
+}
 
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
@@ -16,7 +31,6 @@ interface RequestOptions extends RequestInit {
 async function safeJson(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {
-    // Not JSON — return a generic error object so callers can read .error
     return { error: `Server error (${response.status})` };
   }
   const text = await response.text();
@@ -52,41 +66,33 @@ class ApiClient {
   /**
    * Converts a backend file URL to a browser-safe URL.
    *
-   * The backend returns absolute URLs like `http://127.0.0.1:3000/uploads/file.jpg`.
-   * When accessed remotely (e.g. via ftp.mado.uz:5173) the browser cannot reach
-   * 127.0.0.1:3000 directly — it would look for that port on the visitor's own machine.
+   * The backend sometimes returns absolute URLs like
+   * `http://127.0.0.1:3000/uploads/file.jpg`. When accessed remotely
+   * the browser cannot reach 127.0.0.1:3000 directly.
    *
-   * Instead, we return a root-relative path (/uploads/file.jpg) so the browser
-   * requests it through the same host/port the page was loaded from.
-   * Vite's dev-server proxy then forwards /uploads/* to http://127.0.0.1:3000.
-   *
-   * External URLs (https://...) and already-relative paths are returned as-is.
+   * We strip the origin from local/loopback URLs and return a root-relative
+   * path (/uploads/file.jpg) so Vite proxy or Nginx serves the file correctly.
    */
   getFileUrl(fileUrl: string): string {
     if (!fileUrl) return '';
 
-    // Already an external URL (Unsplash, placehold.co, etc.) — use as-is.
     if (/^https?:\/\//i.test(fileUrl)) {
-      // But if it points to the local backend origin, strip the origin so the
-      // browser uses the Vite proxy instead of connecting directly.
       try {
         const parsed = new URL(fileUrl);
-        const serverParsed = new URL(SERVER_ORIGIN);
-        if (
-          parsed.hostname === serverParsed.hostname ||
+        const isLocal =
           parsed.hostname === '127.0.0.1' ||
-          parsed.hostname === 'localhost'
-        ) {
-          // Return just the path — Vite proxy will handle it.
+          parsed.hostname === 'localhost' ||
+          parsed.hostname === window.location.hostname;
+        if (isLocal) {
           return parsed.pathname + parsed.search + parsed.hash;
         }
       } catch {
-        // Not a valid URL, fall through.
+        // Not a valid URL, fall through
       }
       return fileUrl;
     }
 
-    // Relative path — return with leading slash if missing.
+    // Relative path — ensure leading slash
     return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
   }
 
@@ -105,7 +111,6 @@ class ApiClient {
     try {
       const response = await fetch(url, { ...options, headers });
 
-      // Handle 401: clear token and redirect — must return to stop further processing
       if (response.status === 401) {
         this.clearToken();
         window.location.href = '/admin/login';
@@ -121,7 +126,6 @@ class ApiClient {
 
       return data;
     } catch (error) {
-      // Don't log the "Unauthorized" throw we did ourselves
       if (error instanceof Error && error.message !== 'Unauthorized') {
         console.error('API Request Error:', error);
       }
@@ -136,7 +140,6 @@ class ApiClient {
 
     const response = await fetch(url, { method: 'POST', headers, body: formData });
 
-    // Handle 401: clear token and redirect — must return to stop further processing
     if (response.status === 401) {
       this.clearToken();
       window.location.href = '/admin/login';
@@ -469,4 +472,6 @@ class ApiClient {
   }
 }
 
+// Export getServerOrigin for use in other modules if needed
+export { getServerOrigin };
 export default new ApiClient();
