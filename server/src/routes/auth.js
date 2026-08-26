@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { authenticate, authorize, VALID_ROLES, JWT_SECRET } from '../middleware/auth.js';
 
@@ -16,6 +17,23 @@ const avatarDir = path.resolve(process.cwd(), 'uploads', 'avatars');
 if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
 const router = express.Router();
+
+// Rate limiter: max 10 login attempts per IP per 15 minutes
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Слишком много попыток входа. Попробуйте через 15 минут.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Password policy: minimum 8 characters
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return 'Пароль должен содержать не менее 8 символов';
+  }
+  return null;
+}
 
 // Avatar upload: store in memory, then process with sharp
 const avatarUpload = multer({
@@ -69,8 +87,8 @@ async function getUserById(req, id) {
   }
 }
 
-// Login
-router.post('/login', async (req, res) => {
+// Login (protected against brute force: max 10 attempts per IP per 15 min)
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -127,6 +145,12 @@ router.post('/register', authenticate, authorize(['admin']), async (req, res) =>
 
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({ error: `Role must be one of: ${VALID_ROLES.join(', ')}` });
+  }
+
+  // Validate password strength
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
   }
 
   try {
@@ -194,6 +218,12 @@ router.put('/me', authenticate, async (req, res) => {
   if (newPassword) {
     if (!currentPassword) {
       return res.status(400).json({ error: 'Current password is required to set a new password' });
+    }
+
+    // Validate new password strength
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
 
     const userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
