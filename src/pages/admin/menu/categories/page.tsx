@@ -52,6 +52,11 @@ const DEFAULT_FORM: CategoryFormData = {
   label_ru: "", label_uz: "", label_en: "", label_tr: "", tab: "food", image_url: "",
 };
 
+// Category banner: 800×150 px
+const CATEGORY_IMG_WIDTH = 800;
+const CATEGORY_IMG_HEIGHT = 150;
+const CATEGORY_IMG_ASPECT = CATEGORY_IMG_WIDTH / CATEGORY_IMG_HEIGHT;
+
 function getDisplayLabel(cat: Category): string {
   return [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
     (v): v is string => typeof v === "string" && v.trim() !== ""
@@ -131,16 +136,23 @@ function CategoryForm({
         </select>
       </div>
 
-      {/* Image upload with crop */}
+      {/* Image upload with crop — fixed 800×150 px output */}
       <div>
-        <label className="text-xs text-muted-foreground mb-2 block">Изображение категории</label>
+        <label className="text-xs text-muted-foreground mb-2 block">
+          Изображение категории
+          <span className="ml-1.5 text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-mono">
+            {CATEGORY_IMG_WIDTH}×{CATEGORY_IMG_HEIGHT}px
+          </span>
+        </label>
         <ImageUploadCrop
           value={form.image_url}
           onChange={(url) => set("image_url", url)}
-          aspect={1}
+          aspect={CATEGORY_IMG_ASPECT}
+          outputWidth={CATEGORY_IMG_WIDTH}
+          outputHeight={CATEGORY_IMG_HEIGHT}
           disabled={saving}
-          previewClass="w-20 h-20"
-          label="Выбрать фото"
+          previewClass="w-32 h-6"
+          label="Выбрать баннер"
         />
       </div>
 
@@ -391,10 +403,14 @@ function CategoryList({
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30">
               {cat.image_url ? (
-                <img src={cat.image_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-border shrink-0" />
+                <img
+                  src={cat.image_url}
+                  alt=""
+                  className="w-20 h-[15px] rounded object-cover border border-border shrink-0"
+                />
               ) : (
-                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                  <ImageOff className="w-4 h-4 text-muted-foreground/40" />
+                <div className="w-20 h-[15px] rounded bg-muted flex items-center justify-center shrink-0">
+                  <ImageOff className="w-3 h-3 text-muted-foreground/40" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
