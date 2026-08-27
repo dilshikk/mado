@@ -2,24 +2,53 @@
  * API Client for MADO Admin Frontend
  * Handles all HTTP requests to the backend server
  *
- * Default base URL is '/api' (relative) so requests go through the same
- * host the page was loaded from — Vite proxy in dev, Nginx in prod.
- * Override with VITE_API_URL env var only if the API is on a different domain.
+ * ── How to set VITE_API_URL ──────────────────────────────────────────────────
+ *
+ * In most setups you do NOT need VITE_API_URL at all.
+ * Leave it unset — requests go to /api on the same host (Vite proxy or Nginx).
+ *
+ * Set it ONLY when the API is on a different domain, e.g.:
+ *   VITE_API_URL=https://api.mado.uz/api    ✓ correct — ends with /api, no trailing slash
+ *   VITE_API_URL=http://ftp.mado.uz/api     ✓ correct
+ *   VITE_API_URL=http://ftp.mado.uz/        ✗ wrong — missing /api, trailing slash
+ *   VITE_API_URL=http://ftp.mado.uz         ✗ wrong — missing /api
+ *
+ * The code below normalises trailing slashes so common mistakes don't cause
+ * double-slash URLs, but the /api suffix must be present in the value.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+function resolveBaseUrl(): string {
+  const raw = import.meta.env.VITE_API_URL as string | undefined;
+
+  if (!raw) {
+    // No env var — use a relative path that works with Vite proxy and Nginx
+    return '/api';
+  }
+
+  // Strip any number of trailing slashes to avoid double-slash in URLs
+  const normalised = raw.replace(/\/+$/, '');
+
+  // Warn in dev if the value looks like it's missing /api
+  if (import.meta.env.DEV && !normalised.endsWith('/api')) {
+    console.warn(
+      `[API] VITE_API_URL="${raw}" does not end with /api.\n` +
+      `Expected format: http://ftp.mado.uz/api\n` +
+      `Using "${normalised}" — requests may fail.`
+    );
+  }
+
+  return normalised;
+}
+
+const API_BASE_URL = resolveBaseUrl();
 
 /**
  * Derive the server origin for resolving relative upload URLs.
- * When API_BASE_URL is a relative path ('/api') we use window.location.origin
- * so that /uploads/... URLs resolve to the correct host.
  */
 function getServerOrigin(): string {
   if (!API_BASE_URL.startsWith('/')) {
-    // Absolute URL like https://api.example.com/api → strip the path
-    return API_BASE_URL.replace(/\/api\/?$/, '');
+    return API_BASE_URL.replace(/\/api$/, '');
   }
-  // Relative path → same origin as the page
   return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
@@ -65,13 +94,7 @@ class ApiClient {
 
   /**
    * Converts a backend file URL to a browser-safe URL.
-   *
-   * The backend sometimes returns absolute URLs like
-   * `http://127.0.0.1:3000/uploads/file.jpg`. When accessed remotely
-   * the browser cannot reach 127.0.0.1:3000 directly.
-   *
-   * We strip the origin from local/loopback URLs and return a root-relative
-   * path (/uploads/file.jpg) so Vite proxy or Nginx serves the file correctly.
+   * Strips loopback origins so Vite proxy / Nginx serves the file.
    */
   getFileUrl(fileUrl: string): string {
     if (!fileUrl) return '';
@@ -92,7 +115,6 @@ class ApiClient {
       return fileUrl;
     }
 
-    // Relative path — ensure leading slash
     return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
   }
 
@@ -154,7 +176,6 @@ class ApiClient {
     return data;
   }
 
-  /** Upload a profile avatar image. Returns { avatar_url: string } */
   async uploadAvatar(file: File): Promise<{ avatar_url: string }> {
     const formData = new FormData();
     formData.append('avatar', file);
@@ -162,7 +183,6 @@ class ApiClient {
     return result as { avatar_url: string };
   }
 
-  /** Upload a single dish/category image via the media library. Returns the absolute file URL. */
   async uploadDishImage(file: File): Promise<string> {
     const result = await this.uploadMedia([file]);
     const files = result as { full_url: string; file_url: string }[];
@@ -472,6 +492,5 @@ class ApiClient {
   }
 }
 
-// Export getServerOrigin for use in other modules if needed
 export { getServerOrigin };
 export default new ApiClient();
