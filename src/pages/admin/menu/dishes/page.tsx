@@ -3,7 +3,7 @@ import {
   Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X,
   DatabaseZap, UtensilsCrossed, ChevronDown, CheckSquare,
   Square, Eye, EyeOff, Archive, FileText, FolderInput,
-  CheckCircle2, ChevronUp,
+  CheckCircle2, ChevronUp, ImageOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
@@ -124,7 +124,7 @@ function Dropdown({
       {open && (
         <div
           className={cn(
-            "absolute top-full mt-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden",
+            "absolute bottom-full mb-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden",
             align === "right" ? "right-0" : "left-0"
           )}
         >
@@ -234,7 +234,7 @@ function BulkActionBar({
         </button>
       </div>
 
-      {/* Status dropdown */}
+      {/* Status dropdown — opens upward */}
       <Dropdown
         align="left"
         trigger={
@@ -250,7 +250,7 @@ function BulkActionBar({
         items={statusItems}
       />
 
-      {/* Move dropdown */}
+      {/* Move dropdown — opens upward */}
       <Dropdown
         align="left"
         trigger={
@@ -661,7 +661,6 @@ export default function DishesPage() {
           <option value="hidden">Скрыто</option>
           <option value="archived">Архивировано</option>
         </select>
-        {/* Select all toggle in filter row */}
         {filtered.length > 0 && (
           <button
             onClick={selected.size === filtered.length ? deselectAll : selectAll}
@@ -706,6 +705,25 @@ export default function DishesPage() {
                   className="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"
                 />
 
+                {/* Photo thumbnail */}
+                <div className="w-11 h-11 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-100">
+                  {dish.image_url ? (
+                    <img
+                      src={dish.image_url}
+                      alt={getDishDisplayName(dish)}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                        (e.currentTarget.parentElement as HTMLElement).classList.add("flex", "items-center", "justify-center");
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageOff className="w-4 h-4 text-gray-300" />
+                    </div>
+                  )}
+                </div>
+
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -737,7 +755,7 @@ export default function DishesPage() {
                   {STATUS_META[dish.status].label}
                 </div>
 
-                {/* Row action menu */}
+                {/* Row action menu — opens upward */}
                 <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
                   <button
                     onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
@@ -755,7 +773,7 @@ export default function DishesPage() {
                   </button>
 
                   {isMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-96 overflow-y-auto">
+                    <div className="absolute right-0 bottom-full mb-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-96 overflow-y-auto">
                       {rowMenuItems(dish).map((item, i) => {
                         if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
                         if (item.type === "header")
