@@ -2,11 +2,17 @@
  * Public API client — no auth token required.
  * Used by public-facing pages to fetch page metadata and live menu data.
  *
- * Default base URL is '/api' (relative) so requests go through the same
- * host the page was loaded from — Vite proxy in dev, Nginx in prod.
+ * Default base URL is '/api' (relative).
+ * See src/lib/api.ts for VITE_API_URL usage notes.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+function resolveBaseUrl(): string {
+  const raw = import.meta.env.VITE_API_URL as string | undefined;
+  if (!raw) return '/api';
+  return raw.replace(/\/+$/, ''); // strip trailing slashes
+}
+
+const BASE_URL = resolveBaseUrl();
 
 async function publicFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`);
@@ -49,7 +55,6 @@ export function getPublicFileUrl(fileUrl: string | null | undefined): string {
     return fileUrl;
   }
 
-  // Relative path — ensure leading slash
   return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
 }
 
