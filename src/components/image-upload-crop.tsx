@@ -18,14 +18,17 @@ function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: numbe
 async function getCroppedBlob(
   image: HTMLImageElement,
   crop: PixelCrop,
-  fileName: string
+  fileName: string,
+  outputWidth?: number,
+  outputHeight?: number,
 ): Promise<File> {
   const canvas = document.createElement("canvas");
   const scaleX = image.naturalWidth / image.width;
   const scaleY = image.naturalHeight / image.height;
 
-  canvas.width = Math.round(crop.width * scaleX);
-  canvas.height = Math.round(crop.height * scaleY);
+  // Use exact output dimensions if provided, otherwise use natural crop size
+  canvas.width = outputWidth ?? Math.round(crop.width * scaleX);
+  canvas.height = outputHeight ?? Math.round(crop.height * scaleY);
 
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No canvas context");
@@ -60,12 +63,16 @@ function CropModal({
   src,
   fileName,
   aspect,
+  outputWidth,
+  outputHeight,
   onConfirm,
   onCancel,
 }: {
   src: string;
   fileName: string;
   aspect?: number;
+  outputWidth?: number;
+  outputHeight?: number;
   onConfirm: (file: File) => void;
   onCancel: () => void;
 }) {
@@ -82,17 +89,18 @@ function CropModal({
     [aspect]
   );
 
-  // IMPORTANT: this must be type="button" so it does NOT submit any parent <form>
   const handleConfirm = async () => {
     if (!imgRef.current || !completedCrop || processing) return;
     setProcessing(true);
     try {
-      const file = await getCroppedBlob(imgRef.current, completedCrop, fileName);
+      const file = await getCroppedBlob(imgRef.current, completedCrop, fileName, outputWidth, outputHeight);
       onConfirm(file);
     } finally {
       setProcessing(false);
     }
   };
+
+  const sizeLabel = outputWidth && outputHeight ? `${outputWidth}×${outputHeight}px` : null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -101,9 +109,12 @@ function CropModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div>
             <h2 className="font-bold text-gray-900">Обрезать фото</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Выберите нужную область и нажмите «Готово»</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {sizeLabel
+                ? `Выберите область — она будет сохранена в размере ${sizeLabel}`
+                : "Выберите нужную область и нажмите «Готово»"}
+            </p>
           </div>
-          {/* type="button" prevents accidental form submit */}
           <button type="button" onClick={onCancel} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
             <X className="w-5 h-5" />
           </button>
@@ -130,7 +141,7 @@ function CropModal({
           </ReactCrop>
         </div>
 
-        {/* Footer — BOTH buttons must be type="button" so they never submit the parent form */}
+        {/* Footer */}
         <div className="flex gap-3 px-5 py-4 border-t border-gray-200">
           <button
             type="button"
@@ -164,6 +175,10 @@ type Props = {
   value: string;
   onChange: (url: string) => void;
   aspect?: number;          // e.g. 1 = square, 16/9 = landscape. undefined = free
+  /** Exact output width in pixels after crop (canvas is resized to this) */
+  outputWidth?: number;
+  /** Exact output height in pixels after crop (canvas is resized to this) */
+  outputHeight?: number;
   disabled?: boolean;
   /** Preview size class, e.g. "w-20 h-20". Defaults to "w-16 h-16" */
   previewClass?: string;
@@ -175,6 +190,8 @@ export default function ImageUploadCrop({
   value,
   onChange,
   aspect,
+  outputWidth,
+  outputHeight,
   disabled,
   previewClass = "w-16 h-16",
   label = "Загрузить фото",
@@ -221,6 +238,13 @@ export default function ImageUploadCrop({
     onChange("");
     setError(null);
   };
+
+  // Build aspect ratio hint label
+  const aspectHint = outputWidth && outputHeight
+    ? `${outputWidth}×${outputHeight}px`
+    : aspect
+      ? `рекомендуется ${aspect === 1 ? "1:1" : `${aspect.toFixed(1).replace(".0", "")}:1`}`
+      : null;
 
   return (
     <>
@@ -272,7 +296,7 @@ export default function ImageUploadCrop({
           </button>
           <p className="text-xs text-gray-400">
             JPG, PNG, WebP · до {MAX_FILE_SIZE_MB} МБ
-            {aspect ? ` · рекомендуется ${aspect === 1 ? "1:1" : `${aspect.toFixed(1).replace(".0", "")}:1`}` : ""}
+            {aspectHint ? ` · ${aspectHint}` : ""}
           </p>
           {error && <p className="text-xs text-red-500">{error}</p>}
         </div>
@@ -291,6 +315,8 @@ export default function ImageUploadCrop({
           src={cropSrc}
           fileName={cropFileName}
           aspect={aspect}
+          outputWidth={outputWidth}
+          outputHeight={outputHeight}
           onConfirm={(file) => { void handleCropConfirm(file); }}
           onCancel={handleCropCancel}
         />
