@@ -16,18 +16,46 @@ const router = express.Router();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getBaseUrl(req) {
-  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
-  return `${req.protocol}://${req.get('host')}`;
-}
-
+/**
+ * Add full_url to a media row.
+ *
+ * We intentionally return a ROOT-RELATIVE path (e.g. /uploads/image.jpg)
+ * rather than an absolute URL (http://127.0.0.1:3000/uploads/image.jpg).
+ *
+ * Absolute URLs built from req.protocol + req.get('host') are unreliable:
+ *   - Behind Vite proxy  → host is 127.0.0.1:3000  → browser can't reach it
+ *   - Behind Nginx proxy → protocol may be wrong without trust proxy
+ *
+ * Root-relative paths work in all environments:
+ *   - Dev  (Vite)  → Vite proxy forwards /uploads/* → Node.js
+ *   - Prod (Nginx) → Nginx serves /uploads/* directly from disk
+ *
+ * If BASE_URL env var is set (e.g. https://mado.uz) the full absolute URL
+ * is constructed from it — useful if the API and frontend are on different
+ * domains.
+ */
 function withFullUrl(req, row) {
   if (!row) return row;
-  const base = getBaseUrl(req);
-  const full_url = /^https?:\/\//i.test(row.file_url)
+  if (!row.file_url) return { ...row, full_url: null };
+
+  // Already an external URL (e.g. https://cdn.example.com/…) — keep as-is
+  if (/^https?:\/\//i.test(row.file_url)) {
+    return { ...row, full_url: row.file_url };
+  }
+
+  // Relative path like /uploads/image.jpg
+  const relativePath = row.file_url.startsWith('/')
     ? row.file_url
-    : `${base}${row.file_url.startsWith('/') ? '' : '/'}${row.file_url}`;
-  return { ...row, full_url };
+    : `/${row.file_url}`;
+
+  // If BASE_URL is configured, build an absolute URL from it
+  if (process.env.BASE_URL) {
+    const base = process.env.BASE_URL.replace(/\/+$/, '');
+    return { ...row, full_url: `${base}${relativePath}` };
+  }
+
+  // Default: return root-relative path — browser resolves against current host
+  return { ...row, full_url: relativePath };
 }
 
 // ── Multer config ─────────────────────────────────────────────────────────────
@@ -40,7 +68,7 @@ const storage = multer.diskStorage({
       .replace(/[^a-z0-9]/gi, '-')
       .toLowerCase()
       .slice(0, 60);
-    cb(null, `${base}-${Date.now()}${ext}`);
+    cb(null, `orig-${Date.now()}${ext}`);
   },
 });
 
