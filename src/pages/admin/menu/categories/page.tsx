@@ -1,8 +1,30 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff, CornerDownRight, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff, CornerDownRight, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import ImageUploadCrop from "@/components/image-upload-crop.tsx";
+
+// ─── Image visibility helpers ─────────────────────────────────────────────────
+// Hidden images are stored with a "__hidden__" prefix in image_url so we don't
+// lose the original URL while still being able to hide it on the public site.
+
+const HIDDEN_PREFIX = "__hidden__";
+
+function isImageHidden(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.startsWith(HIDDEN_PREFIX);
+}
+
+function getRealImageUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  return url.startsWith(HIDDEN_PREFIX) ? url.slice(HIDDEN_PREFIX.length) : url;
+}
+
+function buildStoredUrl(realUrl: string, hidden: boolean): string {
+  if (!realUrl) return "";
+  return hidden ? HIDDEN_PREFIX + realUrl : realUrl;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Section = {
   id: number;
@@ -69,7 +91,6 @@ function sectionColor(sectionId: number | null, sections: Section[]): string {
   return SECTION_COLORS[index % SECTION_COLORS.length] ?? "bg-muted text-muted-foreground";
 }
 
-/** Read a boolean from localStorage, returning `fallback` if not set. */
 function lsGetBool(key: string, fallback: boolean): boolean {
   try {
     const raw = localStorage.getItem(key);
@@ -83,12 +104,9 @@ function lsGetBool(key: string, fallback: boolean): boolean {
 function lsSetBool(key: string, value: boolean): void {
   try {
     localStorage.setItem(key, value ? "1" : "0");
-  } catch {
-    // ignore quota errors
-  }
+  } catch {}
 }
 
-/** Collect all descendant ids of a category so it (and its subtree) can be excluded as a valid parent choice. */
 function collectDescendantIds(categoryId: string | number, categories: Category[]): Set<string | number> {
   const result = new Set<string | number>();
   const queue = [categoryId];
@@ -105,16 +123,10 @@ function collectDescendantIds(categoryId: string | number, categories: Category[
   return result;
 }
 
-/**
- * Returns the sibling categories for a given category.
- * For root categories (parent_id === null), siblings are other roots in the same section.
- * For child categories, siblings are categories with the same parent_id.
- */
 function getCategorySiblings(cat: Category, allCategories: Category[]): Category[] {
   if (cat.parent_id !== null) {
     return allCategories.filter((c) => c.parent_id === cat.parent_id);
   }
-  // Root: siblings share the same section
   return allCategories.filter((c) => c.parent_id === null && c.section_id === cat.section_id);
 }
 
@@ -131,6 +143,8 @@ function CategoryForm({
   onCancel: () => void;
   saving: boolean;
 }) {
+  const rawImageUrl = initialData?.image_url ?? "";
+
   const defaultForm: CategoryFormData = {
     label_ru: "", label_uz: "", label_en: "", label_tr: "",
     tab: sections[0]?.slug ?? "food",
@@ -140,6 +154,10 @@ function CategoryForm({
   };
   const [form, setForm] = useState<CategoryFormData>({ ...defaultForm, ...initialData });
   const [activeLang, setActiveLang] = useState<"ru" | "uz" | "en" | "tr">("ru");
+
+  // Separate the real URL from the hidden flag so ImageUploadCrop only sees the real URL
+  const [imageHidden, setImageHidden] = useState<boolean>(() => isImageHidden(rawImageUrl));
+  const [realImageUrl, setRealImageUrl] = useState<string>(() => getRealImageUrl(rawImageUrl));
 
   const set = (key: keyof CategoryFormData, value: string | number | null) => setForm((f) => ({ ...f, [key]: value }));
   const hasAnyLabel = [form.label_ru, form.label_uz, form.label_en, form.label_tr].some((v) => v.trim() !== "");
@@ -151,7 +169,6 @@ function CategoryForm({
     if (section) set("tab", section.slug);
   };
 
-  // A category can't be its own parent, nor a parent of one of its own descendants (would create a cycle)
   const excludedParentIds = editingId != null
     ? new Set([editingId, ...collectDescendantIds(editingId, categories)])
     : new Set<string | number>();
@@ -160,7 +177,10 @@ function CategoryForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasAnyLabel) { alert("Заполните название хотя бы на одном языке"); return; }
-    onSubmit(form);
+    onSubmit({
+      ...form,
+      image_url: buildStoredUrl(realImageUrl, imageHidden),
+    });
   };
 
   return (
@@ -198,7 +218,7 @@ function CategoryForm({
         />
       </div>
 
-      {/* Section selector — categories are children of a main menu section */}
+      {/* Section selector */}
       <div>
         <label className="text-xs text-muted-foreground mb-1 block">Раздел</label>
         <select
@@ -214,7 +234,7 @@ function CategoryForm({
         </select>
       </div>
 
-      {/* Parent category selector — optional, makes this a child/subcategory */}
+      {/* Parent category selector */}
       <div>
         <label className="text-xs text-muted-foreground mb-1 block">
           Родительская категория
@@ -233,19 +253,42 @@ function CategoryForm({
         </select>
       </div>
 
-      {/* Image upload with free-form crop — no fixed aspect ratio */}
+      {/* Image upload with visibility toggle */}
       <div>
         <label className="text-xs text-muted-foreground mb-2 block">
           Изображение категории
           <span className="ml-1.5 text-[10px] text-muted-foreground/60">(свободное кадрирование)</span>
         </label>
         <ImageUploadCrop
-          value={form.image_url}
-          onChange={(url) => set("image_url", url)}
+          value={realImageUrl}
+          onChange={(url) => setRealImageUrl(url)}
           disabled={saving}
           previewClass="w-24 h-16"
           label="Выбрать изображение"
         />
+
+        {/* Hide toggle — only relevant if there's an image */}
+        {realImageUrl && (
+          <label className={cn(
+            "mt-3 inline-flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 text-sm transition-colors",
+            imageHidden
+              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          )}>
+            <input
+              type="checkbox"
+              className="rounded"
+              checked={imageHidden}
+              onChange={(e) => setImageHidden(e.target.checked)}
+              disabled={saving}
+            />
+            {imageHidden ? (
+              <><EyeOff className="w-3.5 h-3.5" /> Фото скрыто на сайте</>
+            ) : (
+              <><Eye className="w-3.5 h-3.5" /> Фото показывается на сайте</>
+            )}
+          </label>
+        )}
       </div>
 
       {/* Actions */}
@@ -284,6 +327,7 @@ export default function CategoriesPage() {
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
 
   useEffect(() => { void loadData(); }, []);
 
@@ -301,12 +345,8 @@ export default function CategoriesPage() {
     }
   };
 
-  // Only top-level categories (no parent) are shown grouped by section.
-  // Child categories render nested underneath their parent in CategoryList.
   const topLevelCategories = categories.filter((c) => c.parent_id == null);
-
   const filtered = activeSectionId === "all" ? topLevelCategories : topLevelCategories.filter((c) => c.section_id === activeSectionId);
-
   const grouped = sections.reduce<Record<number, Category[]>>((acc, section) => {
     acc[section.id] = topLevelCategories.filter((c) => c.section_id === section.id);
     return acc;
@@ -352,29 +392,78 @@ export default function CategoriesPage() {
     }
   };
 
-  /**
-   * Move a category up or down within its sibling group.
-   * Optimistically updates local state, then persists to backend.
-   */
+  /** Quick toggle image visibility for a single category without opening the form */
+  const handleToggleImageVisibility = async (id: string | number) => {
+    const cat = categories.find((c) => String(c.id) === String(id));
+    if (!cat) return;
+    const currentlyHidden = isImageHidden(cat.image_url);
+    const realUrl = getRealImageUrl(cat.image_url);
+    const newImageUrl = buildStoredUrl(realUrl, !currentlyHidden);
+    try {
+      setSavingId(id);
+      await api.updateCategory(id, {
+        label_ru: cat.label_ru ?? "",
+        label_uz: cat.label_uz ?? "",
+        label_en: cat.label_en ?? "",
+        label_tr: cat.label_tr ?? "",
+        tab: cat.tab,
+        section_id: cat.section_id,
+        parent_id: cat.parent_id,
+        image_url: newImageUrl,
+      });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось изменить видимость фото");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  /** Bulk: show or hide image for all selected categories */
+  const handleBulkImageVisibility = async (hide: boolean) => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setSelectedIds(new Set());
+    try {
+      setSavingId("bulk");
+      for (const id of ids) {
+        const cat = categories.find((c) => String(c.id) === String(id));
+        if (!cat) continue;
+        const realUrl = getRealImageUrl(cat.image_url);
+        const newImageUrl = buildStoredUrl(realUrl, hide);
+        if (newImageUrl === (cat.image_url ?? "")) continue;
+        await api.updateCategory(id, {
+          label_ru: cat.label_ru ?? "",
+          label_uz: cat.label_uz ?? "",
+          label_en: cat.label_en ?? "",
+          label_tr: cat.label_tr ?? "",
+          tab: cat.tab,
+          section_id: cat.section_id,
+          parent_id: cat.parent_id,
+          image_url: newImageUrl,
+        });
+      }
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось изменить видимость");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const handleMoveCategory = async (id: string | number, direction: -1 | 1) => {
     const cat = categories.find((c) => String(c.id) === String(id));
     if (!cat) return;
-
     const siblings = getCategorySiblings(cat, categories);
     const sibIdx = siblings.findIndex((c) => String(c.id) === String(id));
     const targetIdx = sibIdx + direction;
     if (targetIdx < 0 || targetIdx >= siblings.length) return;
-
-    // Find the actual positions of these two siblings in the global categories array
     const posA = categories.findIndex((c) => String(c.id) === String(siblings[sibIdx].id));
     const posB = categories.findIndex((c) => String(c.id) === String(siblings[targetIdx].id));
     if (posA === -1 || posB === -1) return;
-
-    // Swap in the global array (optimistic update)
     const newCats = [...categories];
     [newCats[posA], newCats[posB]] = [newCats[posB], newCats[posA]];
     setCategories(newCats);
-
     try {
       setReordering(true);
       await api.reorderCategories(newCats.map((c) => c.id));
@@ -386,6 +475,14 @@ export default function CategoriesPage() {
     }
   };
 
+  const toggleSelect = (id: string | number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const listProps = {
     allCategories: categories,
     sections,
@@ -395,10 +492,19 @@ export default function CategoriesPage() {
     onCancelEdit: () => setEditingId(null),
     onDelete: handleDelete,
     onMove: handleMoveCategory,
+    onToggleImageVisibility: handleToggleImageVisibility,
+    selectedIds,
+    onToggleSelect: toggleSelect,
     savingId,
     deletingId,
     reordering,
   };
+
+  const isBulkSaving = savingId === "bulk";
+  const selectedHaveImage = [...selectedIds].some((id) => {
+    const cat = categories.find((c) => String(c.id) === String(id));
+    return cat && getRealImageUrl(cat.image_url);
+  });
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -421,6 +527,43 @@ export default function CategoriesPage() {
           <AlertCircle className="w-4 h-4 text-red-600" />
           <span className="text-sm text-red-700 font-medium">{error}</span>
           <button onClick={() => setError(null)} className="ml-auto text-sm underline">Закрыть</button>
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl">
+          <span className="text-sm font-medium text-foreground">
+            Выбрано: {selectedIds.size}
+          </span>
+          <div className="flex gap-2 ml-auto">
+            {selectedHaveImage && (
+              <>
+                <button
+                  onClick={() => { void handleBulkImageVisibility(true); }}
+                  disabled={isBulkSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 rounded-lg hover:bg-amber-200 disabled:opacity-50 transition-colors"
+                >
+                  {isBulkSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <EyeOff className="w-3 h-3" />}
+                  Скрыть фото
+                </button>
+                <button
+                  onClick={() => { void handleBulkImageVisibility(false); }}
+                  disabled={isBulkSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
+                >
+                  {isBulkSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                  Показать фото
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 text-xs text-muted-foreground rounded-lg hover:bg-muted transition-colors"
+            >
+              Снять выделение
+            </button>
+          </div>
         </div>
       )}
 
@@ -518,13 +661,15 @@ type ListProps = {
   onCancelEdit: () => void;
   onDelete: (id: string | number) => void;
   onMove: (id: string | number, direction: -1 | 1) => void;
+  onToggleImageVisibility: (id: string | number) => void;
+  selectedIds: Set<string | number>;
+  onToggleSelect: (id: string | number) => void;
   savingId: string | number | null;
   deletingId: string | number | null;
   reordering: boolean;
 };
 
 function SectionGroup({ section, categories, allCategories, sections, ...rest }: { section: Section } & ListProps) {
-  // Persist open/closed state per section id
   const lsKey = `mado_cat_section_open_${section.id}`;
   const [open, setOpen] = useState(() => lsGetBool(lsKey, true));
 
@@ -554,7 +699,7 @@ function SectionGroup({ section, categories, allCategories, sections, ...rest }:
 }
 
 function CategoryList({
-  categories, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, onMove, savingId, deletingId, reordering,
+  categories, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, onMove, onToggleImageVisibility, selectedIds, onToggleSelect, savingId, deletingId, reordering,
 }: ListProps) {
   return (
     <div className="divide-y divide-border">
@@ -571,6 +716,9 @@ function CategoryList({
           onCancelEdit={onCancelEdit}
           onDelete={onDelete}
           onMove={onMove}
+          onToggleImageVisibility={onToggleImageVisibility}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
           savingId={savingId}
           deletingId={deletingId}
           reordering={reordering}
@@ -586,12 +734,11 @@ function CategoryList({
 }
 
 function CategoryRow({
-  cat, depth, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, onMove, savingId, deletingId, reordering,
+  cat, depth, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, onMove, onToggleImageVisibility, selectedIds, onToggleSelect, savingId, deletingId, reordering,
 }: {
   cat: Category;
   depth: number;
 } & Omit<ListProps, "categories">) {
-  // Persist open/closed state per category id
   const lsKey = `mado_cat_children_open_${cat.id}`;
   const [childrenOpen, setChildrenOpen] = useState(() => lsGetBool(lsKey, true));
   const children = allCategories.filter((c) => c.parent_id === cat.id);
@@ -604,12 +751,16 @@ function CategoryRow({
     });
   };
 
-  // Determine position among siblings for disabling ↑↓ buttons
   const siblings = getCategorySiblings(cat, allCategories);
   const sibIdx = siblings.findIndex((c) => String(c.id) === String(cat.id));
   const isFirst = sibIdx === 0;
   const isLast = sibIdx === siblings.length - 1;
   const isBusy = savingId !== null || deletingId !== null || reordering;
+  const isSelected = selectedIds.has(cat.id);
+
+  const imageHidden = isImageHidden(cat.image_url);
+  const realUrl = getRealImageUrl(cat.image_url);
+  const hasImage = Boolean(realUrl);
 
   return (
     <>
@@ -627,6 +778,7 @@ function CategoryRow({
               tab: cat.tab,
               section_id: cat.section_id,
               parent_id: cat.parent_id,
+              // Pass the raw image_url (may include __hidden__ prefix) so the form can parse it
               image_url: cat.image_url ?? "",
             }}
             onSubmit={(data) => onSaveEdit(cat.id, data)}
@@ -636,9 +788,21 @@ function CategoryRow({
         </div>
       ) : (
         <div
-          className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30"
+          className={cn(
+            "group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors",
+            isSelected && "bg-primary/5"
+          )}
           style={{ paddingLeft: `${16 + depth * 20}px` }}
         >
+          {/* Checkbox */}
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(cat.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded border-border shrink-0 cursor-pointer"
+          />
+
           {depth > 0 && <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />}
           {children.length > 0 && (
             <button
@@ -649,25 +813,47 @@ function CategoryRow({
               {childrenOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
             </button>
           )}
-          {cat.image_url ? (
-            <img
-              src={cat.image_url}
-              alt=""
-              className="w-20 h-[15px] rounded object-cover border border-border shrink-0"
-            />
-          ) : (
-            <div className="w-20 h-[15px] rounded bg-muted flex items-center justify-center shrink-0">
-              <ImageOff className="w-3 h-3 text-muted-foreground/40" />
-            </div>
-          )}
+
+          {/* Image thumbnail with hidden overlay */}
+          <div className="relative w-20 h-[30px] shrink-0">
+            {hasImage ? (
+              <>
+                <img
+                  src={realUrl}
+                  alt=""
+                  className={cn(
+                    "w-full h-full rounded object-cover border border-border",
+                    imageHidden && "opacity-40"
+                  )}
+                />
+                {imageHidden && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded">
+                    <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full rounded bg-muted flex items-center justify-center">
+                <ImageOff className="w-3 h-3 text-muted-foreground/40" />
+              </div>
+            )}
+          </div>
+
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{getDisplayLabel(cat)}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              {imageHidden && hasImage && (
+                <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+                  <EyeOff className="w-2.5 h-2.5" /> фото скрыто
+                </span>
+              )}
+              {imageHidden && hasImage && (typeof cat.dishCount === "number" && cat.dishCount > 0 || children.length > 0) && " · "}
               {typeof cat.dishCount === "number" && cat.dishCount > 0 && `${cat.dishCount} блюд`}
               {typeof cat.dishCount === "number" && cat.dishCount > 0 && children.length > 0 && " · "}
               {children.length > 0 && `${children.length} дочерних категорий`}
             </p>
           </div>
+
           {depth === 0 && (
             <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 uppercase", sectionColor(cat.section_id, sections))}>
               {cat.section_id != null
@@ -676,7 +862,7 @@ function CategoryRow({
             </span>
           )}
 
-          {/* Reorder buttons — always visible for discoverability */}
+          {/* Reorder buttons */}
           <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={() => onMove(cat.id, -1)}
@@ -697,6 +883,26 @@ function CategoryRow({
           </div>
 
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Quick image visibility toggle */}
+            {hasImage && (
+              <button
+                onClick={() => { void onToggleImageVisibility(cat.id); }}
+                disabled={isBusy}
+                className={cn(
+                  "p-1.5 rounded disabled:opacity-50 transition-colors",
+                  imageHidden
+                    ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                    : "hover:bg-muted text-muted-foreground"
+                )}
+                title={imageHidden ? "Показать фото на сайте" : "Скрыть фото на сайте"}
+              >
+                {savingId === cat.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : imageHidden
+                    ? <Eye className="w-3.5 h-3.5" />
+                    : <EyeOff className="w-3.5 h-3.5" />}
+              </button>
+            )}
             <button
               onClick={() => onStartEdit(cat.id)}
               disabled={isBusy}
@@ -729,6 +935,9 @@ function CategoryRow({
           onCancelEdit={onCancelEdit}
           onDelete={onDelete}
           onMove={onMove}
+          onToggleImageVisibility={onToggleImageVisibility}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
           savingId={savingId}
           deletingId={deletingId}
           reordering={reordering}
