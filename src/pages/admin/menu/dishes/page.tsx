@@ -39,6 +39,7 @@ type Category = {
   label_en?: string | null;
   label_tr?: string | null;
   tab: string;
+  parent_id?: number | null;
 };
 
 function getCategoryLabel(cat: Category): string {
@@ -49,6 +50,22 @@ function getCategoryLabel(cat: Category): string {
     cat.label ??
     "Без названия"
   );
+}
+
+/** Collect a category's own id plus every descendant category id (children, grandchildren, ...). */
+function collectCategoryAndDescendantIds(categoryId: number, categories: Category[]): Set<number> {
+  const result = new Set<number>([categoryId]);
+  const queue = [categoryId];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    for (const cat of categories) {
+      if (cat.parent_id === current && !result.has(cat.id)) {
+        result.add(cat.id);
+        queue.push(cat.id);
+      }
+    }
+  }
+  return result;
 }
 
 const STATUS_META: Record<DishStatus, { label: string; color: string; icon: React.ReactNode }> = {
@@ -333,7 +350,7 @@ export default function DishesPage() {
   const loadCategories = async () => {
     try {
       const data = await api.getCategories();
-      setCategories(Array.isArray(data) ? data : []);
+      setCategories(Array.isArray(data) ? (data as Category[]) : []);
     } catch (err) {
       console.error("Failed to load categories:", err);
       setCategories([]);
@@ -345,7 +362,7 @@ export default function DishesPage() {
       setLoading(true);
       setError(null);
       const data = await api.getDishes({});
-      setDishes(Array.isArray(data) ? data : []);
+      setDishes(Array.isArray(data) ? (data as Dish[]) : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить блюда");
     } finally {
@@ -381,6 +398,13 @@ export default function DishesPage() {
     }
   };
 
+  // When filtering by a category that has child categories (subcategories), also
+  // match dishes stored under any of its descendants — not just the exact category.
+  const categoryFilterIds = useMemo(() => {
+    if (categoryFilter === "all") return null;
+    return collectCategoryAndDescendantIds(categoryFilter, categories);
+  }, [categoryFilter, categories]);
+
   const filtered = useMemo(() => {
     return dishes.filter((dish) => {
       const q = search.toLowerCase();
@@ -389,11 +413,11 @@ export default function DishesPage() {
         .join(" ")
         .toLowerCase();
       const matchSearch = searchable.includes(q);
-      const matchCategory = categoryFilter === "all" || dish.category_id === categoryFilter;
+      const matchCategory = categoryFilterIds === null || categoryFilterIds.has(dish.category_id);
       const matchStatus = statusFilter === "all" || dish.status === statusFilter;
       return matchSearch && matchCategory && matchStatus;
     });
-  }, [dishes, search, categoryFilter, statusFilter]);
+  }, [dishes, search, categoryFilterIds, statusFilter]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -441,20 +465,6 @@ export default function DishesPage() {
     }
   };
 
-  const handleQuickMove = async (id: string | number, categoryId: number) => {
-    try {
-      setSavingId(id);
-      await api.updateDish(id, { category_id: categoryId });
-      await loadDishes();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось переместить");
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  // ── Bulk handlers ──────────────────────────────────────────────────────────
-
   const handleBulkStatus = async (status: DishStatus) => {
     if (selected.size === 0) return;
     try {
@@ -463,7 +473,7 @@ export default function DishesPage() {
       await loadDishes();
       setSelected(new Set());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить статус");
+      setError(err instanceof Error ? err.message : "Не удалось обновить статусы");
     } finally {
       setBulkLoading(false);
     }
@@ -473,13 +483,11 @@ export default function DishesPage() {
     if (selected.size === 0) return;
     try {
       setBulkLoading(true);
-      await Promise.all(
-        Array.from(selected).map((id) => api.updateDish(id, { category_id: categoryId }))
-      );
+      await Promise.all(Array.from(selected).map((id) => api.updateDish(id, { category_id: categoryId })));
       await loadDishes();
       setSelected(new Set());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось переместить");
+      setError(err instanceof Error ? err.message : "Не удалось переместить блюда");
     } finally {
       setBulkLoading(false);
     }
@@ -487,367 +495,327 @@ export default function DishesPage() {
 
   const handleBulkDelete = async () => {
     if (selected.size === 0) return;
-    if (!confirm(`Удалить ${selected.size} блюд? Это действие нельзя отменить.`)) return;
+    if (!confirm(`Удалить ${selected.size} блюд(о/а)?`)) return;
     try {
       setBulkLoading(true);
       await Promise.all(Array.from(selected).map((id) => api.deleteDish(id)));
       await loadDishes();
       setSelected(new Set());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить");
+      setError(err instanceof Error ? err.message : "Не удалось удалить блюда");
     } finally {
       setBulkLoading(false);
     }
   };
 
   const toggleSelect = (id: string | number) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelected(next);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const selectAll = () => setSelected(new Set(filtered.map((d) => d.id)));
   const deselectAll = () => setSelected(new Set());
 
-  // ── Row context menu items ─────────────────────────────────────────────────
-
   const rowMenuItems = (dish: Dish): DropdownItem[] => [
-    {
-      type: "item", label: "Редактировать", icon: <Edit2 className="w-4 h-4" />,
-      onClick: () => { setEditingId(dish.id); setShowForm(true); },
-    },
-    { type: "separator" },
     { type: "header", label: "Статус" },
-    ...(["published", "draft", "hidden", "archived"] as DishStatus[])
-      .filter((s) => s !== dish.status)
-      .map<DropdownItem>((s) => ({
-        type: "item",
-        label: STATUS_META[s].label,
-        icon: STATUS_META[s].icon,
-        onClick: () => handleQuickStatus(dish.id, s),
-        disabled: savingId === dish.id,
-      })),
+    { type: "item", label: "Опубликовать", icon: <Eye className="w-4 h-4" />, onClick: () => handleQuickStatus(dish.id, "published"), disabled: dish.status === "published" },
+    { type: "item", label: "В черновик", icon: <FileText className="w-4 h-4" />, onClick: () => handleQuickStatus(dish.id, "draft"), disabled: dish.status === "draft" },
+    { type: "item", label: "Скрыть", icon: <EyeOff className="w-4 h-4" />, onClick: () => handleQuickStatus(dish.id, "hidden"), disabled: dish.status === "hidden" },
+    { type: "item", label: "Архивировать", icon: <Archive className="w-4 h-4" />, onClick: () => handleQuickStatus(dish.id, "archived"), disabled: dish.status === "archived" },
     { type: "separator" },
-    { type: "header", label: "Переместить в" },
-    ...categories
-      .filter((c) => c.id !== dish.category_id)
-      .slice(0, 8)
-      .map<DropdownItem>((cat) => ({
-        type: "item",
-        label: getCategoryLabel(cat),
-        icon: <FolderInput className="w-4 h-4" />,
-        onClick: () => handleQuickMove(dish.id, cat.id),
-        disabled: savingId === dish.id,
-      })),
-    { type: "separator" },
-    {
-      type: "item", label: "Удалить", icon: <Trash2 className="w-4 h-4" />,
-      onClick: () => handleDelete(dish.id),
-      danger: true,
-      disabled: deletingId === dish.id,
-    },
+    { type: "item", label: "Редактировать", icon: <Edit2 className="w-4 h-4" />, onClick: () => { setEditingId(dish.id); setShowForm(true); } },
+    { type: "item", label: "Удалить", icon: <Trash2 className="w-4 h-4" />, onClick: () => handleDelete(dish.id), danger: true },
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  if (loading && dishes.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 pb-24">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Блюда меню</h1>
-          <p className="text-gray-500">{filtered.length} блюд</p>
+          <h1 className="text-2xl font-bold">Блюда меню</h1>
+          <p className="text-sm text-gray-500">{dishes.length} блюд</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => { setEditingId(null); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            disabled={savingId === "new"}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            Добавить блюдо
+            <Plus className="w-4 h-4" /> Добавить блюдо
           </button>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleSeed("kitchen")}
-              disabled={seeding !== null}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-            >
-              {seeding === "kitchen" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UtensilsCrossed className="w-3.5 h-3.5" />}
-              Кухня
-            </button>
-            <button
-              onClick={() => handleSeed("beverages")}
-              disabled={seeding !== null}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
-            >
-              {seeding === "beverages" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DatabaseZap className="w-3.5 h-3.5" />}
-              Напитки
-            </button>
-          </div>
+          <button
+            onClick={() => handleSeed("kitchen")}
+            disabled={seeding !== null}
+            className="flex items-center gap-1.5 px-3 py-2 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors disabled:opacity-50"
+          >
+            {seeding === "kitchen" ? <Loader2 className="w-4 h-4 animate-spin" /> : <UtensilsCrossed className="w-4 h-4" />}
+            Кухня
+          </button>
+          <button
+            onClick={() => handleSeed("beverages")}
+            disabled={seeding !== null}
+            className="flex items-center gap-1.5 px-3 py-2 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors disabled:opacity-50"
+          >
+            {seeding === "beverages" ? <Loader2 className="w-4 h-4 animate-spin" /> : <DatabaseZap className="w-4 h-4" />}
+            Напитки
+          </button>
         </div>
       </div>
 
-      {/* Seed result */}
-      {seedResult && showSeedLog && (
-        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-          <div className="flex items-center justify-between mb-2">
-            <p className="font-semibold text-orange-800">
-              ✅ {seedLabel} — новых категорий: {seedResult.newCategories}, блюд: {seedResult.totalDishes}
-            </p>
-            <button onClick={() => setShowSeedLog(false)} className="text-orange-600 hover:text-orange-800">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <details className="text-xs text-orange-700">
-            <summary className="cursor-pointer select-none">Показать лог</summary>
-            <pre className="mt-2 whitespace-pre-wrap">{seedResult.log.join("\n")}</pre>
-          </details>
-        </div>
-      )}
-
-      {/* Error */}
       {error && (
-        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-red-800">{error}</p>
-          </div>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-56">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Поиск по названию..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-          />
-        </div>
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value === "all" ? "all" : parseInt(e.target.value))}
-          className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-        >
-          <option value="all">Все категории</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>{getCategoryLabel(cat)}</option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "all" | DishStatus)}
-          className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-        >
-          <option value="all">Все статусы</option>
-          <option value="published">Опубликовано</option>
-          <option value="draft">Черновик</option>
-          <option value="hidden">Скрыто</option>
-          <option value="archived">Архивировано</option>
-        </select>
-        {filtered.length > 0 && (
-          <button
-            onClick={selected.size === filtered.length ? deselectAll : selectAll}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
-          >
-            {selected.size === filtered.length ? (
-              <CheckSquare className="w-4 h-4 text-emerald-600" />
-            ) : (
-              <Square className="w-4 h-4" />
-            )}
-            {selected.size === filtered.length ? "Снять всё" : "Выбрать всё"}
-          </button>
-        )}
-      </div>
-
-      {/* Dishes list */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-gray-400 text-lg">Блюда не найдены</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((dish) => {
-            const isSelected = selected.has(dish.id);
-            const isMenuOpen = openMenuId === dish.id;
-
-            return (
-              <div
-                key={dish.id}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 border rounded-xl transition-all",
-                  isSelected
-                    ? "border-emerald-300 bg-emerald-50/50"
-                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
-                )}
-              >
-                {/* Checkbox */}
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleSelect(dish.id)}
-                  className="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"
-                />
-
-                {/* Photo thumbnail */}
-                <div className="w-11 h-11 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-100">
-                  {dish.image_url ? (
-                    <img
-                      src={dish.image_url}
-                      alt={getDishDisplayName(dish)}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                        (e.currentTarget.parentElement as HTMLElement).classList.add("flex", "items-center", "justify-center");
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageOff className="w-4 h-4 text-gray-300" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-sm truncate">{getDishDisplayName(dish)}</p>
-                    {dish.is_new && (
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Новое</span>
-                    )}
-                    {dish.is_signature && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">⭐</span>
-                    )}
-                    {dish.is_vegetarian && (
-                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Вег</span>
-                    )}
-                    {dish.is_spicy && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">🌶</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{getDishTranslationPreview(dish)}</p>
-                </div>
-
-                {/* Price */}
-                <div className="text-sm font-semibold text-gray-700 min-w-fit tabular-nums">
-                  {Number(dish.price).toLocaleString("ru-RU")} сум
-                </div>
-
-                {/* Status badge */}
-                <div className={cn("text-xs px-2 py-1 rounded-full font-medium min-w-fit hidden sm:flex items-center gap-1", STATUS_META[dish.status].color)}>
-                  {STATUS_META[dish.status].icon}
-                  {STATUS_META[dish.status].label}
-                </div>
-
-                {/* Row action menu — opens upward */}
-                <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
-                  <button
-                    onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
-                    disabled={savingId === dish.id || deletingId === dish.id}
-                    className={cn(
-                      "flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50",
-                      isMenuOpen
-                        ? "bg-gray-900 text-white border-gray-900"
-                        : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-                    )}
-                  >
-                    {savingId === dish.id || deletingId === dish.id
-                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      : <>Действия <ChevronDown className="w-3 h-3" /></>}
-                  </button>
-
-                  {isMenuOpen && (
-                    <div className="absolute right-0 bottom-full mb-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-96 overflow-y-auto">
-                      {rowMenuItems(dish).map((item, i) => {
-                        if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
-                        if (item.type === "header")
-                          return (
-                            <div key={i} className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                              {item.label}
-                            </div>
-                          );
-                        return (
-                          <button
-                            key={i}
-                            disabled={item.disabled}
-                            onClick={() => {
-                              item.onClick();
-                              setOpenMenuId(null);
-                            }}
-                            className={cn(
-                              "flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm transition-colors",
-                              item.danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50",
-                              item.disabled && "opacity-40 cursor-not-allowed"
-                            )}
-                          >
-                            {item.icon && <span className="text-gray-400 flex-shrink-0">{item.icon}</span>}
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Floating bulk action bar */}
-      {selected.size > 0 && (
-        <BulkActionBar
-          count={selected.size}
-          total={filtered.length}
-          categories={categories}
-          onSelectAll={selectAll}
-          onDeselectAll={deselectAll}
-          onStatus={handleBulkStatus}
-          onMove={handleBulkMove}
-          onDelete={handleBulkDelete}
-          loading={bulkLoading}
-        />
-      )}
-
-      {/* Form modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
-          <div className="relative z-10 w-full max-w-2xl">
-            <DishForm
-              onClose={() => setShowForm(false)}
-              onSubmit={handleSubmit}
-              initialData={
-                editingId
-                  ? dishes.find((d) => d.id === editingId)
-                    ? {
-                        ...dishes.find((d) => d.id === editingId)!,
-                        price: String(dishes.find((d) => d.id === editingId)!.price),
-                      }
-                    : undefined
-                  : undefined
-              }
-              categories={categories}
-              loading={savingId !== null}
-            />
+      {showSeedLog && seedResult && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 space-y-1">
+          <div className="flex items-center justify-between">
+            <p className="font-medium">
+              Импорт «{seedLabel}» завершён: {seedResult.newCategories} новых категорий, {seedResult.totalDishes} блюд всего.
+            </p>
+            <button onClick={() => setShowSeedLog(false)} className="text-blue-500 hover:text-blue-700">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Поиск по названию..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              />
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+              className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            >
+              <option value="all">Все категории</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.parent_id != null ? "— " : ""}{getCategoryLabel(cat)}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | DishStatus)}
+              className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            >
+              <option value="all">Все статусы</option>
+              <option value="published">Опубликовано</option>
+              <option value="draft">Черновик</option>
+              <option value="hidden">Скрыто</option>
+              <option value="archived">Архивировано</option>
+            </select>
+            {filtered.length > 0 && (
+              <button
+                onClick={selected.size === filtered.length ? deselectAll : selectAll}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+              >
+                {selected.size === filtered.length ? (
+                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
+                {selected.size === filtered.length ? "Снять всё" : "Выбрать всё"}
+              </button>
+            )}
+          </div>
+
+          {/* Dishes list */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-gray-400 text-lg">Блюда не найдены</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((dish) => {
+                const isSelected = selected.has(dish.id);
+                const isMenuOpen = openMenuId === dish.id;
+
+                return (
+                  <div
+                    key={dish.id}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 border rounded-xl transition-all",
+                      isSelected
+                        ? "border-emerald-300 bg-emerald-50/50"
+                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(dish.id)}
+                      className="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"
+                    />
+
+                    {/* Photo thumbnail */}
+                    <div className="w-11 h-11 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-100">
+                      {dish.image_url ? (
+                        <img
+                          src={dish.image_url}
+                          alt={getDishDisplayName(dish)}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                            (e.currentTarget.parentElement as HTMLElement).classList.add("flex", "items-center", "justify-center");
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageOff className="w-4 h-4 text-gray-300" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm truncate">{getDishDisplayName(dish)}</p>
+                        {dish.is_new && (
+                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Новое</span>
+                        )}
+                        {dish.is_signature && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">⭐</span>
+                        )}
+                        {dish.is_vegetarian && (
+                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Вег</span>
+                        )}
+                        {dish.is_spicy && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">🌶</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{getDishTranslationPreview(dish)}</p>
+                    </div>
+
+                    {/* Price */}
+                    <div className="text-sm font-semibold text-gray-700 min-w-fit tabular-nums">
+                      {Number(dish.price).toLocaleString("ru-RU")} сум
+                    </div>
+
+                    {/* Status badge */}
+                    <div className={cn("text-xs px-2 py-1 rounded-full font-medium min-w-fit hidden sm:flex items-center gap-1", STATUS_META[dish.status].color)}>
+                      {STATUS_META[dish.status].icon}
+                      {STATUS_META[dish.status].label}
+                    </div>
+
+                    {/* Row action menu — opens upward */}
+                    <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
+                      <button
+                        onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
+                        disabled={savingId === dish.id || deletingId === dish.id}
+                        className={cn(
+                          "flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50",
+                          isMenuOpen
+                            ? "bg-gray-900 text-white border-gray-900"
+                            : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                        )}
+                      >
+                        {savingId === dish.id || deletingId === dish.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <>Действия <ChevronDown className="w-3 h-3" /></>}
+                      </button>
+
+                      {isMenuOpen && (
+                        <div className="absolute right-0 bottom-full mb-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-96 overflow-y-auto">
+                          {rowMenuItems(dish).map((item, i) => {
+                            if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
+                            if (item.type === "header")
+                              return (
+                                <div key={i} className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                  {item.label}
+                                </div>
+                              );
+                            return (
+                              <button
+                                key={i}
+                                disabled={item.disabled}
+                                onClick={() => {
+                                  item.onClick();
+                                  setOpenMenuId(null);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm transition-colors",
+                                  item.danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50",
+                                  item.disabled && "opacity-40 cursor-not-allowed"
+                                )}
+                              >
+                                {item.icon && <span className="text-gray-400 flex-shrink-0">{item.icon}</span>}
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Floating bulk action bar */}
+          {selected.size > 0 && (
+            <BulkActionBar
+              count={selected.size}
+              total={filtered.length}
+              categories={categories}
+              onSelectAll={selectAll}
+              onDeselectAll={deselectAll}
+              onStatus={handleBulkStatus}
+              onMove={handleBulkMove}
+              onDelete={handleBulkDelete}
+              loading={bulkLoading}
+            />
+          )}
+
+          {/* Form modal */}
+          {showForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
+              <div className="relative z-10 w-full max-w-2xl">
+                <DishForm
+                  onClose={() => setShowForm(false)}
+                  onSubmit={handleSubmit}
+                  initialData={
+                    editingId
+                      ? dishes.find((d) => d.id === editingId)
+                        ? {
+                            ...dishes.find((d) => d.id === editingId)!,
+                            price: String(dishes.find((d) => d.id === editingId)!.price),
+                          }
+                        : undefined
+                      : undefined
+                  }
+                  categories={categories}
+                  loading={savingId !== null}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
