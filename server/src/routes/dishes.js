@@ -7,6 +7,8 @@ import { runSeedDesserts } from '../db/seed-desserts.js';
 
 const router = express.Router();
 
+const DEFAULT_IMAGE = 'https://mado.uz/uploads/mado_logo.jpg';
+
 // Get all dishes with filters
 router.get('/', async (req, res) => {
   const { category, tab, status } = req.query;
@@ -50,7 +52,7 @@ router.get('/', async (req, res) => {
 });
 
 // Seed endpoints — must be defined BEFORE /:id so Express does not treat
-// "seed-beverages" / "seed-kitchen" / "seed-desserts" as an id parameter.
+// "seed-*" / "set-default-image" as an id parameter.
 router.post('/seed-beverages', authenticate, authorize(['admin']), async (req, res) => {
   const result = await runSeedBeverages();
   res.json(result);
@@ -66,6 +68,18 @@ router.post('/seed-desserts', authenticate, authorize(['admin']), async (req, re
   res.json(result);
 });
 
+// Set default image on dishes that have no photo
+router.post('/set-default-image', authenticate, authorize(['admin']), async (req, res) => {
+  const result = await pool.query(
+    `UPDATE dishes
+     SET image_url = $1
+     WHERE image_url IS NULL OR TRIM(image_url) = ''
+     RETURNING id`,
+    [DEFAULT_IMAGE]
+  );
+  res.json({ ok: true, updated: result.rowCount });
+});
+
 // Bulk status update — also defined before /:id
 router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { ids, status } = req.body;
@@ -74,14 +88,11 @@ router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager'])
     return res.status(400).json({ error: 'IDs array and status required' });
   }
 
-  // Pass status as $1 and the ids array as $2 for ANY($2).
-  // Do NOT spread ids as individual params — ANY() expects a single array param.
   const result = await pool.query(
     `UPDATE dishes SET status = $1 WHERE id = ANY($2) RETURNING id`,
     [status, ids]
   );
 
-  // Log the activity — wrapped in try/catch so a missing table never breaks the response.
   try {
     await pool.query(
       'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
