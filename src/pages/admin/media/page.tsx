@@ -25,8 +25,8 @@ type MediaCategory = { id: number; name: string };
 type MediaFile = {
   id: number;
   filename: string;
-  file_url: string;       // stored path (may be relative or old absolute)
-  full_url: string;       // always absolute, computed by server per-request
+  file_url: string;
+  full_url: string;
   file_size: number | null;
   file_type: string | null;
   category_id: number | null;
@@ -50,11 +50,6 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Copy text to clipboard.
- * Uses the modern Clipboard API on https/localhost,
- * falls back to legacy execCommand for plain http.
- */
 function copyToClipboard(text: string): void {
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
@@ -72,6 +67,73 @@ function legacyCopy(text: string): void {
   ta.focus();
   ta.select();
   try { document.execCommand("copy"); } finally { document.body.removeChild(ta); }
+}
+
+// ─── Inline filename editor ───────────────────────────────────────────────────
+
+function FilenameEditor({
+  fileId,
+  filename,
+  onSaved,
+  onCancel,
+}: {
+  fileId: number;
+  filename: string;
+  onSaved: (newName: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(filename);
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); }, []);
+
+  const save = async () => {
+    const name = value.trim();
+    if (!name || name === filename) { onCancel(); return; }
+    setSaving(true);
+    try {
+      await api.renameMedia(fileId, name);
+      onSaved(name);
+      toast.success("Имя файла изменено");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось переименовать");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 p-2 pt-0" onClick={(e) => e.stopPropagation()}>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Escape") onCancel();
+        }}
+        disabled={saving}
+        className="flex-1 text-[11px] border border-primary rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary min-w-0"
+      />
+      <button
+        onClick={save}
+        disabled={saving}
+        className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 cursor-pointer"
+        title="Сохранить"
+      >
+        {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+      </button>
+      <button
+        onClick={onCancel}
+        disabled={saving}
+        className="p-0.5 rounded text-muted-foreground hover:bg-muted cursor-pointer"
+        title="Отмена"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 // ─── Drop Zone ────────────────────────────────────────────────────────────────
@@ -374,6 +436,8 @@ export default function MediaPage() {
   const [showCategories, setShowCategories] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadCategoryId, setUploadCategoryId] = useState("");
+  // id of the file whose name is currently being edited inline
+  const [renamingId, setRenamingId] = useState<number | null>(null);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -454,6 +518,12 @@ export default function MediaPage() {
     setCopied(file.id);
     toast.success("URL скопирован");
     setTimeout(() => setCopied(null), 1500);
+  };
+
+  // Optimistic rename: update local state immediately
+  const handleRenamed = (fileId: number, newName: string) => {
+    setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, filename: newName } : f));
+    setRenamingId(null);
   };
 
   const toggleSelect = (id: number) => {
@@ -586,23 +656,48 @@ export default function MediaPage() {
                 </div>
               </div>
 
-              {/* Image — uses full_url from server */}
+              {/* Image */}
               <div className="aspect-square bg-muted cursor-zoom-in" onClick={() => setPreview(file)}>
                 <img src={file.full_url} alt={file.filename} className="w-full h-full object-cover" loading="lazy" />
               </div>
 
-              {/* Info */}
-              <div className="p-2">
-                <p className="text-[11px] font-medium text-foreground truncate">{file.filename}</p>
-                <div className="flex items-center justify-between mt-0.5 gap-1 flex-wrap">
-                  <span className="text-[10px] text-muted-foreground">{formatSize(file.file_size)}</span>
-                  {file.category_name && (
-                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded truncate max-w-[70px]">
-                      {file.category_name}
-                    </span>
-                  )}
+              {/* Info / inline rename */}
+              {renamingId === file.id ? (
+                <FilenameEditor
+                  fileId={file.id}
+                  filename={file.filename}
+                  onSaved={(newName) => handleRenamed(file.id, newName)}
+                  onCancel={() => setRenamingId(null)}
+                />
+              ) : (
+                <div className="p-2">
+                  <div className="flex items-center gap-1 group/name">
+                    <p
+                      className="text-[11px] font-medium text-foreground truncate flex-1 cursor-text"
+                      title={file.filename}
+                      onDoubleClick={() => setRenamingId(file.id)}
+                    >
+                      {file.filename}
+                    </p>
+                    {/* Pencil icon — visible on card hover */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setRenamingId(file.id); }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted cursor-pointer flex-shrink-0"
+                      title="Переименовать"
+                    >
+                      <Pencil className="w-2.5 h-2.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5 gap-1 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground">{formatSize(file.file_size)}</span>
+                    {file.category_name && (
+                      <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded truncate max-w-[70px]">
+                        {file.category_name}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Hover actions */}
               <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
