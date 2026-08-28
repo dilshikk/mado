@@ -9,20 +9,18 @@ import { useLanguage } from "@/hooks/use-language.ts";
 import { menuPageText } from "@/lib/i18n/menu.ts";
 import type { LangCode } from "@/hooks/use-language.ts";
 import { publicApi, getPublicFileUrl } from "@/lib/public-api.ts";
-import type { PublicCategory, PublicDish } from "@/lib/public-api.ts";
+import type { PublicCategory, PublicDish, PublicSection } from "@/lib/public-api.ts";
 import { useQuery } from "@tanstack/react-query";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type TabId = "food" | "beverage" | "dessert" | "takeaway";
 type LocalizedText = Record<LangCode, string>;
 
-const TABS: { id: TabId; label: LocalizedText }[] = [
-  { id: "food",     label: { ru: "Еда",     uz: "Taomlar",     en: "Food",      tr: "Yemekler"  } },
-  { id: "beverage", label: { ru: "Напитки", uz: "Ichimliklar", en: "Beverages", tr: "İçecekler" } },
-  { id: "dessert",  label: { ru: "Десерты", uz: "Shirinliklar",en: "Desserts",  tr: "Tatlılar"  } },
-  { id: "takeaway", label: { ru: "С собой", uz: "Olib ketish", en: "Takeaway",  tr: "Paket"     } },
-];
+type ViewSection = {
+  id: number;
+  slug: string;
+  label: LocalizedText;
+};
 
 type ViewDish = {
   id: number;
@@ -39,7 +37,7 @@ type ViewDish = {
 type ViewCategory = {
   id: number;
   label: LocalizedText;
-  tab: TabId;
+  sectionId: number | null;
   image: string;
   dishes: ViewDish[];
 };
@@ -67,8 +65,12 @@ function formatPrice(price: string | number): string {
   return `${Math.round(numeric).toLocaleString("ru-RU")}\u00a0сум`;
 }
 
-function isTabId(value: string): value is TabId {
-  return value === "food" || value === "beverage" || value === "dessert" || value === "takeaway";
+function buildViewSections(sections: PublicSection[]): ViewSection[] {
+  return sections.map((s) => ({
+    id: s.id,
+    slug: s.slug,
+    label: pickLocalized(s.label || s.slug, s.label_ru, s.label_uz, s.label_en, s.label_tr),
+  }));
 }
 
 function buildViewCategories(
@@ -80,10 +82,6 @@ function buildViewCategories(
   const result: ViewCategory[] = [];
 
   for (const cat of categories) {
-    if (!isTabId(cat.tab)) continue;
-
-    const tabId: TabId = cat.tab;
-
     const catDishes = published
       .filter((d) => d.category_id === cat.id)
       .map(
@@ -107,7 +105,7 @@ function buildViewCategories(
     result.push({
       id: cat.id,
       label: pickLocalized("Без названия", cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr),
-      tab: tabId,
+      sectionId: cat.section_id,
       image:
         getPublicFileUrl(cat.image_url) ||
         "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
@@ -186,12 +184,18 @@ function DishCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MenuPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("food");
+  const [activeSectionId, setActiveSectionId] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const { lang } = useLanguage();
   const t = menuPageText[lang];
 
+  const sectionsQuery = useQuery({
+    queryKey: ["public-sections"],
+    queryFn: () => publicApi.getSections(),
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
   const categoriesQuery = useQuery({
     queryKey: ["public-categories"],
     queryFn: () => publicApi.getCategories(),
@@ -205,16 +209,24 @@ export default function MenuPage() {
     retry: 1,
   });
 
-  const isLoading = categoriesQuery.isLoading || dishesQuery.isLoading;
-  const isError = categoriesQuery.isError || dishesQuery.isError;
+  const isLoading = sectionsQuery.isLoading || categoriesQuery.isLoading || dishesQuery.isLoading;
+  const isError = sectionsQuery.isError || categoriesQuery.isError || dishesQuery.isError;
+
+  const allSections = useMemo(
+    () => buildViewSections(sectionsQuery.data ?? []),
+    [sectionsQuery.data],
+  );
 
   const allCategories = useMemo(
     () => buildViewCategories(categoriesQuery.data ?? [], dishesQuery.data ?? []),
     [categoriesQuery.data, dishesQuery.data],
   );
 
+  // Default to the first section with content once sections/categories load
+  const activeTab = activeSectionId ?? allSections.find((s) => allCategories.some((c) => c.sectionId === s.id))?.id ?? allSections[0]?.id ?? null;
+
   const tabCategories = useMemo(
-    () => allCategories.filter((c) => c.tab === activeTab),
+    () => allCategories.filter((c) => c.sectionId === activeTab),
     [allCategories, activeTab],
   );
 
@@ -245,8 +257,8 @@ export default function MenuPage() {
     return tabCategories;
   }, [isSearching, activeCategoryData, tabCategories]);
 
-  const handleTabChange = (tab: TabId) => {
-    setActiveTab(tab);
+  const handleTabChange = (sectionId: number) => {
+    setActiveSectionId(sectionId);
     setActiveCategory(null);
     setSearch("");
   };
@@ -289,20 +301,20 @@ export default function MenuPage() {
       <div className="sticky top-[57px] z-40 border-b border-border/60 bg-background/95 backdrop-blur-md">
         <div className="mx-auto max-w-[1140px] px-6">
           <div className="flex gap-0 overflow-x-auto">
-            {TABS.map((tab) => (
+            {allSections.map((section) => (
               <button
-                key={tab.id}
+                key={section.id}
                 type="button"
-                onClick={() => handleTabChange(tab.id)}
+                onClick={() => handleTabChange(section.id)}
                 className={cn(
                   "relative shrink-0 cursor-pointer px-5 py-4 text-sm font-semibold tracking-wide transition-colors",
-                  activeTab === tab.id
+                  activeTab === section.id
                     ? "text-primary"
                     : "text-foreground/60 hover:text-foreground",
                 )}
               >
-                {tab.label[lang].toUpperCase()}
-                {activeTab === tab.id && (
+                {section.label[lang].toUpperCase()}
+                {activeTab === section.id && (
                   <motion.span
                     layoutId="tab-underline"
                     className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent"
@@ -447,7 +459,7 @@ export default function MenuPage() {
                   <div className="mt-5 flex items-end justify-between">
                     <div>
                       <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">
-                        {TABS.find((tb) => tb.id === cat.tab)?.label[lang]}
+                        {allSections.find((s) => s.id === cat.sectionId)?.label[lang]}
                       </p>
                       <h2 className="mt-1 font-serif text-2xl font-bold text-primary sm:text-3xl">
                         {cat.label[lang]}
