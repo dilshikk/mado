@@ -108,11 +108,19 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
 
   const fallbackLabelRu = label_ru && String(label_ru).trim() ? String(label_ru).trim() : primaryLabel;
 
+  // Compute next position in a separate query (avoids reusing $6 with two
+  // different inferred types inside the same statement, which Postgres rejects).
+  const positionResult = await pool.query(
+    'SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM menu_categories WHERE tab = $1',
+    [tab]
+  );
+  const nextPosition = positionResult.rows[0].next_position;
+
   const result = await pool.query(
     `INSERT INTO menu_categories (label, label_ru, label_uz, label_en, label_tr, tab, section_id, parent_id, image_url, position)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(MAX(position), -1) + 1 FROM menu_categories WHERE tab = $6))
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING ${CATEGORY_FIELDS}`,
-    [fallbackLabelRu, label_ru, label_uz, label_en, label_tr, tab, section_id ?? null, parent_id ?? null, image_url]
+    [fallbackLabelRu, label_ru, label_uz, label_en, label_tr, tab, section_id ?? null, parent_id ?? null, image_url, nextPosition]
   );
 
   // Log activity
