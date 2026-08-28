@@ -68,6 +68,28 @@ function collectCategoryAndDescendantIds(categoryId: number, categories: Categor
   return result;
 }
 
+/**
+ * Returns categories sorted in hierarchical order:
+ * each root category is followed immediately by its direct children,
+ * so the dropdown reads: Parent → — Child → — Child → Next Parent → …
+ */
+function getSortedCategories(categories: Category[]): Category[] {
+  const roots = categories.filter((c) => c.parent_id == null);
+  const result: Category[] = [];
+  for (const root of roots) {
+    result.push(root);
+    for (const child of categories.filter((c) => c.parent_id === root.id)) {
+      result.push(child);
+    }
+  }
+  // Append any orphans that didn't match a known root (safety net)
+  const inResult = new Set(result.map((c) => c.id));
+  for (const cat of categories) {
+    if (!inResult.has(cat.id)) result.push(cat);
+  }
+  return result;
+}
+
 const STATUS_META: Record<DishStatus, { label: string; color: string; icon: React.ReactNode }> = {
   published: {
     label: "Опубликовано",
@@ -226,9 +248,12 @@ function BulkActionBar({
     },
   ];
 
+  // Use hierarchically sorted categories for the move dropdown
+  const sortedCategories = getSortedCategories(categories);
+
   const moveItems: DropdownItem[] = [
     { type: "header", label: "Переместить в категорию" },
-    ...categories.map<DropdownItem>((cat) => ({
+    ...sortedCategories.map<DropdownItem>((cat) => ({
       type: "item",
       label: (cat.parent_id != null ? "— " : "") + getCategoryLabel(cat),
       onClick: () => onMove(cat.id),
@@ -422,6 +447,9 @@ export default function DishesPage() {
     });
   }, [dishes, search, categoryFilterIds, statusFilter]);
 
+  // Hierarchically sorted categories for all dropdowns / selects
+  const sortedCategories = useMemo(() => getSortedCategories(categories), [categories]);
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
@@ -613,7 +641,7 @@ export default function DishesPage() {
               className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             >
               <option value="all">Все категории</option>
-              {categories.map((cat) => (
+              {sortedCategories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.parent_id != null ? "— " : ""}{getCategoryLabel(cat)}
                 </option>
