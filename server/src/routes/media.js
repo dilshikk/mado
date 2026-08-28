@@ -36,6 +36,20 @@ function withFullUrl(req, row) {
   return { ...row, full_url: relativePath };
 }
 
+/**
+ * Sanitize a user-provided filename into a safe on-disk filename.
+ * Keeps ASCII alphanumerics, hyphens, underscores, and dots.
+ * Replaces everything else with a hyphen and collapses runs.
+ */
+function sanitizeDiskName(name) {
+  return name
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'file';
+}
+
 // ── Multer config ─────────────────────────────────────────────────────────────
 
 const storage = multer.diskStorage({
@@ -179,7 +193,13 @@ router.post(
   }
 );
 
-// Rename a media file (updates display name only, does not move the file on disk)
+/**
+ * PATCH /media/:id/rename
+ *
+ * Renames both the display name (filename) and the physical file on disk.
+ * Cascades the new file_url to dishes.image_url, promotions.image_url,
+ * and menu_categories.image_url wherever they reference the old path.
+ */
 router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
   const { filename } = req.body;
@@ -188,23 +208,85 @@ router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'cont
     return res.status(400).json({ error: 'filename is required' });
   }
 
-  const newName = String(filename).trim();
+  const newDisplayName = String(filename).trim();
 
-  const result = await pool.query(
-    'UPDATE media SET filename = $1 WHERE id = $2 RETURNING *',
-    [newName, id]
-  );
-
-  if (result.rows.length === 0) {
+  // ── 1. Fetch current record ──────────────────────────────────────────────────
+  const existing = await pool.query('SELECT * FROM media WHERE id = $1', [id]);
+  if (existing.rows.length === 0) {
     return res.status(404).json({ error: 'File not found' });
   }
+  const file = existing.rows[0];
 
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-    [req.user.id, 'update', 'media', id, `Renamed file to: ${newName}`]
+  // ── 2. Determine new disk filename ───────────────────────────────────────────
+  // Only rename files stored locally in /uploads/
+  const isLocal = typeof file.file_url === 'string' && file.file_url.startsWith('/uploads/');
+
+  let newFileUrl = file.file_url; // default: keep old URL if external
+
+  if (isLocal) {
+    const oldDiskName = path.basename(file.file_url); // e.g. orig-1787887561860.jpg
+    const ext = path.extname(oldDiskName);             // e.g. .jpg
+
+    // Build new disk filename: sanitized display name + timestamp to avoid collisions
+    const baseName = sanitizeDiskName(
+      path.extname(newDisplayName) ? newDisplayName : `${newDisplayName}${ext}`
+    );
+    // If baseName already has an extension matching, use as-is; otherwise append
+    const newDiskName = `${Date.now()}-${baseName}`;
+    newFileUrl = `/uploads/${newDiskName}`;
+
+    const oldPath = path.join(uploadDir, oldDiskName);
+    const newPath = path.join(uploadDir, newDiskName);
+
+    if (fs.existsSync(oldPath)) {
+      fs.renameSync(oldPath, newPath);
+    }
+    // If old file is missing, we still update the DB paths so they're consistent
+  }
+
+  const oldFileUrl = file.file_url;
+
+  // ── 3. Update media table ────────────────────────────────────────────────────
+  const updated = await pool.query(
+    'UPDATE media SET filename = $1, file_url = $2 WHERE id = $3 RETURNING *',
+    [newDisplayName, newFileUrl, id]
   );
 
-  res.json(withFullUrl(req, result.rows[0]));
+  // ── 4. Cascade update all tables that store image URLs ───────────────────────
+  // These tables store either the relative path (/uploads/xxx) or the full
+  // absolute URL (https://domain/uploads/xxx). We match on the path suffix.
+  if (isLocal && oldFileUrl !== newFileUrl) {
+    const oldDiskName = path.basename(oldFileUrl); // e.g. orig-1787887561860.jpg
+    const newDiskName = path.basename(newFileUrl);
+
+    // Helper: replace the old disk filename inside an image_url with the new one.
+    // Works for both relative (/uploads/old.jpg) and absolute (https://x.com/uploads/old.jpg).
+    const cascadeSQL = (table, column) => pool.query(
+      `UPDATE ${table}
+       SET ${column} = REGEXP_REPLACE(${column}, $1, $2)
+       WHERE ${column} LIKE $3`,
+      [
+        // Pattern: match the old disk filename at the end of the URL path
+        oldDiskName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), // escape regex special chars
+        newDiskName,
+        `%${oldDiskName}`,
+      ]
+    );
+
+    await Promise.all([
+      cascadeSQL('dishes', 'image_url'),
+      cascadeSQL('promotions', 'image_url'),
+      cascadeSQL('menu_categories', 'image_url'),
+    ]);
+  }
+
+  // ── 5. Log activity ──────────────────────────────────────────────────────────
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'update', 'media', id, `Renamed file: ${file.filename} → ${newDisplayName}`]
+  );
+
+  res.json(withFullUrl(req, updated.rows[0]));
 });
 
 router.patch('/:id/category', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
@@ -224,9 +306,9 @@ router.delete('/:id', authenticate, authorize(['admin', 'marketing', 'content_ma
   if (result.rows.length === 0) return res.status(404).json({ error: 'File not found' });
 
   const file = result.rows[0];
-  const filename = file.file_url.replace(/^\/uploads\//, '');
-  if (filename) {
-    const filePath = path.join(uploadDir, filename);
+  const diskName = file.file_url.replace(/^\/uploads\//, '');
+  if (diskName) {
+    const filePath = path.join(uploadDir, diskName);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 
@@ -251,9 +333,9 @@ router.post('/bulk-delete', authenticate, authorize(['admin', 'marketing', 'cont
   );
 
   for (const file of result.rows) {
-    const filename = file.file_url.replace(/^\/uploads\//, '');
-    if (filename) {
-      const filePath = path.join(uploadDir, filename);
+    const diskName = file.file_url.replace(/^\/uploads\//, '');
+    if (diskName) {
+      const filePath = path.join(uploadDir, diskName);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
   }
