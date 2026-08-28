@@ -9,6 +9,7 @@ import Careers from "./pages/careers/page.tsx";
 import Contact from "./pages/contact/page.tsx";
 import MenuPage from "./pages/menu/page.tsx";
 import ReviewsPublicPage from "./pages/reviews/page.tsx";
+import FaqPublicPage from "./pages/faq/page.tsx";
 import QrRedirect from "./pages/QrRedirect.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminLayout from "./pages/admin/layout.tsx";
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/reviews" element={<ReviewsPublicPage />} />
+          <Route path="/faq" element={<FaqPublicPage />} />
 
           {/* QR-code menu redirect → PDF until /menu is ready */}
           <Route path="/qr" element={<QrRedirect />} />
