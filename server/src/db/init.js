@@ -31,6 +31,23 @@ const initDb = async () => {
       )
     `);
 
+    // Menu sections table (top-level tabs: Food / Beverages / Desserts / Takeaway, etc.)
+    // These are now DB-driven so admins can rename, reorder, add, or remove them.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS menu_sections (
+        id SERIAL PRIMARY KEY,
+        slug VARCHAR(50) UNIQUE NOT NULL,
+        label VARCHAR(255) NOT NULL,
+        label_ru VARCHAR(255),
+        label_uz VARCHAR(255),
+        label_en VARCHAR(255),
+        label_tr VARCHAR(255),
+        position INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Menu categories table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS menu_categories (
@@ -56,6 +73,33 @@ const initDb = async () => {
       const colType = col.split(' ').slice(1).join(' ');
       await pool.query(`ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS ${colName} ${colType}`);
     }
+
+    // Safe migration: section_id FK on menu_categories (categories are now children of menu_sections)
+    await pool.query(`ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS section_id INT REFERENCES menu_sections(id) ON DELETE SET NULL`);
+
+    // Seed default sections (Food / Beverages / Desserts / Takeaway) if none exist yet
+    const defaultSections = [
+      { slug: 'food', label_ru: 'Еда', label_uz: 'Taomlar', label_en: 'Food', label_tr: 'Yemekler', position: 0 },
+      { slug: 'beverage', label_ru: 'Напитки', label_uz: 'Ichimliklar', label_en: 'Beverages', label_tr: 'İçecekler', position: 1 },
+      { slug: 'dessert', label_ru: 'Десерты', label_uz: 'Shirinliklar', label_en: 'Desserts', label_tr: 'Tatlılar', position: 2 },
+      { slug: 'takeaway', label_ru: 'Навынос', label_uz: 'Olib ketish', label_en: 'Takeaway', label_tr: 'Paket', position: 3 },
+    ];
+    for (const section of defaultSections) {
+      await pool.query(
+        `INSERT INTO menu_sections (slug, label, label_ru, label_uz, label_en, label_tr, position)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (slug) DO NOTHING`,
+        [section.slug, section.label_ru, section.label_ru, section.label_uz, section.label_en, section.label_tr, section.position]
+      );
+    }
+
+    // Auto-migrate existing categories: link section_id based on their current `tab` value
+    await pool.query(`
+      UPDATE menu_categories c
+      SET section_id = s.id
+      FROM menu_sections s
+      WHERE c.section_id IS NULL AND c.tab = s.slug
+    `);
 
     // Dishes table
     await pool.query(`
