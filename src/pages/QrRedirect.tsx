@@ -2,13 +2,17 @@ import { useEffect } from "react";
 
 const PDF_URL = "https://mado.uz/uploads/menu.pdf";
 
+// Google Docs viewer renders the PDF inside the browser on any device.
+// Direct PDF links are downloaded on Android instead of being shown.
+const VIEWER_URL = `https://docs.google.com/viewer?url=${encodeURIComponent(PDF_URL)}&embedded=true`;
+
 /**
- * /qr — instantly redirects to the printed menu PDF.
- * When the digital menu at /menu is ready, update PDF_URL to point there.
+ * /qr — opens the menu PDF via Google Docs Viewer (works on iOS & Android).
+ * When the digital menu at /menu is ready, replace VIEWER_URL with "/menu".
  */
 export default function QrRedirect() {
   useEffect(() => {
-    window.location.replace(PDF_URL);
+    window.location.replace(VIEWER_URL);
   }, []);
 
   return (
