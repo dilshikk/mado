@@ -70,19 +70,26 @@ router.post('/seed-desserts', authenticate, authorize(['admin']), async (req, re
 router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { ids, status } = req.body;
 
-  if (!ids || !Array.isArray(ids) || !status) {
+  if (!ids || !Array.isArray(ids) || ids.length === 0 || !status) {
     return res.status(400).json({ error: 'IDs array and status required' });
   }
 
+  // Pass status as $1 and the ids array as $2 for ANY($2).
+  // Do NOT spread ids as individual params — ANY() expects a single array param.
   const result = await pool.query(
-    `UPDATE dishes SET status = $${ids.length + 1}, updated_at = NOW() WHERE id = ANY($${ids.length + 2}) RETURNING id`,
-    [...ids, status, ids]
+    `UPDATE dishes SET status = $1 WHERE id = ANY($2) RETURNING id`,
+    [status, ids]
   );
 
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
-    [req.user.id, 'bulk_update', 'dish', `Updated status to ${status} for ${ids.length} dishes`]
-  );
+  // Log the activity — wrapped in try/catch so a missing table never breaks the response.
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
+      [req.user.id, 'bulk_update', 'dish', `Updated status to ${status} for ${ids.length} dishes`]
+    );
+  } catch (_) {
+    // activity_log is non-critical
+  }
 
   res.json({ updated: result.rowCount });
 });
@@ -98,14 +105,18 @@ router.put('/reorder/category', authenticate, authorize(['admin', 'content_manag
 
   await Promise.all(
     orderedIds.map((dishId, index) =>
-      pool.query('UPDATE dishes SET position = $1, updated_at = NOW() WHERE id = $2 AND category_id = $3', [index, dishId, categoryId])
+      pool.query('UPDATE dishes SET position = $1 WHERE id = $2 AND category_id = $3', [index, dishId, categoryId])
     )
   );
 
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
-    [req.user.id, 'update', 'dish', `Reordered dishes in category ${categoryId}`]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
+      [req.user.id, 'update', 'dish', `Reordered dishes in category ${categoryId}`]
+    );
+  } catch (_) {
+    // activity_log is non-critical
+  }
 
   const result = await pool.query(
     'SELECT id, name_ru, position FROM dishes WHERE category_id = $1 ORDER BY position',
@@ -164,10 +175,14 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
     price, image_url, status, is_new, is_signature, is_vegetarian, is_spicy
   ]);
 
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-    [req.user.id, 'create', 'dish', result.rows[0].id, `Created dish: ${fallbackNameRu}`]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.id, 'create', 'dish', result.rows[0].id, `Created dish: ${fallbackNameRu}`]
+    );
+  } catch (_) {
+    // activity_log is non-critical
+  }
 
   res.status(201).json(result.rows[0]);
 });
@@ -179,7 +194,8 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     name_ru, name_uz, name_en, name_tr,
     description_ru, description_uz, description_en, description_tr,
     price, image_url, status,
-    is_new, is_signature, is_vegetarian, is_spicy
+    is_new, is_signature, is_vegetarian, is_spicy,
+    category_id,
   } = req.body;
 
   const updates = [];
@@ -187,6 +203,7 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
   let paramCount = 0;
 
   const fieldsMap = {
+    category_id,
     name_ru, name_uz, name_en, name_tr,
     description_ru, description_uz, description_en, description_tr,
     price, image_url, status, is_new, is_signature, is_vegetarian, is_spicy
@@ -207,7 +224,7 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
   paramCount++;
   values.push(id);
 
-  const query = `UPDATE dishes SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramCount} RETURNING id, name_ru, price, status`;
+  const query = `UPDATE dishes SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING id, name_ru, price, status`;
 
   const result = await pool.query(query, values);
 
@@ -215,10 +232,14 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     return res.status(404).json({ error: 'Dish not found' });
   }
 
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-    [req.user.id, 'update', 'dish', id, `Updated dish: ${name_ru || 'Unknown'}`]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.id, 'update', 'dish', id, `Updated dish: ${name_ru || 'Unknown'}`]
+    );
+  } catch (_) {
+    // activity_log is non-critical
+  }
 
   res.json(result.rows[0]);
 });
@@ -233,10 +254,14 @@ router.delete('/:id', authenticate, authorize(['admin', 'content_manager']), asy
     return res.status(404).json({ error: 'Dish not found' });
   }
 
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
-    [req.user.id, 'delete', 'dish', id, `Deleted dish: ${result.rows[0].name_ru}`]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.id, 'delete', 'dish', id, `Deleted dish: ${result.rows[0].name_ru}`]
+    );
+  } catch (_) {
+    // activity_log is non-critical
+  }
 
   res.json({ message: 'Dish deleted' });
 });
