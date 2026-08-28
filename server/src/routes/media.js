@@ -16,45 +16,23 @@ const router = express.Router();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Add full_url to a media row.
- *
- * We intentionally return a ROOT-RELATIVE path (e.g. /uploads/image.jpg)
- * rather than an absolute URL (http://127.0.0.1:3000/uploads/image.jpg).
- *
- * Absolute URLs built from req.protocol + req.get('host') are unreliable:
- *   - Behind Vite proxy  → host is 127.0.0.1:3000  → browser can't reach it
- *   - Behind Nginx proxy → protocol may be wrong without trust proxy
- *
- * Root-relative paths work in all environments:
- *   - Dev  (Vite)  → Vite proxy forwards /uploads/* → Node.js
- *   - Prod (Nginx) → Nginx serves /uploads/* directly from disk
- *
- * If BASE_URL env var is set (e.g. https://mado.uz) the full absolute URL
- * is constructed from it — useful if the API and frontend are on different
- * domains.
- */
 function withFullUrl(req, row) {
   if (!row) return row;
   if (!row.file_url) return { ...row, full_url: null };
 
-  // Already an external URL (e.g. https://cdn.example.com/…) — keep as-is
   if (/^https?:\/\//i.test(row.file_url)) {
     return { ...row, full_url: row.file_url };
   }
 
-  // Relative path like /uploads/image.jpg
   const relativePath = row.file_url.startsWith('/')
     ? row.file_url
     : `/${row.file_url}`;
 
-  // If BASE_URL is configured, build an absolute URL from it
   if (process.env.BASE_URL) {
     const base = process.env.BASE_URL.replace(/\/+$/, '');
     return { ...row, full_url: `${base}${relativePath}` };
   }
 
-  // Default: return root-relative path — browser resolves against current host
   return { ...row, full_url: relativePath };
 }
 
@@ -64,10 +42,6 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext)
-      .replace(/[^a-z0-9]/gi, '-')
-      .toLowerCase()
-      .slice(0, 60);
     cb(null, `orig-${Date.now()}${ext}`);
   },
 });
@@ -204,6 +178,34 @@ router.post(
     res.status(201).json(inserted);
   }
 );
+
+// Rename a media file (updates display name only, does not move the file on disk)
+router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
+  const { id } = req.params;
+  const { filename } = req.body;
+
+  if (!filename || !String(filename).trim()) {
+    return res.status(400).json({ error: 'filename is required' });
+  }
+
+  const newName = String(filename).trim();
+
+  const result = await pool.query(
+    'UPDATE media SET filename = $1 WHERE id = $2 RETURNING *',
+    [newName, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
+    [req.user.id, 'update', 'media', id, `Renamed file to: ${newName}`]
+  );
+
+  res.json(withFullUrl(req, result.rows[0]));
+});
 
 router.patch('/:id/category', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
