@@ -211,6 +211,32 @@ class ApiClient {
     return this.request('/auth/me');
   }
 
+  // ── Menu sections (top-level tabs) ───────────────────────────────────────────
+
+  getSections(): Promise<unknown> {
+    return this.request('/sections');
+  }
+
+  getSection(id: string | number): Promise<unknown> {
+    return this.request(`/sections/${id}`);
+  }
+
+  createSection(section: Record<string, unknown>): Promise<unknown> {
+    return this.request('/sections', { method: 'POST', body: JSON.stringify(section) });
+  }
+
+  updateSection(id: string | number, section: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/sections/${id}`, { method: 'PUT', body: JSON.stringify(section) });
+  }
+
+  reorderSections(orderedIds: (string | number)[]): Promise<unknown> {
+    return this.request('/sections/reorder/all', { method: 'PUT', body: JSON.stringify({ orderedIds }) });
+  }
+
+  deleteSection(id: string | number): Promise<unknown> {
+    return this.request(`/sections/${id}`, { method: 'DELETE' });
+  }
+
   // ── Categories ──────────────────────────────────────────────────────────────
 
   getCategories(tab?: string): Promise<unknown> {
