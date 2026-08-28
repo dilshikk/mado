@@ -4,19 +4,35 @@ import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const CATEGORY_FIELDS = 'id, label, label_ru, label_uz, label_en, label_tr, tab, image_url, position';
+const CATEGORY_FIELDS = 'id, label, label_ru, label_uz, label_en, label_tr, tab, section_id, image_url, position';
 
 // Get all categories
 router.get('/', async (req, res) => {
   const tab = req.query.tab;
+  const sectionId = req.query.section_id;
 
-  let query = `SELECT ${CATEGORY_FIELDS} FROM menu_categories ORDER BY tab, position`;
+  let query = `
+    SELECT c.${CATEGORY_FIELDS.replace(/, /g, ', c.')},
+           s.slug as section_slug, s.label as section_label,
+           s.label_ru as section_label_ru, s.label_uz as section_label_uz,
+           s.label_en as section_label_en, s.label_tr as section_label_tr
+    FROM menu_categories c
+    LEFT JOIN menu_sections s ON c.section_id = s.id
+    WHERE 1=1
+  `;
   const params = [];
 
   if (tab) {
-    query = `SELECT ${CATEGORY_FIELDS} FROM menu_categories WHERE tab = $1 ORDER BY position`;
     params.push(tab);
+    query += ` AND c.tab = $${params.length}`;
   }
+
+  if (sectionId) {
+    params.push(sectionId);
+    query += ` AND c.section_id = $${params.length}`;
+  }
+
+  query += ' ORDER BY c.tab, c.position';
 
   const result = await pool.query(query, params);
 
@@ -55,7 +71,7 @@ router.get('/:id', async (req, res) => {
 
 // Create category
 router.post('/', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
-  const { label_ru, label_uz, label_en, label_tr, tab, image_url } = req.body;
+  const { label_ru, label_uz, label_en, label_tr, tab, section_id, image_url } = req.body;
 
   const normalizedLabels = [label_ru, label_uz, label_en, label_tr].map((value) => typeof value === 'string' ? value.trim() : '');
   const primaryLabel = normalizedLabels.find((value) => value.length > 0) || '';
@@ -67,10 +83,10 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
   const fallbackLabelRu = label_ru && String(label_ru).trim() ? String(label_ru).trim() : primaryLabel;
 
   const result = await pool.query(
-    `INSERT INTO menu_categories (label, label_ru, label_uz, label_en, label_tr, tab, image_url, position)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COALESCE(MAX(position), -1) + 1 FROM menu_categories WHERE tab = $6))
+    `INSERT INTO menu_categories (label, label_ru, label_uz, label_en, label_tr, tab, section_id, image_url, position)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, (SELECT COALESCE(MAX(position), -1) + 1 FROM menu_categories WHERE tab = $6))
      RETURNING ${CATEGORY_FIELDS}`,
-    [fallbackLabelRu, label_ru, label_uz, label_en, label_tr, tab, image_url]
+    [fallbackLabelRu, label_ru, label_uz, label_en, label_tr, tab, section_id ?? null, image_url]
   );
 
   // Log activity
@@ -85,13 +101,13 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
 // Update category
 router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
   const { id } = req.params;
-  const { label_ru, label_uz, label_en, label_tr, tab, image_url } = req.body;
+  const { label_ru, label_uz, label_en, label_tr, tab, section_id, image_url } = req.body;
 
   const updates = [];
   const values = [];
   let paramCount = 0;
 
-  const fieldsMap = { label_ru, label_uz, label_en, label_tr, tab, image_url };
+  const fieldsMap = { label_ru, label_uz, label_en, label_tr, tab, section_id, image_url };
 
   Object.entries(fieldsMap).forEach(([key, value]) => {
     if (value !== undefined) {
