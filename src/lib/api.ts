@@ -255,6 +255,15 @@ class ApiClient {
     return this.request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(category) });
   }
 
+  /**
+   * Reorder all categories. Sends the full ordered list of category IDs.
+   * Backend should update the `position` field for each category accordingly.
+   * Endpoint: PUT /categories/reorder/all  { orderedIds: (string|number)[] }
+   */
+  reorderCategories(orderedIds: (string | number)[]): Promise<unknown> {
+    return this.request('/categories/reorder/all', { method: 'PUT', body: JSON.stringify({ orderedIds }) });
+  }
+
   deleteCategory(id: string | number): Promise<unknown> {
     return this.request(`/categories/${id}`, { method: 'DELETE' });
   }
@@ -284,6 +293,16 @@ class ApiClient {
 
   bulkUpdateDishStatus(ids: (string | number)[], status: string): Promise<unknown> {
     return this.request('/dishes/bulk/status', { method: 'PUT', body: JSON.stringify({ ids, status }) });
+  }
+
+  /**
+   * Reorder dishes within a specific category.
+   * Sends the category ID and the ordered list of dish IDs.
+   * Backend should update the `position` field for each dish accordingly.
+   * Endpoint: PUT /dishes/reorder/category  { categoryId, orderedIds }
+   */
+  reorderDishes(categoryId: number, orderedIds: (string | number)[]): Promise<unknown> {
+    return this.request('/dishes/reorder/category', { method: 'PUT', body: JSON.stringify({ categoryId, orderedIds }) });
   }
 
   // ── Locations ───────────────────────────────────────────────────────────────
