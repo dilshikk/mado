@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 
-// Use the bundled legacy worker so no separate file is needed
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+// Use CDN worker — avoids build-time bundling issues on Android Chrome
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 const PDF_URL = "https://mado.uz/uploads/menu.pdf";
 
 export default function QrRedirect() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [rendered, setRendered] = useState(0);
 
@@ -21,39 +19,48 @@ export default function QrRedirect() {
 
     const run = async () => {
       try {
-        const pdf = await pdfjsLib.getDocument({
+        const loadingTask = pdfjsLib.getDocument({
           url: PDF_URL,
-          cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist/cmaps/",
+          cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
           cMapPacked: true,
-        }).promise;
+          enableXfa: false,
+        });
 
+        const pdf = await loadingTask.promise;
         if (cancelled) return;
+
         setTotal(pdf.numPages);
         setLoading(false);
 
         for (let i = 1; i <= pdf.numPages; i++) {
           if (cancelled) break;
+
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: window.devicePixelRatio > 1 ? 2 : 1.5 });
+          // Scale to fit mobile width
+          const scale = Math.min(window.innerWidth / page.getViewport({ scale: 1 }).width, 2);
+          const viewport = page.getViewport({ scale });
 
           const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d")!;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           canvas.style.width = "100%";
           canvas.style.display = "block";
-          canvas.style.marginBottom = "8px";
+          canvas.style.marginBottom = "4px";
+          canvas.style.backgroundColor = "#fff";
 
           await page.render({ canvasContext: ctx, viewport }).promise;
 
-          if (!cancelled) {
-            containerRef.current?.appendChild(canvas);
+          if (!cancelled && containerRef.current) {
+            containerRef.current.appendChild(canvas);
             setRendered(i);
           }
         }
       } catch (e) {
         console.error("PDF load error", e);
-        if (!cancelled) setError(true);
+        if (!cancelled) setError(String(e));
       }
     };
 
@@ -64,12 +71,14 @@ export default function QrRedirect() {
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-white p-6 text-center">
-        <p className="text-gray-600">Не удалось загрузить меню.</p>
+        <p className="text-gray-600 text-sm">Не удалось загрузить меню.</p>
         <a
           href={PDF_URL}
-          className="px-4 py-2 bg-black text-white rounded-lg text-sm"
+          target="_blank"
+          rel="noreferrer"
+          className="px-5 py-2.5 bg-black text-white rounded-xl text-sm font-medium"
         >
-          Скачать PDF
+          Открыть PDF
         </a>
       </div>
     );
@@ -79,22 +88,23 @@ export default function QrRedirect() {
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <span className="font-semibold text-gray-800">Меню Mado</span>
-        {!loading && (
-          <span className="text-xs text-gray-400">
-            {rendered} / {total} стр.
-          </span>
-        )}
-        <a
-          href={PDF_URL}
-          download
-          className="text-xs text-gray-500 underline"
-        >
-          Скачать
-        </a>
+        <span className="font-semibold text-gray-800 text-sm">Меню Mado</span>
+        <div className="flex items-center gap-3">
+          {!loading && total > 0 && (
+            <span className="text-xs text-gray-400">{rendered} / {total} стр.</span>
+          )}
+          <a
+            href={PDF_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-gray-500 underline"
+          >
+            Скачать
+          </a>
+        </div>
       </div>
 
-      {/* Loading */}
+      {/* Loading spinner */}
       {loading && (
         <div className="flex items-center justify-center py-20">
           <div className="text-center space-y-3">
@@ -104,11 +114,8 @@ export default function QrRedirect() {
         </div>
       )}
 
-      {/* Pages rendered as canvas */}
-      <div
-        ref={containerRef}
-        className="max-w-2xl mx-auto px-2 py-4"
-      />
+      {/* Canvas pages */}
+      <div ref={containerRef} className="max-w-2xl mx-auto" />
     </div>
   );
 }
