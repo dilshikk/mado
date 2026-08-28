@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound.tsx";
 import AdminLayout from "./pages/admin/layout.tsx";
 import AdminLoginPage from "./pages/admin/login.tsx";
 import AdminDashboard from "./pages/admin/dashboard/page.tsx";
+import SectionsPage from "./pages/admin/menu/sections/page.tsx";
 import CategoriesPage from "./pages/admin/menu/categories/page.tsx";
 import DishesPage from "./pages/admin/menu/dishes/page.tsx";
 import LocationsAdminPage from "./pages/admin/locations/page.tsx";
@@ -71,6 +72,14 @@ export default function App() {
               element={
                 <RoleGuard section="pages">
                   <PagesPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="menu/sections"
+              element={
+                <RoleGuard section="menu">
+                  <SectionsPage />
                 </RoleGuard>
               }
             />
