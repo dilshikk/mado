@@ -111,6 +111,8 @@ export type PublicCategory = {
   section_label_uz: string | null;
   section_label_en: string | null;
   section_label_tr: string | null;
+  /** Parent category id, when this category is a child (subcategory) of another category. */
+  parent_id: number | null;
   image_url: string | null;
   position: number;
   dishCount: number;
