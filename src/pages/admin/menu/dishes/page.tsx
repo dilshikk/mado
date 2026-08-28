@@ -139,9 +139,12 @@ function Dropdown({
     <div className="relative" ref={ref}>
       <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
       {open && (
+        // Opens upward since the trigger lives in the bottom bulk-action bar.
+        // max-h + overflow-y-auto keeps a long category list scrolling inside the
+        // dropdown itself instead of stretching past the viewport.
         <div
           className={cn(
-            "absolute bottom-full mb-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden",
+            "absolute bottom-full mb-1 z-50 min-w-52 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl py-1",
             align === "right" ? "right-0" : "left-0"
           )}
         >
@@ -149,7 +152,7 @@ function Dropdown({
             if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
             if (item.type === "header")
               return (
-                <div key={i} className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                <div key={i} className="sticky top-0 bg-white px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                   {item.label}
                 </div>
               );
@@ -227,7 +230,7 @@ function BulkActionBar({
     { type: "header", label: "Переместить в категорию" },
     ...categories.map<DropdownItem>((cat) => ({
       type: "item",
-      label: getCategoryLabel(cat),
+      label: (cat.parent_id != null ? "— " : "") + getCategoryLabel(cat),
       onClick: () => onMove(cat.id),
     })),
   ];
@@ -267,7 +270,7 @@ function BulkActionBar({
         items={statusItems}
       />
 
-      {/* Move dropdown — opens upward */}
+      {/* Move dropdown — opens upward, scrolls internally when the category list is long */}
       <Dropdown
         align="left"
         trigger={
@@ -721,7 +724,8 @@ export default function DishesPage() {
                       {STATUS_META[dish.status].label}
                     </div>
 
-                    {/* Row action menu — opens upward */}
+                    {/* Row action menu — opens downward with its own scroll so it
+                        never gets clipped under the sticky top navbar */}
                     <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
                       <button
                         onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
@@ -739,12 +743,12 @@ export default function DishesPage() {
                       </button>
 
                       {isMenuOpen && (
-                        <div className="absolute right-0 bottom-full mb-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-96 overflow-y-auto">
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 max-h-72 overflow-y-auto">
                           {rowMenuItems(dish).map((item, i) => {
                             if (item.type === "separator") return <div key={i} className="my-1 border-t border-gray-100" />;
                             if (item.type === "header")
                               return (
-                                <div key={i} className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                <div key={i} className="sticky top-0 bg-white px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                                   {item.label}
                                 </div>
                               );
