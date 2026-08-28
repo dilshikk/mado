@@ -1,34 +1,11 @@
 /**
  * API Client for MADO Admin Frontend
- * Handles all HTTP requests to the backend server
- *
- * ── How to set VITE_API_URL ──────────────────────────────────────────────────
- *
- * In most setups you do NOT need VITE_API_URL at all.
- * Leave it unset — requests go to /api on the same host (Vite proxy or Nginx).
- *
- * Set it ONLY when the API is on a different domain, e.g.:
- *   VITE_API_URL=https://api.mado.uz/api    ✓ correct — ends with /api, no trailing slash
- *   VITE_API_URL=http://ftp.mado.uz/api     ✓ correct
- *   VITE_API_URL=http://ftp.mado.uz/        ✗ wrong — missing /api, trailing slash
- *   VITE_API_URL=http://ftp.mado.uz         ✗ wrong — missing /api
- *
- * The code below normalises trailing slashes so common mistakes don't cause
- * double-slash URLs, but the /api suffix must be present in the value.
  */
 
 function resolveBaseUrl(): string {
   const raw = import.meta.env.VITE_API_URL as string | undefined;
-
-  if (!raw) {
-    // No env var — use a relative path that works with Vite proxy and Nginx
-    return '/api';
-  }
-
-  // Strip any number of trailing slashes to avoid double-slash in URLs
+  if (!raw) return '/api';
   const normalised = raw.replace(/\/+$/, '');
-
-  // Warn in dev if the value looks like it's missing /api
   if (import.meta.env.DEV && !normalised.endsWith('/api')) {
     console.warn(
       `[API] VITE_API_URL="${raw}" does not end with /api.\n` +
@@ -36,15 +13,11 @@ function resolveBaseUrl(): string {
       `Using "${normalised}" — requests may fail.`
     );
   }
-
   return normalised;
 }
 
 const API_BASE_URL = resolveBaseUrl();
 
-/**
- * Derive the server origin for resolving relative upload URLs.
- */
 function getServerOrigin(): string {
   if (!API_BASE_URL.startsWith('/')) {
     return API_BASE_URL.replace(/\/api$/, '');
@@ -56,7 +29,6 @@ interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
 
-/** Safely parse JSON from a Response. Returns null if body is empty or not JSON. */
 async function safeJson(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {
@@ -92,13 +64,8 @@ class ApiClient {
     localStorage.removeItem('token');
   }
 
-  /**
-   * Converts a backend file URL to a browser-safe URL.
-   * Strips loopback origins so Vite proxy / Nginx serves the file.
-   */
   getFileUrl(fileUrl: string): string {
     if (!fileUrl) return '';
-
     if (/^https?:\/\//i.test(fileUrl)) {
       try {
         const parsed = new URL(fileUrl);
@@ -114,7 +81,6 @@ class ApiClient {
       }
       return fileUrl;
     }
-
     return fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
   }
 
@@ -211,7 +177,7 @@ class ApiClient {
     return this.request('/auth/me');
   }
 
-  // ── Menu sections (top-level tabs) ───────────────────────────────────────────
+  // ── Menu sections ────────────────────────────────────────────────────────────
 
   getSections(): Promise<unknown> {
     return this.request('/sections');
@@ -255,11 +221,6 @@ class ApiClient {
     return this.request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(category) });
   }
 
-  /**
-   * Reorder all categories. Sends the full ordered list of category IDs.
-   * Backend should update the `position` field for each category accordingly.
-   * Endpoint: PUT /categories/reorder/all  { orderedIds: (string|number)[] }
-   */
   reorderCategories(orderedIds: (string | number)[]): Promise<unknown> {
     return this.request('/categories/reorder/all', { method: 'PUT', body: JSON.stringify({ orderedIds }) });
   }
@@ -295,12 +256,6 @@ class ApiClient {
     return this.request('/dishes/bulk/status', { method: 'PUT', body: JSON.stringify({ ids, status }) });
   }
 
-  /**
-   * Reorder dishes within a specific category.
-   * Sends the category ID and the ordered list of dish IDs.
-   * Backend should update the `position` field for each dish accordingly.
-   * Endpoint: PUT /dishes/reorder/category  { categoryId, orderedIds }
-   */
   reorderDishes(categoryId: number, orderedIds: (string | number)[]): Promise<unknown> {
     return this.request('/dishes/reorder/category', { method: 'PUT', body: JSON.stringify({ categoryId, orderedIds }) });
   }
@@ -505,6 +460,11 @@ class ApiClient {
     files.forEach((f) => form.append('files', f));
     if (categoryId != null) form.append('category_id', String(categoryId));
     return this.uploadFiles('/media/upload', form);
+  }
+
+  /** Rename a media file (updates the display name in the database only; does not move the file on disk). */
+  renameMedia(id: number, filename: string): Promise<unknown> {
+    return this.request(`/media/${id}/rename`, { method: 'PATCH', body: JSON.stringify({ filename }) });
   }
 
   updateMediaCategory(id: string | number, categoryId: string | number | null): Promise<unknown> {
