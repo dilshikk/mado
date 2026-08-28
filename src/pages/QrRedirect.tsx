@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import PageMeta from "@/components/page-meta.tsx";
+import { useLanguage } from "@/hooks/use-language.ts";
 
 // Use CDN worker — avoids build-time bundling issues on Android Chrome
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -13,6 +15,7 @@ export default function QrRedirect() {
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [rendered, setRendered] = useState(0);
+  const { lang } = useLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +39,6 @@ export default function QrRedirect() {
           if (cancelled) break;
 
           const page = await pdf.getPage(i);
-          // Scale to fit mobile width
           const scale = Math.min(window.innerWidth / page.getViewport({ scale: 1 }).width, 2);
           const viewport = page.getViewport({ scale });
 
@@ -71,6 +73,7 @@ export default function QrRedirect() {
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-white p-6 text-center">
+        <PageMeta slug="qr" lang={lang} />
         <p className="text-gray-600 text-sm">Не удалось загрузить меню.</p>
         <a
           href={PDF_URL}
@@ -86,6 +89,9 @@ export default function QrRedirect() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Reads meta_title / meta_description from the "qr" page in admin */}
+      <PageMeta slug="qr" lang={lang} />
+
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <span className="font-semibold text-gray-800 text-sm">Меню Mado</span>
