@@ -72,6 +72,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         icon: UtensilsCrossed,
         section: "menu",
         children: [
+          { label: "Разделы", href: "/admin/menu/sections" },
           { label: "Категории", href: "/admin/menu/categories" },
           { label: "Блюда", href: "/admin/menu/dishes" },
         ],
