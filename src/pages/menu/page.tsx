@@ -12,6 +12,19 @@ import { publicApi, getPublicFileUrl } from "@/lib/public-api.ts";
 import type { PublicCategory, PublicDish, PublicSection } from "@/lib/public-api.ts";
 import { useQuery } from "@tanstack/react-query";
 
+// ─── Image visibility helper ──────────────────────────────────────────────────
+// Mirrors the HIDDEN_PREFIX convention used in the admin categories page.
+const HIDDEN_PREFIX = "__hidden__";
+
+function isCategoryImageHidden(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.startsWith(HIDDEN_PREFIX);
+}
+
+function getVisibleImageUrl(url: string | null | undefined): string {
+  if (!url || isCategoryImageHidden(url)) return "";
+  return getPublicFileUrl(url);
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type LocalizedText = Record<LangCode, string>;
@@ -38,6 +51,7 @@ type ViewCategory = {
   id: number;
   label: LocalizedText;
   sectionId: number | null;
+  /** Empty string means no image should be shown */
   image: string;
   dishes: ViewDish[];
 };
@@ -106,9 +120,8 @@ function buildViewCategories(
       id: cat.id,
       label: pickLocalized("Без названия", cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr),
       sectionId: cat.section_id,
-      image:
-        getPublicFileUrl(cat.image_url) ||
-        "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
+      // If image is hidden via __hidden__ prefix or absent — use empty string (no image block rendered)
+      image: getVisibleImageUrl(cat.image_url),
       dishes: catDishes,
     });
   }
@@ -222,7 +235,6 @@ export default function MenuPage() {
     [categoriesQuery.data, dishesQuery.data],
   );
 
-  // Default to the first section with content once sections/categories load
   const activeTab = activeSectionId ?? allSections.find((s) => allCategories.some((c) => c.sectionId === s.id))?.id ?? allSections[0]?.id ?? null;
 
   const tabCategories = useMemo(
@@ -449,14 +461,17 @@ export default function MenuPage() {
                   transition={{ duration: 0.5, ease: "easeOut" }}
                   className="mb-8"
                 >
-                  <div className="overflow-hidden rounded-xl">
-                    <img
-                      src={cat.image}
-                      alt={cat.label[lang]}
-                      className="h-[180px] w-full object-cover sm:h-[240px]"
-                    />
-                  </div>
-                  <div className="mt-5 flex items-end justify-between">
+                  {/* Category image — only rendered if visible (not hidden and not empty) */}
+                  {cat.image && (
+                    <div className="overflow-hidden rounded-xl mb-5">
+                      <img
+                        src={cat.image}
+                        alt={cat.label[lang]}
+                        className="h-[180px] w-full object-cover sm:h-[240px]"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-end justify-between">
                     <div>
                       <p className="text-xs font-semibold tracking-[0.3em] text-accent uppercase">
                         {allSections.find((s) => s.id === cat.sectionId)?.label[lang]}
