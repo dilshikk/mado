@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff, CornerDownRight } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import ImageUploadCrop from "@/components/image-upload-crop.tsx";
@@ -24,8 +24,10 @@ type Category = {
   label_tr: string | null;
   tab: string;
   section_id: number | null;
+  parent_id: number | null;
   image_url: string | null;
   dishCount?: number;
+  childCount?: number;
 };
 
 type CategoryFormData = {
@@ -35,6 +37,7 @@ type CategoryFormData = {
   label_tr: string;
   tab: string;
   section_id: number | null;
+  parent_id: number | null;
   image_url: string;
 };
 
@@ -71,13 +74,32 @@ function sectionColor(sectionId: number | null, sections: Section[]): string {
   return SECTION_COLORS[index % SECTION_COLORS.length] ?? "bg-muted text-muted-foreground";
 }
 
+/** Collect all descendant ids of a category so it (and its subtree) can be excluded as a valid parent choice. */
+function collectDescendantIds(categoryId: string | number, categories: Category[]): Set<string | number> {
+  const result = new Set<string | number>();
+  const queue = [categoryId];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const children = categories.filter((c) => String(c.parent_id) === String(current));
+    for (const child of children) {
+      if (!result.has(child.id)) {
+        result.add(child.id);
+        queue.push(child.id);
+      }
+    }
+  }
+  return result;
+}
+
 // ─── Category form ─────────────────────────────────────────────────────────────
 
 function CategoryForm({
-  initialData, sections, onSubmit, onCancel, saving,
+  initialData, sections, categories, editingId, onSubmit, onCancel, saving,
 }: {
   initialData?: Partial<CategoryFormData>;
   sections: Section[];
+  categories: Category[];
+  editingId?: string | number | null;
   onSubmit: (data: CategoryFormData) => void;
   onCancel: () => void;
   saving: boolean;
@@ -86,6 +108,7 @@ function CategoryForm({
     label_ru: "", label_uz: "", label_en: "", label_tr: "",
     tab: sections[0]?.slug ?? "food",
     section_id: sections[0]?.id ?? null,
+    parent_id: null,
     image_url: "",
   };
   const [form, setForm] = useState<CategoryFormData>({ ...defaultForm, ...initialData });
@@ -100,6 +123,12 @@ function CategoryForm({
     set("section_id", sectionId);
     if (section) set("tab", section.slug);
   };
+
+  // A category can't be its own parent, nor a parent of one of its own descendants (would create a cycle)
+  const excludedParentIds = editingId != null
+    ? new Set([editingId, ...collectDescendantIds(editingId, categories)])
+    : new Set<string | number>();
+  const eligibleParents = categories.filter((c) => !excludedParentIds.has(c.id));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,6 +183,25 @@ function CategoryForm({
           {sections.length === 0 && <option value="">Нет разделов</option>}
           {sections.map((s) => (
             <option key={s.id} value={s.id}>{getDisplayLabel(s)}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Parent category selector — optional, makes this a child/subcategory */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">
+          Родительская категория
+          <span className="ml-1.5 text-[10px] text-muted-foreground/70">(необязательно — для создания дочерних категорий)</span>
+        </label>
+        <select
+          value={form.parent_id ?? ""}
+          onChange={(e) => set("parent_id", e.target.value ? Number(e.target.value) : null)}
+          disabled={saving}
+          className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none disabled:opacity-50"
+        >
+          <option value="">Без родителя (основная категория)</option>
+          {eligibleParents.map((c) => (
+            <option key={c.id} value={c.id}>{getDisplayLabel(c)}</option>
           ))}
         </select>
       </div>
@@ -230,13 +278,17 @@ export default function CategoriesPage() {
     }
   };
 
-  const filtered = activeSectionId === "all" ? categories : categories.filter((c) => c.section_id === activeSectionId);
+  // Only top-level categories (no parent) are shown grouped by section.
+  // Child categories render nested underneath their parent in CategoryList.
+  const topLevelCategories = categories.filter((c) => c.parent_id == null);
+
+  const filtered = activeSectionId === "all" ? topLevelCategories : topLevelCategories.filter((c) => c.section_id === activeSectionId);
 
   const grouped = sections.reduce<Record<number, Category[]>>((acc, section) => {
-    acc[section.id] = categories.filter((c) => c.section_id === section.id);
+    acc[section.id] = topLevelCategories.filter((c) => c.section_id === section.id);
     return acc;
   }, {});
-  const unassigned = categories.filter((c) => c.section_id == null);
+  const unassigned = topLevelCategories.filter((c) => c.section_id == null);
 
   const handleAdd = async (data: CategoryFormData) => {
     try {
@@ -252,7 +304,7 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (id: string | number) => {
-    if (!confirm("Удалить категорию? Блюда в этой категории удалены не будут.")) return;
+    if (!confirm("Удалить категорию? Блюда в этой категории удалены не будут, а дочерние категории останутся без родителя.")) return;
     try {
       setDeletingId(id);
       await api.deleteCategory(id);
@@ -275,6 +327,18 @@ export default function CategoriesPage() {
     } finally {
       setSavingId(null);
     }
+  };
+
+  const listProps = {
+    allCategories: categories,
+    sections,
+    editingId,
+    onStartEdit: (id: string | number) => { setAdding(false); setEditingId(id); },
+    onSaveEdit: saveEdit,
+    onCancelEdit: () => setEditingId(null),
+    onDelete: handleDelete,
+    savingId,
+    deletingId,
   };
 
   return (
@@ -318,7 +382,7 @@ export default function CategoriesPage() {
               )}
             >
               Все
-              <span className="ml-1.5 text-xs opacity-70">{categories.length}</span>
+              <span className="ml-1.5 text-xs opacity-70">{topLevelCategories.length}</span>
             </button>
             {sections.map((s) => (
               <button
@@ -330,7 +394,7 @@ export default function CategoriesPage() {
                 )}
               >
                 {getDisplayLabel(s)}
-                <span className="ml-1.5 text-xs opacity-70">{categories.filter((c) => c.section_id === s.id).length}</span>
+                <span className="ml-1.5 text-xs opacity-70">{topLevelCategories.filter((c) => c.section_id === s.id).length}</span>
               </button>
             ))}
           </div>
@@ -345,7 +409,7 @@ export default function CategoriesPage() {
           )}
 
           {adding && (
-            <CategoryForm sections={sections} onSubmit={handleAdd} onCancel={() => setAdding(false)} saving={savingId === "new"} />
+            <CategoryForm sections={sections} categories={categories} onSubmit={handleAdd} onCancel={() => setAdding(false)} saving={savingId === "new"} />
           )}
 
           {activeSectionId === "all" ? (
@@ -355,14 +419,7 @@ export default function CategoriesPage() {
                   key={section.id}
                   section={section}
                   categories={grouped[section.id] ?? []}
-                  sections={sections}
-                  editingId={editingId}
-                  onStartEdit={(id) => { setAdding(false); setEditingId(id); }}
-                  onSaveEdit={saveEdit}
-                  onCancelEdit={() => setEditingId(null)}
-                  onDelete={handleDelete}
-                  savingId={savingId}
-                  deletingId={deletingId}
+                  {...listProps}
                 />
               ))}
               {unassigned.length > 0 && (
@@ -371,33 +428,13 @@ export default function CategoriesPage() {
                     <span className="text-xs font-bold px-2 py-0.5 rounded bg-muted text-muted-foreground">БЕЗ РАЗДЕЛА</span>
                     <span className="text-sm text-muted-foreground">{unassigned.length} категорий</span>
                   </div>
-                  <CategoryList
-                    categories={unassigned}
-                    sections={sections}
-                    editingId={editingId}
-                    onStartEdit={(id) => { setAdding(false); setEditingId(id); }}
-                    onSaveEdit={saveEdit}
-                    onCancelEdit={() => setEditingId(null)}
-                    onDelete={handleDelete}
-                    savingId={savingId}
-                    deletingId={deletingId}
-                  />
+                  <CategoryList categories={unassigned} {...listProps} />
                 </div>
               )}
             </div>
           ) : (
             <div className="bg-card border border-border rounded-xl overflow-hidden">
-              <CategoryList
-                categories={filtered}
-                sections={sections}
-                editingId={editingId}
-                onStartEdit={(id) => { setAdding(false); setEditingId(id); }}
-                onSaveEdit={saveEdit}
-                onCancelEdit={() => setEditingId(null)}
-                onDelete={handleDelete}
-                savingId={savingId}
-                deletingId={deletingId}
-              />
+              <CategoryList categories={filtered} {...listProps} />
             </div>
           )}
 
@@ -414,6 +451,7 @@ export default function CategoriesPage() {
 
 type ListProps = {
   categories: Category[];
+  allCategories: Category[];
   sections: Section[];
   editingId: string | number | null;
   onStartEdit: (id: string | number) => void;
@@ -424,7 +462,7 @@ type ListProps = {
   deletingId: string | number | null;
 };
 
-function SectionGroup({ section, categories, sections, ...rest }: { section: Section } & ListProps) {
+function SectionGroup({ section, categories, allCategories, sections, ...rest }: { section: Section } & ListProps) {
   const [open, setOpen] = useState(true);
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -438,81 +476,31 @@ function SectionGroup({ section, categories, sections, ...rest }: { section: Sec
         </span>
         <span className="text-sm text-muted-foreground">{categories.length} категорий</span>
       </button>
-      {open && <CategoryList categories={categories} sections={sections} {...rest} />}
+      {open && <CategoryList categories={categories} allCategories={allCategories} sections={sections} {...rest} />}
     </div>
   );
 }
 
 function CategoryList({
-  categories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
+  categories, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
 }: ListProps) {
   return (
     <div className="divide-y divide-border">
       {categories.map((cat) => (
-        <div key={cat.id} className="group">
-          {editingId === cat.id ? (
-            <div className="p-3">
-              <CategoryForm
-                sections={sections}
-                initialData={{
-                  label_ru: cat.label_ru ?? "",
-                  label_uz: cat.label_uz ?? "",
-                  label_en: cat.label_en ?? "",
-                  label_tr: cat.label_tr ?? "",
-                  tab: cat.tab,
-                  section_id: cat.section_id,
-                  image_url: cat.image_url ?? "",
-                }}
-                onSubmit={(data) => onSaveEdit(cat.id, data)}
-                onCancel={onCancelEdit}
-                saving={savingId === cat.id}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30">
-              {cat.image_url ? (
-                <img
-                  src={cat.image_url}
-                  alt=""
-                  className="w-20 h-[15px] rounded object-cover border border-border shrink-0"
-                />
-              ) : (
-                <div className="w-20 h-[15px] rounded bg-muted flex items-center justify-center shrink-0">
-                  <ImageOff className="w-3 h-3 text-muted-foreground/40" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{getDisplayLabel(cat)}</p>
-                {typeof cat.dishCount === "number" && (
-                  <p className="text-xs text-muted-foreground">{cat.dishCount} блюд</p>
-                )}
-              </div>
-              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 uppercase", sectionColor(cat.section_id, sections))}>
-                {cat.section_id != null
-                  ? getDisplayLabel(sections.find((s) => s.id === cat.section_id) ?? {})
-                  : "БЕЗ РАЗДЕЛА"}
-              </span>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => onStartEdit(cat.id)}
-                  disabled={savingId !== null || deletingId !== null}
-                  className="p-1.5 rounded hover:bg-muted disabled:opacity-50"
-                >
-                  <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-                <button
-                  onClick={() => onDelete(cat.id)}
-                  disabled={deletingId === cat.id || savingId !== null}
-                  className="p-1.5 rounded hover:bg-destructive/10 disabled:opacity-50 flex items-center gap-1"
-                >
-                  {deletingId === cat.id
-                    ? <Loader2 className="w-3.5 h-3.5 text-destructive animate-spin" />
-                    : <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <CategoryRow
+          key={cat.id}
+          cat={cat}
+          depth={0}
+          allCategories={allCategories}
+          sections={sections}
+          editingId={editingId}
+          onStartEdit={onStartEdit}
+          onSaveEdit={onSaveEdit}
+          onCancelEdit={onCancelEdit}
+          onDelete={onDelete}
+          savingId={savingId}
+          deletingId={deletingId}
+        />
       ))}
       {categories.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
@@ -520,5 +508,118 @@ function CategoryList({
         </div>
       )}
     </div>
+  );
+}
+
+function CategoryRow({
+  cat, depth, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
+}: {
+  cat: Category;
+  depth: number;
+} & Omit<ListProps, "categories">) {
+  const [childrenOpen, setChildrenOpen] = useState(true);
+  const children = allCategories.filter((c) => c.parent_id === cat.id);
+
+  return (
+    <>
+      {editingId === cat.id ? (
+        <div className="p-3" style={{ paddingLeft: `${12 + depth * 20}px` }}>
+          <CategoryForm
+            sections={sections}
+            categories={allCategories}
+            editingId={cat.id}
+            initialData={{
+              label_ru: cat.label_ru ?? "",
+              label_uz: cat.label_uz ?? "",
+              label_en: cat.label_en ?? "",
+              label_tr: cat.label_tr ?? "",
+              tab: cat.tab,
+              section_id: cat.section_id,
+              parent_id: cat.parent_id,
+              image_url: cat.image_url ?? "",
+            }}
+            onSubmit={(data) => onSaveEdit(cat.id, data)}
+            onCancel={onCancelEdit}
+            saving={savingId === cat.id}
+          />
+        </div>
+      ) : (
+        <div
+          className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30"
+          style={{ paddingLeft: `${16 + depth * 20}px` }}
+        >
+          {depth > 0 && <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />}
+          {children.length > 0 && (
+            <button
+              onClick={() => setChildrenOpen(!childrenOpen)}
+              className="p-0.5 rounded hover:bg-muted shrink-0"
+              title={childrenOpen ? "Свернуть" : "Развернуть"}
+            >
+              {childrenOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+          )}
+          {cat.image_url ? (
+            <img
+              src={cat.image_url}
+              alt=""
+              className="w-20 h-[15px] rounded object-cover border border-border shrink-0"
+            />
+          ) : (
+            <div className="w-20 h-[15px] rounded bg-muted flex items-center justify-center shrink-0">
+              <ImageOff className="w-3 h-3 text-muted-foreground/40" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{getDisplayLabel(cat)}</p>
+            <p className="text-xs text-muted-foreground">
+              {typeof cat.dishCount === "number" && cat.dishCount > 0 && `${cat.dishCount} блюд`}
+              {typeof cat.dishCount === "number" && cat.dishCount > 0 && children.length > 0 && " · "}
+              {children.length > 0 && `${children.length} дочерних категорий`}
+            </p>
+          </div>
+          {depth === 0 && (
+            <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 uppercase", sectionColor(cat.section_id, sections))}>
+              {cat.section_id != null
+                ? getDisplayLabel(sections.find((s) => s.id === cat.section_id) ?? {})
+                : "БЕЗ РАЗДЕЛА"}
+            </span>
+          )}
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => onStartEdit(cat.id)}
+              disabled={savingId !== null || deletingId !== null}
+              className="p-1.5 rounded hover:bg-muted disabled:opacity-50"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => onDelete(cat.id)}
+              disabled={deletingId === cat.id || savingId !== null}
+              className="p-1.5 rounded hover:bg-destructive/10 disabled:opacity-50 flex items-center gap-1"
+            >
+              {deletingId === cat.id
+                ? <Loader2 className="w-3.5 h-3.5 text-destructive animate-spin" />
+                : <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />}
+            </button>
+          </div>
+        </div>
+      )}
+      {childrenOpen && children.map((child) => (
+        <CategoryRow
+          key={child.id}
+          cat={child}
+          depth={depth + 1}
+          allCategories={allCategories}
+          sections={sections}
+          editingId={editingId}
+          onStartEdit={onStartEdit}
+          onSaveEdit={onSaveEdit}
+          onCancelEdit={onCancelEdit}
+          onDelete={onDelete}
+          savingId={savingId}
+          deletingId={deletingId}
+        />
+      ))}
+    </>
   );
 }
