@@ -42,22 +42,70 @@ router.get('/', async (req, res) => {
     params.push(status);
   }
 
-  query += ' ORDER BY c.tab, d.position';
+  query += ' ORDER BY c.position, d.position';
 
   const result = await pool.query(query, params);
   res.json(result.rows);
 });
 
-// Seed beverages — one-time import endpoint (admin only)
+// Seed endpoints — must be defined BEFORE /:id so Express does not treat
+// "seed-beverages" / "seed-kitchen" as an id parameter.
 router.post('/seed-beverages', authenticate, authorize(['admin']), async (req, res) => {
   const result = await runSeedBeverages();
   res.json(result);
 });
 
-// Seed kitchen — one-time import endpoint (admin only)
 router.post('/seed-kitchen', authenticate, authorize(['admin']), async (req, res) => {
   const result = await runSeedKitchen();
   res.json(result);
+});
+
+// Bulk status update — also defined before /:id
+router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
+  const { ids, status } = req.body;
+
+  if (!ids || !Array.isArray(ids) || !status) {
+    return res.status(400).json({ error: 'IDs array and status required' });
+  }
+
+  const result = await pool.query(
+    `UPDATE dishes SET status = $${ids.length + 1}, updated_at = NOW() WHERE id = ANY($${ids.length + 2}) RETURNING id`,
+    [...ids, status, ids]
+  );
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
+    [req.user.id, 'bulk_update', 'dish', `Updated status to ${status} for ${ids.length} dishes`]
+  );
+
+  res.json({ updated: result.rowCount });
+});
+
+// Reorder dishes within a category — accepts { categoryId, orderedIds }.
+// Also defined before /:id.
+router.put('/reorder/category', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
+  const { categoryId, orderedIds } = req.body;
+
+  if (!categoryId || !Array.isArray(orderedIds) || orderedIds.length === 0) {
+    return res.status(400).json({ error: 'categoryId and orderedIds array are required' });
+  }
+
+  await Promise.all(
+    orderedIds.map((dishId, index) =>
+      pool.query('UPDATE dishes SET position = $1, updated_at = NOW() WHERE id = $2 AND category_id = $3', [index, dishId, categoryId])
+    )
+  );
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
+    [req.user.id, 'update', 'dish', `Reordered dishes in category ${categoryId}`]
+  );
+
+  const result = await pool.query(
+    'SELECT id, name_ru, position FROM dishes WHERE category_id = $1 ORDER BY position',
+    [categoryId]
+  );
+  res.json(result.rows);
 });
 
 // Get single dish
@@ -110,7 +158,6 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
     price, image_url, status, is_new, is_signature, is_vegetarian, is_spicy
   ]);
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'create', 'dish', result.rows[0].id, `Created dish: ${fallbackNameRu}`]
@@ -162,7 +209,6 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     return res.status(404).json({ error: 'Dish not found' });
   }
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'update', 'dish', id, `Updated dish: ${name_ru || 'Unknown'}`]
@@ -181,35 +227,12 @@ router.delete('/:id', authenticate, authorize(['admin', 'content_manager']), asy
     return res.status(404).json({ error: 'Dish not found' });
   }
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'delete', 'dish', id, `Deleted dish: ${result.rows[0].name_ru}`]
   );
 
   res.json({ message: 'Dish deleted' });
-});
-
-// Bulk update status
-router.put('/bulk/status', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
-  const { ids, status } = req.body;
-
-  if (!ids || !Array.isArray(ids) || !status) {
-    return res.status(400).json({ error: 'IDs array and status required' });
-  }
-
-  const result = await pool.query(
-    `UPDATE dishes SET status = $${ids.length + 1}, updated_at = NOW() WHERE id = ANY($${ids.length + 2}) RETURNING id`,
-    [...ids, status, ids]
-  );
-
-  // Log activity
-  await pool.query(
-    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
-    [req.user.id, 'bulk_update', 'dish', `Updated status to ${status} for ${ids.length} dishes`]
-  );
-
-  res.json({ updated: result.rowCount });
 });
 
 export default router;
