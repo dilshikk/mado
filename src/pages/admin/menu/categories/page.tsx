@@ -74,6 +74,25 @@ function sectionColor(sectionId: number | null, sections: Section[]): string {
   return SECTION_COLORS[index % SECTION_COLORS.length] ?? "bg-muted text-muted-foreground";
 }
 
+/** Read a boolean from localStorage, returning `fallback` if not set. */
+function lsGetBool(key: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === "1";
+  } catch {
+    return fallback;
+  }
+}
+
+function lsSetBool(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // ignore quota errors
+  }
+}
+
 /** Collect all descendant ids of a category so it (and its subtree) can be excluded as a valid parent choice. */
 function collectDescendantIds(categoryId: string | number, categories: Category[]): Set<string | number> {
   const result = new Set<string | number>();
@@ -515,11 +534,22 @@ type ListProps = {
 };
 
 function SectionGroup({ section, categories, allCategories, sections, ...rest }: { section: Section } & ListProps) {
-  const [open, setOpen] = useState(true);
+  // Persist open/closed state per section id
+  const lsKey = `mado_cat_section_open_${section.id}`;
+  const [open, setOpen] = useState(() => lsGetBool(lsKey, true));
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      lsSetBool(lsKey, next);
+      return next;
+    });
+  };
+
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
       >
         {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
@@ -571,8 +601,18 @@ function CategoryRow({
   cat: Category;
   depth: number;
 } & Omit<ListProps, "categories">) {
-  const [childrenOpen, setChildrenOpen] = useState(true);
+  // Persist open/closed state per category id
+  const lsKey = `mado_cat_children_open_${cat.id}`;
+  const [childrenOpen, setChildrenOpen] = useState(() => lsGetBool(lsKey, true));
   const children = allCategories.filter((c) => c.parent_id === cat.id);
+
+  const toggleChildren = () => {
+    setChildrenOpen((prev) => {
+      const next = !prev;
+      lsSetBool(lsKey, next);
+      return next;
+    });
+  };
 
   // Determine position among siblings for disabling ↑↓ buttons
   const siblings = getCategorySiblings(cat, allCategories);
@@ -612,7 +652,7 @@ function CategoryRow({
           {depth > 0 && <CornerDownRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />}
           {children.length > 0 && (
             <button
-              onClick={() => setChildrenOpen(!childrenOpen)}
+              onClick={toggleChildren}
               className="p-0.5 rounded hover:bg-muted shrink-0"
               title={childrenOpen ? "Свернуть" : "Развернуть"}
             >
