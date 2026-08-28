@@ -3,6 +3,7 @@ import pool from '../db/pool.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { runSeedBeverages } from '../db/seed-beverages.js';
 import { runSeedKitchen } from '../db/seed-kitchen.js';
+import { runSeedDesserts } from '../db/seed-desserts.js';
 
 const router = express.Router();
 
@@ -49,7 +50,7 @@ router.get('/', async (req, res) => {
 });
 
 // Seed endpoints — must be defined BEFORE /:id so Express does not treat
-// "seed-beverages" / "seed-kitchen" as an id parameter.
+// "seed-beverages" / "seed-kitchen" / "seed-desserts" as an id parameter.
 router.post('/seed-beverages', authenticate, authorize(['admin']), async (req, res) => {
   const result = await runSeedBeverages();
   res.json(result);
@@ -57,6 +58,11 @@ router.post('/seed-beverages', authenticate, authorize(['admin']), async (req, r
 
 router.post('/seed-kitchen', authenticate, authorize(['admin']), async (req, res) => {
   const result = await runSeedKitchen();
+  res.json(result);
+});
+
+router.post('/seed-desserts', authenticate, authorize(['admin']), async (req, res) => {
+  const result = await runSeedDesserts();
   res.json(result);
 });
 
