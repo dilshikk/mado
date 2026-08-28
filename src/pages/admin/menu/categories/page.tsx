@@ -4,6 +4,17 @@ import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import ImageUploadCrop from "@/components/image-upload-crop.tsx";
 
+type Section = {
+  id: number;
+  slug: string;
+  label: string;
+  label_ru: string | null;
+  label_uz: string | null;
+  label_en: string | null;
+  label_tr: string | null;
+  position: number;
+};
+
 type Category = {
   id: string | number;
   label: string;
@@ -12,6 +23,7 @@ type Category = {
   label_en: string | null;
   label_tr: string | null;
   tab: string;
+  section_id: number | null;
   image_url: string | null;
   dishCount?: number;
 };
@@ -22,24 +34,9 @@ type CategoryFormData = {
   label_en: string;
   label_tr: string;
   tab: string;
+  section_id: number | null;
   image_url: string;
 };
-
-const TAB_COLORS: Record<string, string> = {
-  food: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  beverage: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  dessert: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
-  takeaway: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-};
-
-const TAB_LABELS: Record<string, string> = {
-  food: "ЕДА",
-  beverage: "НАПИТКИ",
-  dessert: "ДЕСЕРТЫ",
-  takeaway: "НАВЫНОС",
-};
-
-const TABS = ["all", "food", "beverage", "dessert", "takeaway"];
 
 const LANGS = [
   { code: "ru" as const, flag: "🇷🇺", label: "Русский" },
@@ -48,37 +45,61 @@ const LANGS = [
   { code: "tr" as const, flag: "🇹🇷", label: "Türkçe" },
 ];
 
-const DEFAULT_FORM: CategoryFormData = {
-  label_ru: "", label_uz: "", label_en: "", label_tr: "", tab: "food", image_url: "",
-};
-
 // Category banner: 800×150 px
 const CATEGORY_IMG_WIDTH = 800;
 const CATEGORY_IMG_HEIGHT = 150;
 const CATEGORY_IMG_ASPECT = CATEGORY_IMG_WIDTH / CATEGORY_IMG_HEIGHT;
 
-function getDisplayLabel(cat: Category): string {
+function getDisplayLabel(cat: { label_ru?: string | null; label_uz?: string | null; label_en?: string | null; label_tr?: string | null; label?: string }): string {
   return [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
     (v): v is string => typeof v === "string" && v.trim() !== ""
   ) ?? cat.label ?? "Без названия";
 }
 
+const SECTION_COLORS = [
+  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+];
+
+function sectionColor(sectionId: number | null, sections: Section[]): string {
+  if (sectionId == null) return "bg-muted text-muted-foreground";
+  const index = sections.findIndex((s) => s.id === sectionId);
+  return SECTION_COLORS[index % SECTION_COLORS.length] ?? "bg-muted text-muted-foreground";
+}
+
 // ─── Category form ─────────────────────────────────────────────────────────────
 
 function CategoryForm({
-  initialData, onSubmit, onCancel, saving,
+  initialData, sections, onSubmit, onCancel, saving,
 }: {
   initialData?: Partial<CategoryFormData>;
+  sections: Section[];
   onSubmit: (data: CategoryFormData) => void;
   onCancel: () => void;
   saving: boolean;
 }) {
-  const [form, setForm] = useState<CategoryFormData>({ ...DEFAULT_FORM, ...initialData });
+  const defaultForm: CategoryFormData = {
+    label_ru: "", label_uz: "", label_en: "", label_tr: "",
+    tab: sections[0]?.slug ?? "food",
+    section_id: sections[0]?.id ?? null,
+    image_url: "",
+  };
+  const [form, setForm] = useState<CategoryFormData>({ ...defaultForm, ...initialData });
   const [activeLang, setActiveLang] = useState<"ru" | "uz" | "en" | "tr">("ru");
 
-  const set = (key: keyof CategoryFormData, value: string) => setForm((f) => ({ ...f, [key]: value }));
+  const set = (key: keyof CategoryFormData, value: string | number | null) => setForm((f) => ({ ...f, [key]: value }));
   const hasAnyLabel = [form.label_ru, form.label_uz, form.label_en, form.label_tr].some((v) => v.trim() !== "");
   const labelKey = `label_${activeLang}` as keyof CategoryFormData;
+
+  const handleSectionChange = (sectionId: number) => {
+    const section = sections.find((s) => s.id === sectionId);
+    set("section_id", sectionId);
+    if (section) set("tab", section.slug);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,17 +142,18 @@ function CategoryForm({
         />
       </div>
 
-      {/* Tab selector */}
+      {/* Section selector — categories are children of a main menu section */}
       <div>
         <label className="text-xs text-muted-foreground mb-1 block">Раздел</label>
         <select
-          value={form.tab}
-          onChange={(e) => set("tab", e.target.value)}
-          disabled={saving}
+          value={form.section_id ?? ""}
+          onChange={(e) => handleSectionChange(Number(e.target.value))}
+          disabled={saving || sections.length === 0}
           className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none disabled:opacity-50"
         >
-          {["food", "beverage", "dessert", "takeaway"].map((t) => (
-            <option key={t} value={t}>{TAB_LABELS[t]}</option>
+          {sections.length === 0 && <option value="">Нет разделов</option>}
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>{getDisplayLabel(s)}</option>
           ))}
         </select>
       </div>
@@ -183,22 +205,24 @@ function CategoryForm({
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeSectionId, setActiveSectionId] = useState<number | "all">("all");
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
-  useEffect(() => { void loadCategories(); }, []);
+  useEffect(() => { void loadData(); }, []);
 
-  const loadCategories = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getCategories();
-      setCategories(Array.isArray(data) ? (data as Category[]) : []);
+      const [catData, sectionData] = await Promise.all([api.getCategories(), api.getSections()]);
+      setCategories(Array.isArray(catData) ? (catData as Category[]) : []);
+      setSections(Array.isArray(sectionData) ? (sectionData as Section[]) : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить категории");
     } finally {
@@ -206,19 +230,20 @@ export default function CategoriesPage() {
     }
   };
 
-  const filtered = activeTab === "all" ? categories : categories.filter((c) => c.tab === activeTab);
+  const filtered = activeSectionId === "all" ? categories : categories.filter((c) => c.section_id === activeSectionId);
 
-  const grouped = ["food", "beverage", "dessert", "takeaway"].reduce<Record<string, Category[]>>((acc, tab) => {
-    acc[tab] = categories.filter((c) => c.tab === tab);
+  const grouped = sections.reduce<Record<number, Category[]>>((acc, section) => {
+    acc[section.id] = categories.filter((c) => c.section_id === section.id);
     return acc;
   }, {});
+  const unassigned = categories.filter((c) => c.section_id == null);
 
   const handleAdd = async (data: CategoryFormData) => {
     try {
       setSavingId("new");
       await api.createCategory(data);
       setAdding(false);
-      await loadCategories();
+      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось создать категорию");
     } finally {
@@ -231,7 +256,7 @@ export default function CategoriesPage() {
     try {
       setDeletingId(id);
       await api.deleteCategory(id);
-      await loadCategories();
+      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось удалить категорию");
     } finally {
@@ -244,7 +269,7 @@ export default function CategoriesPage() {
       setSavingId(id);
       await api.updateCategory(id, data);
       setEditingId(null);
-      await loadCategories();
+      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось обновить категорию");
     } finally {
@@ -285,36 +310,54 @@ export default function CategoriesPage() {
       {!loading && (
         <>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {TABS.map((tab) => (
+            <button
+              onClick={() => setActiveSectionId("all")}
+              className={cn(
+                "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors uppercase",
+                activeSectionId === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              Все
+              <span className="ml-1.5 text-xs opacity-70">{categories.length}</span>
+            </button>
+            {sections.map((s) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={s.id}
+                onClick={() => setActiveSectionId(s.id)}
                 className={cn(
                   "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors uppercase",
-                  activeTab === tab ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  activeSectionId === s.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 )}
               >
-                {tab === "all" ? "Все" : TAB_LABELS[tab]}
-                <span className="ml-1.5 text-xs opacity-70">
-                  {tab === "all" ? categories.length : categories.filter((c) => c.tab === tab).length}
-                </span>
+                {getDisplayLabel(s)}
+                <span className="ml-1.5 text-xs opacity-70">{categories.filter((c) => c.section_id === s.id).length}</span>
               </button>
             ))}
           </div>
 
-          {adding && (
-            <CategoryForm onSubmit={handleAdd} onCancel={() => setAdding(false)} saving={savingId === "new"} />
+          {sections.length === 0 && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <span className="text-sm text-amber-700">
+                Нет разделов меню. Создайте их на странице «Разделы», чтобы привязывать категории.
+              </span>
+            </div>
           )}
 
-          {activeTab === "all" ? (
+          {adding && (
+            <CategoryForm sections={sections} onSubmit={handleAdd} onCancel={() => setAdding(false)} saving={savingId === "new"} />
+          )}
+
+          {activeSectionId === "all" ? (
             <div className="space-y-4">
-              {["food", "beverage", "dessert", "takeaway"].map((tab) => (
-                <TabGroup
-                  key={tab}
-                  tab={tab}
-                  categories={grouped[tab]}
+              {sections.map((section) => (
+                <SectionGroup
+                  key={section.id}
+                  section={section}
+                  categories={grouped[section.id] ?? []}
+                  sections={sections}
                   editingId={editingId}
-                  onStartEdit={setEditingId}
+                  onStartEdit={(id) => { setAdding(false); setEditingId(id); }}
                   onSaveEdit={saveEdit}
                   onCancelEdit={() => setEditingId(null)}
                   onDelete={handleDelete}
@@ -322,13 +365,33 @@ export default function CategoriesPage() {
                   deletingId={deletingId}
                 />
               ))}
+              {unassigned.length > 0 && (
+                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-muted text-muted-foreground">БЕЗ РАЗДЕЛА</span>
+                    <span className="text-sm text-muted-foreground">{unassigned.length} категорий</span>
+                  </div>
+                  <CategoryList
+                    categories={unassigned}
+                    sections={sections}
+                    editingId={editingId}
+                    onStartEdit={(id) => { setAdding(false); setEditingId(id); }}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={() => setEditingId(null)}
+                    onDelete={handleDelete}
+                    savingId={savingId}
+                    deletingId={deletingId}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-card border border-border rounded-xl overflow-hidden">
               <CategoryList
                 categories={filtered}
+                sections={sections}
                 editingId={editingId}
-                onStartEdit={setEditingId}
+                onStartEdit={(id) => { setAdding(false); setEditingId(id); }}
                 onSaveEdit={saveEdit}
                 onCancelEdit={() => setEditingId(null)}
                 onDelete={handleDelete}
@@ -351,6 +414,7 @@ export default function CategoriesPage() {
 
 type ListProps = {
   categories: Category[];
+  sections: Section[];
   editingId: string | number | null;
   onStartEdit: (id: string | number) => void;
   onSaveEdit: (id: string | number, data: CategoryFormData) => void;
@@ -360,7 +424,7 @@ type ListProps = {
   deletingId: string | number | null;
 };
 
-function TabGroup({ tab, categories, ...rest }: { tab: string } & ListProps) {
+function SectionGroup({ section, categories, sections, ...rest }: { section: Section } & ListProps) {
   const [open, setOpen] = useState(true);
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -369,16 +433,18 @@ function TabGroup({ tab, categories, ...rest }: { tab: string } & ListProps) {
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
       >
         {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-        <span className={cn("text-xs font-bold px-2 py-0.5 rounded", TAB_COLORS[tab])}>{TAB_LABELS[tab]}</span>
+        <span className={cn("text-xs font-bold px-2 py-0.5 rounded uppercase", sectionColor(section.id, sections))}>
+          {getDisplayLabel(section)}
+        </span>
         <span className="text-sm text-muted-foreground">{categories.length} категорий</span>
       </button>
-      {open && <CategoryList categories={categories} {...rest} />}
+      {open && <CategoryList categories={categories} sections={sections} {...rest} />}
     </div>
   );
 }
 
 function CategoryList({
-  categories, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
+  categories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
 }: ListProps) {
   return (
     <div className="divide-y divide-border">
@@ -387,12 +453,14 @@ function CategoryList({
           {editingId === cat.id ? (
             <div className="p-3">
               <CategoryForm
+                sections={sections}
                 initialData={{
                   label_ru: cat.label_ru ?? "",
                   label_uz: cat.label_uz ?? "",
                   label_en: cat.label_en ?? "",
                   label_tr: cat.label_tr ?? "",
                   tab: cat.tab,
+                  section_id: cat.section_id,
                   image_url: cat.image_url ?? "",
                 }}
                 onSubmit={(data) => onSaveEdit(cat.id, data)}
@@ -419,8 +487,10 @@ function CategoryList({
                   <p className="text-xs text-muted-foreground">{cat.dishCount} блюд</p>
                 )}
               </div>
-              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0", TAB_COLORS[cat.tab])}>
-                {TAB_LABELS[cat.tab]}
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 uppercase", sectionColor(cat.section_id, sections))}>
+                {cat.section_id != null
+                  ? getDisplayLabel(sections.find((s) => s.id === cat.section_id) ?? {})
+                  : "БЕЗ РАЗДЕЛА"}
               </span>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
