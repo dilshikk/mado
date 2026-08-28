@@ -161,9 +161,6 @@ function Dropdown({
     <div className="relative" ref={ref}>
       <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
       {open && (
-        // Opens upward since the trigger lives in the bottom bulk-action bar.
-        // max-h + overflow-y-auto keeps a long category list scrolling inside the
-        // dropdown itself instead of stretching past the viewport.
         <div
           className={cn(
             "absolute bottom-full mb-1 z-50 min-w-52 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl py-1",
@@ -248,7 +245,6 @@ function BulkActionBar({
     },
   ];
 
-  // Use hierarchically sorted categories for the move dropdown
   const sortedCategories = getSortedCategories(categories);
 
   const moveItems: DropdownItem[] = [
@@ -262,7 +258,6 @@ function BulkActionBar({
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-700 animate-in slide-in-from-bottom-4 duration-200">
-      {/* Count + select controls */}
       <div className="flex items-center gap-2 pr-3 border-r border-gray-700">
         <button
           onClick={count === total ? onDeselectAll : onSelectAll}
@@ -279,7 +274,6 @@ function BulkActionBar({
         </button>
       </div>
 
-      {/* Status dropdown — opens upward */}
       <Dropdown
         align="left"
         trigger={
@@ -295,7 +289,6 @@ function BulkActionBar({
         items={statusItems}
       />
 
-      {/* Move dropdown — opens upward, scrolls internally when the category list is long */}
       <Dropdown
         align="left"
         trigger={
@@ -311,10 +304,8 @@ function BulkActionBar({
         items={moveItems}
       />
 
-      {/* Separator */}
       <div className="w-px h-6 bg-gray-700" />
 
-      {/* Delete */}
       <button
         disabled={loading}
         onClick={onDelete}
@@ -324,7 +315,6 @@ function BulkActionBar({
         Удалить
       </button>
 
-      {/* Close / deselect */}
       <button
         onClick={onDeselectAll}
         className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
@@ -355,17 +345,14 @@ export default function DishesPage() {
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
-  // Row-level dropdown state
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
 
-  // Seed state
   const [seeding, setSeeding] = useState<SeedKey | null>(null);
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const [seedLabel, setSeedLabel] = useState("");
   const [showSeedLog, setShowSeedLog] = useState(false);
 
-  // Close row menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (rowMenuRef.current && !rowMenuRef.current.contains(e.target as Node)) {
@@ -427,8 +414,6 @@ export default function DishesPage() {
     }
   };
 
-  // When filtering by a category that has child categories (subcategories), also
-  // match dishes stored under any of its descendants — not just the exact category.
   const categoryFilterIds = useMemo(() => {
     if (categoryFilter === "all") return null;
     return collectCategoryAndDescendantIds(categoryFilter, categories);
@@ -448,10 +433,9 @@ export default function DishesPage() {
     });
   }, [dishes, search, categoryFilterIds, statusFilter]);
 
-  // Hierarchically sorted categories for all dropdowns / selects
   const sortedCategories = useMemo(() => getSortedCategories(categories), [categories]);
 
-  // Reorder arrows are only shown when exactly one category is selected and no other filters are active
+  // Reorder arrows only when a specific category is selected and no other filters active
   const canReorder = categoryFilter !== "all" && search.trim() === "" && statusFilter === "all";
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -545,20 +529,22 @@ export default function DishesPage() {
 
   /**
    * Move a dish up or down within the currently filtered list.
-   * Only available when a specific category is selected with no other filters.
-   * Optimistically updates local state, then persists to backend.
+   * Only available when canReorder is true (specific category selected, no other filters).
    */
   const handleMoveDish = async (id: string | number, direction: -1 | 1) => {
-    if (!canReorder || categoryFilter === "all") return;
+    // canReorder already guarantees categoryFilter is a number, but we extract
+    // it safely to keep TypeScript happy without a redundant equality check.
+    if (!canReorder) return;
+    const activeCategoryId = categoryFilter as number;
+
     const idx = filtered.findIndex((d) => d.id === id);
     const targetIdx = idx + direction;
     if (targetIdx < 0 || targetIdx >= filtered.length) return;
 
-    // Compute the new ordered list
+    // Swap in the global dishes array (optimistic update)
     const newFiltered = [...filtered];
     [newFiltered[idx], newFiltered[targetIdx]] = [newFiltered[targetIdx], newFiltered[idx]];
 
-    // Swap in the global dishes array (optimistic update)
     const posA = dishes.findIndex((d) => d.id === filtered[idx].id);
     const posB = dishes.findIndex((d) => d.id === filtered[targetIdx].id);
     if (posA === -1 || posB === -1) return;
@@ -568,7 +554,7 @@ export default function DishesPage() {
 
     try {
       setReordering(true);
-      await api.reorderDishes(categoryFilter, newFiltered.map((d) => d.id));
+      await api.reorderDishes(activeCategoryId, newFiltered.map((d) => d.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось изменить порядок");
       await loadDishes();
@@ -719,7 +705,6 @@ export default function DishesPage() {
             </div>
           )}
 
-          {/* Dishes list */}
           {filtered.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-gray-400 text-lg">Блюда не найдены</p>
@@ -741,7 +726,6 @@ export default function DishesPage() {
                         : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
                     )}
                   >
-                    {/* Checkbox */}
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -749,7 +733,6 @@ export default function DishesPage() {
                       className="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"
                     />
 
-                    {/* Photo thumbnail */}
                     <div className="w-11 h-11 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-100">
                       {dish.image_url ? (
                         <img
@@ -768,7 +751,6 @@ export default function DishesPage() {
                       )}
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-sm truncate">{getDishDisplayName(dish)}</p>
@@ -788,18 +770,16 @@ export default function DishesPage() {
                       <p className="text-xs text-gray-400 truncate mt-0.5">{getDishTranslationPreview(dish)}</p>
                     </div>
 
-                    {/* Price */}
                     <div className="text-sm font-semibold text-gray-700 min-w-fit tabular-nums">
                       {Number(dish.price).toLocaleString("ru-RU")} сум
                     </div>
 
-                    {/* Status badge */}
                     <div className={cn("text-xs px-2 py-1 rounded-full font-medium min-w-fit hidden sm:flex items-center gap-1", STATUS_META[dish.status].color)}>
                       {STATUS_META[dish.status].icon}
                       {STATUS_META[dish.status].label}
                     </div>
 
-                    {/* Reorder buttons — only shown when a single category filter is active */}
+                    {/* Reorder buttons */}
                     {canReorder && (
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         <button
@@ -821,8 +801,6 @@ export default function DishesPage() {
                       </div>
                     )}
 
-                    {/* Row action menu — opens downward with its own scroll so it
-                        never gets clipped under the sticky top navbar */}
                     <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
                       <button
                         onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
@@ -877,7 +855,6 @@ export default function DishesPage() {
             </div>
           )}
 
-          {/* Floating bulk action bar */}
           {selected.size > 0 && (
             <BulkActionBar
               count={selected.size}
@@ -892,7 +869,6 @@ export default function DishesPage() {
             />
           )}
 
-          {/* Form modal */}
           {showForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
