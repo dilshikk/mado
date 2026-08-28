@@ -3,7 +3,7 @@ import {
   Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X,
   DatabaseZap, UtensilsCrossed, ChevronDown, CheckSquare,
   Square, Eye, EyeOff, Archive, FileText, FolderInput,
-  CheckCircle2, ChevronUp, ImageOff, ArrowUp, ArrowDown, Cake,
+  CheckCircle2, ChevronUp, ImageOff, ArrowUp, ArrowDown, Cake, Image,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
@@ -161,9 +161,6 @@ function Dropdown({
     <div className="relative" ref={ref}>
       <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
       {open && (
-        // Opens upward since the trigger lives in the bottom bulk-action bar.
-        // max-h + overflow-y-auto keeps a long category list scrolling inside the
-        // dropdown itself instead of stretching past the viewport.
         <div
           className={cn(
             "absolute bottom-full mb-1 z-50 min-w-52 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl py-1",
@@ -230,25 +227,12 @@ function BulkActionBar({
 }) {
   const statusItems: DropdownItem[] = [
     { type: "header", label: "Изменить статус" },
-    {
-      type: "item", label: "Опубликовать", icon: <Eye className="w-4 h-4" />,
-      onClick: () => onStatus("published"),
-    },
-    {
-      type: "item", label: "В черновик", icon: <FileText className="w-4 h-4" />,
-      onClick: () => onStatus("draft"),
-    },
-    {
-      type: "item", label: "Скрыть", icon: <EyeOff className="w-4 h-4" />,
-      onClick: () => onStatus("hidden"),
-    },
-    {
-      type: "item", label: "Архивировать", icon: <Archive className="w-4 h-4" />,
-      onClick: () => onStatus("archived"),
-    },
+    { type: "item", label: "Опубликовать", icon: <Eye className="w-4 h-4" />, onClick: () => onStatus("published") },
+    { type: "item", label: "В черновик", icon: <FileText className="w-4 h-4" />, onClick: () => onStatus("draft") },
+    { type: "item", label: "Скрыть", icon: <EyeOff className="w-4 h-4" />, onClick: () => onStatus("hidden") },
+    { type: "item", label: "Архивировать", icon: <Archive className="w-4 h-4" />, onClick: () => onStatus("archived") },
   ];
 
-  // Use hierarchically sorted categories for the move dropdown
   const sortedCategories = getSortedCategories(categories);
 
   const moveItems: DropdownItem[] = [
@@ -262,7 +246,6 @@ function BulkActionBar({
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-700 animate-in slide-in-from-bottom-4 duration-200">
-      {/* Count + select controls */}
       <div className="flex items-center gap-2 pr-3 border-r border-gray-700">
         <button
           onClick={count === total ? onDeselectAll : onSelectAll}
@@ -279,7 +262,6 @@ function BulkActionBar({
         </button>
       </div>
 
-      {/* Status dropdown — opens upward */}
       <Dropdown
         align="left"
         trigger={
@@ -295,7 +277,6 @@ function BulkActionBar({
         items={statusItems}
       />
 
-      {/* Move dropdown — opens upward, scrolls internally when the category list is long */}
       <Dropdown
         align="left"
         trigger={
@@ -311,10 +292,8 @@ function BulkActionBar({
         items={moveItems}
       />
 
-      {/* Separator */}
       <div className="w-px h-6 bg-gray-700" />
 
-      {/* Delete */}
       <button
         disabled={loading}
         onClick={onDelete}
@@ -324,7 +303,6 @@ function BulkActionBar({
         Удалить
       </button>
 
-      {/* Close / deselect */}
       <button
         onClick={onDeselectAll}
         className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
@@ -344,6 +322,7 @@ export default function DishesPage() {
   const [loading, setLoading] = useState(true);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [settingDefaultImage, setSettingDefaultImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
@@ -355,17 +334,14 @@ export default function DishesPage() {
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
-  // Row-level dropdown state
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
 
-  // Seed state
   const [seeding, setSeeding] = useState<SeedKey | null>(null);
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const [seedLabel, setSeedLabel] = useState("");
   const [showSeedLog, setShowSeedLog] = useState(false);
 
-  // Close row menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (rowMenuRef.current && !rowMenuRef.current.contains(e.target as Node)) {
@@ -437,8 +413,24 @@ export default function DishesPage() {
     }
   };
 
-  // When filtering by a category that has child categories (subcategories), also
-  // match dishes stored under any of its descendants — not just the exact category.
+  const handleSetDefaultImage = async () => {
+    if (!confirm("Поставить лого Mado как фото для всех блюд без фотографии?")) return;
+    try {
+      setSettingDefaultImage(true);
+      const res = (await api.request("/dishes/set-default-image", { method: "POST" })) as { updated: number };
+      await loadDishes();
+      setError(null);
+      // Show a brief success note via the seed-log banner
+      setSeedResult({ ok: true, newCategories: 0, totalDishes: res.updated, log: [] });
+      setSeedLabel(`Фото по умолчанию — обновлено блюд: ${res.updated}`);
+      setShowSeedLog(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обновить фото");
+    } finally {
+      setSettingDefaultImage(false);
+    }
+  };
+
   const categoryFilterIds = useMemo(() => {
     if (categoryFilter === "all") return null;
     return collectCategoryAndDescendantIds(categoryFilter, categories);
@@ -458,10 +450,8 @@ export default function DishesPage() {
     });
   }, [dishes, search, categoryFilterIds, statusFilter]);
 
-  // Hierarchically sorted categories for all dropdowns / selects
   const sortedCategories = useMemo(() => getSortedCategories(categories), [categories]);
 
-  // Reorder arrows are only shown when exactly one category is selected and no other filters are active
   const canReorder = categoryFilter !== "all" && search.trim() === "" && statusFilter === "all";
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -553,24 +543,15 @@ export default function DishesPage() {
     }
   };
 
-  /**
-   * Move a dish up or down within the currently filtered list.
-   * Only available when a specific category is selected with no other filters.
-   * Optimistically updates local state, then persists to backend.
-   */
   const handleMoveDish = async (id: string | number, direction: -1 | 1) => {
-    // canReorder already guarantees categoryFilter !== "all", but we re-check
-    // via typeof to narrow the type for TypeScript.
     if (!canReorder || typeof categoryFilter !== "number") return;
     const idx = filtered.findIndex((d) => d.id === id);
     const targetIdx = idx + direction;
     if (targetIdx < 0 || targetIdx >= filtered.length) return;
 
-    // Compute the new ordered list
     const newFiltered = [...filtered];
     [newFiltered[idx], newFiltered[targetIdx]] = [newFiltered[targetIdx], newFiltered[idx]];
 
-    // Swap in the global dishes array (optimistic update)
     const posA = dishes.findIndex((d) => d.id === filtered[idx].id);
     const posB = dishes.findIndex((d) => d.id === filtered[targetIdx].id);
     if (posA === -1 || posB === -1) return;
@@ -612,6 +593,8 @@ export default function DishesPage() {
     { type: "item", label: "Удалить", icon: <Trash2 className="w-4 h-4" />, onClick: () => handleDelete(dish.id), danger: true },
   ];
 
+  const anyLoading = seeding !== null || settingDefaultImage;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -628,7 +611,7 @@ export default function DishesPage() {
           </button>
           <button
             onClick={() => handleSeed("kitchen")}
-            disabled={seeding !== null}
+            disabled={anyLoading}
             className="flex items-center gap-1.5 px-3 py-2 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors disabled:opacity-50"
           >
             {seeding === "kitchen" ? <Loader2 className="w-4 h-4 animate-spin" /> : <UtensilsCrossed className="w-4 h-4" />}
@@ -636,7 +619,7 @@ export default function DishesPage() {
           </button>
           <button
             onClick={() => handleSeed("beverages")}
-            disabled={seeding !== null}
+            disabled={anyLoading}
             className="flex items-center gap-1.5 px-3 py-2 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors disabled:opacity-50"
           >
             {seeding === "beverages" ? <Loader2 className="w-4 h-4 animate-spin" /> : <DatabaseZap className="w-4 h-4" />}
@@ -644,11 +627,21 @@ export default function DishesPage() {
           </button>
           <button
             onClick={() => handleSeed("desserts")}
-            disabled={seeding !== null}
+            disabled={anyLoading}
             className="flex items-center gap-1.5 px-3 py-2 bg-pink-100 text-pink-700 rounded-lg text-sm font-medium hover:bg-pink-200 transition-colors disabled:opacity-50"
           >
             {seeding === "desserts" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cake className="w-4 h-4" />}
             Десерты
+          </button>
+          {/* Set default photo for dishes without an image */}
+          <button
+            onClick={handleSetDefaultImage}
+            disabled={anyLoading}
+            className="flex items-center gap-1.5 px-3 py-2 bg-sky-100 text-sky-700 rounded-lg text-sm font-medium hover:bg-sky-200 transition-colors disabled:opacity-50"
+            title="Поставить лого Mado на все блюда без фотографии"
+          >
+            {settingDefaultImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
+            Фото по умолчанию
           </button>
         </div>
       </div>
@@ -664,11 +657,9 @@ export default function DishesPage() {
       )}
 
       {showSeedLog && seedResult && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 space-y-1">
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
           <div className="flex items-center justify-between">
-            <p className="font-medium">
-              Импорт «{seedLabel}» завершён: {seedResult.newCategories} новых категорий, {seedResult.totalDishes} блюд всего.
-            </p>
+            <p className="font-medium">{seedLabel}</p>
             <button onClick={() => setShowSeedLog(false)} className="text-blue-500 hover:text-blue-700">
               <X className="w-4 h-4" />
             </button>
@@ -731,7 +722,6 @@ export default function DishesPage() {
             )}
           </div>
 
-          {/* Hint when reorder is available */}
           {canReorder && filtered.length > 1 && (
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg text-xs text-blue-700 dark:text-blue-400">
               <ArrowUp className="w-3.5 h-3.5 shrink-0" />
@@ -739,7 +729,6 @@ export default function DishesPage() {
             </div>
           )}
 
-          {/* Dishes list */}
           {filtered.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-gray-400 text-lg">Блюда не найдены</p>
@@ -761,7 +750,6 @@ export default function DishesPage() {
                         : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
                     )}
                   >
-                    {/* Checkbox */}
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -769,7 +757,6 @@ export default function DishesPage() {
                       className="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"
                     />
 
-                    {/* Photo thumbnail */}
                     <div className="w-11 h-11 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-100">
                       {dish.image_url ? (
                         <img
@@ -788,38 +775,26 @@ export default function DishesPage() {
                       )}
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-sm truncate">{getDishDisplayName(dish)}</p>
-                        {dish.is_new && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Новое</span>
-                        )}
-                        {dish.is_signature && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">Фирм.</span>
-                        )}
-                        {dish.is_vegetarian && (
-                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Вег</span>
-                        )}
-                        {dish.is_spicy && (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Остр.</span>
-                        )}
+                        {dish.is_new && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Новое</span>}
+                        {dish.is_signature && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">Фирм.</span>}
+                        {dish.is_vegetarian && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Вег</span>}
+                        {dish.is_spicy && <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Остр.</span>}
                       </div>
                       <p className="text-xs text-gray-400 truncate mt-0.5">{getDishTranslationPreview(dish)}</p>
                     </div>
 
-                    {/* Price */}
                     <div className="text-sm font-semibold text-gray-700 min-w-fit tabular-nums">
                       {Number(dish.price).toLocaleString("ru-RU")} сум
                     </div>
 
-                    {/* Status badge */}
                     <div className={cn("text-xs px-2 py-1 rounded-full font-medium min-w-fit hidden sm:flex items-center gap-1", STATUS_META[dish.status].color)}>
                       {STATUS_META[dish.status].icon}
                       {STATUS_META[dish.status].label}
                     </div>
 
-                    {/* Reorder buttons — only shown when a single category filter is active */}
                     {canReorder && (
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         <button
@@ -841,8 +816,6 @@ export default function DishesPage() {
                       </div>
                     )}
 
-                    {/* Row action menu — opens downward with its own scroll so it
-                        never gets clipped under the sticky top navbar */}
                     <div className="relative flex-shrink-0" ref={isMenuOpen ? rowMenuRef : null}>
                       <button
                         onClick={() => setOpenMenuId(isMenuOpen ? null : dish.id)}
@@ -897,7 +870,6 @@ export default function DishesPage() {
             </div>
           )}
 
-          {/* Floating bulk action bar */}
           {selected.size > 0 && (
             <BulkActionBar
               count={selected.size}
@@ -912,7 +884,6 @@ export default function DishesPage() {
             />
           )}
 
-          {/* Form modal */}
           {showForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
