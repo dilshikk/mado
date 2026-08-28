@@ -48,11 +48,6 @@ const LANGS = [
   { code: "tr" as const, flag: "🇹🇷", label: "Türkçe" },
 ];
 
-// Category banner: 800×150 px
-const CATEGORY_IMG_WIDTH = 800;
-const CATEGORY_IMG_HEIGHT = 150;
-const CATEGORY_IMG_ASPECT = CATEGORY_IMG_WIDTH / CATEGORY_IMG_HEIGHT;
-
 function getDisplayLabel(cat: { label_ru?: string | null; label_uz?: string | null; label_en?: string | null; label_tr?: string | null; label?: string }): string {
   return [cat.label_ru, cat.label_uz, cat.label_en, cat.label_tr].find(
     (v): v is string => typeof v === "string" && v.trim() !== ""
@@ -238,23 +233,18 @@ function CategoryForm({
         </select>
       </div>
 
-      {/* Image upload with crop — fixed 800×150 px output */}
+      {/* Image upload with free-form crop — no fixed aspect ratio */}
       <div>
         <label className="text-xs text-muted-foreground mb-2 block">
           Изображение категории
-          <span className="ml-1.5 text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-            {CATEGORY_IMG_WIDTH}×{CATEGORY_IMG_HEIGHT}px
-          </span>
+          <span className="ml-1.5 text-[10px] text-muted-foreground/60">(свободное кадрирование)</span>
         </label>
         <ImageUploadCrop
           value={form.image_url}
           onChange={(url) => set("image_url", url)}
-          aspect={CATEGORY_IMG_ASPECT}
-          outputWidth={CATEGORY_IMG_WIDTH}
-          outputHeight={CATEGORY_IMG_HEIGHT}
           disabled={saving}
-          previewClass="w-32 h-6"
-          label="Выбрать баннер"
+          previewClass="w-24 h-16"
+          label="Выбрать изображение"
         />
       </div>
 
