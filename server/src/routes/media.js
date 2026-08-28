@@ -39,16 +39,41 @@ function withFullUrl(req, row) {
 /**
  * Sanitize a user-provided filename into a safe on-disk filename.
  * Keeps ASCII alphanumerics, hyphens, underscores, and dots.
- * Replaces spaces and other characters with hyphens.
  */
 function sanitizeDiskName(name) {
   return name
     .trim()
-    .replace(/\s+/g, '-')           // spaces → hyphens
+    .replace(/\s+/g, '-')
     .replace(/[^a-zA-Z0-9._-]/g, '-')
     .replace(/-{2,}/g, '-')
     .replace(/^-+|-+$/g, '')
     || 'file';
+}
+
+/**
+ * Given a desired disk filename, return a non-colliding name.
+ * If "logo.jpg" exists, returns "logo-1.jpg", then "logo-2.jpg", etc.
+ * Skips collision check for the file that is currently occupying oldDiskName
+ * (i.e. the file being renamed — it will be moved away).
+ */
+function resolveUniqueDiskName(desiredName, oldDiskName) {
+  const ext = path.extname(desiredName);
+  const base = path.basename(desiredName, ext);
+
+  let candidate = desiredName;
+  let counter = 1;
+
+  while (true) {
+    // If the candidate is the file we're about to move, it won't conflict
+    if (candidate === oldDiskName) return candidate;
+
+    const candidatePath = path.join(uploadDir, candidate);
+    if (!fs.existsSync(candidatePath)) return candidate;
+
+    // Collision: append / increment suffix
+    candidate = `${base}-${counter}${ext}`;
+    counter++;
+  }
 }
 
 // ── Multer config ─────────────────────────────────────────────────────────────
@@ -197,10 +222,9 @@ router.post(
 /**
  * PATCH /media/:id/rename
  *
- * Renames both the display name (filename) AND the physical file on disk.
- * The new disk filename matches exactly what the user typed (sanitized for FS safety).
- * Cascades the updated file_url to dishes.image_url, promotions.image_url,
- * and menu_categories.image_url wherever they referenced the old path.
+ * Renames the display name AND the physical file on disk.
+ * If the desired disk name is already taken by another file, appends -1, -2, …
+ * Cascades the updated file_url to dishes, promotions, and menu_categories.
  */
 router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
@@ -221,24 +245,20 @@ router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'cont
   const oldFileUrl = file.file_url;
 
   // ── 2. Compute new disk filename ─────────────────────────────────────────────
-  // Only rename files stored locally in /uploads/
   const isLocal = typeof oldFileUrl === 'string' && oldFileUrl.startsWith('/uploads/');
-
-  let newFileUrl = oldFileUrl; // keep old URL for external files
+  let newFileUrl = oldFileUrl;
 
   if (isLocal) {
-    const oldDiskName = path.basename(oldFileUrl);       // e.g. orig-1787887561860.jpg
-    const oldExt = path.extname(oldDiskName);            // e.g. .jpg
+    const oldDiskName = path.basename(oldFileUrl);   // e.g. orig-1787887561860.jpg
+    const oldExt = path.extname(oldDiskName);         // e.g. .jpg
 
-    // Build the new disk name: sanitize what the user typed and preserve the
-    // original extension when the user didn't provide one.
+    // Build sanitized desired disk name, preserving extension
     const userExt = path.extname(newDisplayName);
     const baseSanitized = sanitizeDiskName(newDisplayName);
-    // Ensure the disk name has an extension
-    const newDiskName = userExt
-      ? baseSanitized
-      : `${baseSanitized}${oldExt}`;
+    const desiredDiskName = userExt ? baseSanitized : `${baseSanitized}${oldExt}`;
 
+    // Resolve collision: if desired name is taken, use logo-1.jpg, logo-2.jpg …
+    const newDiskName = resolveUniqueDiskName(desiredDiskName, oldDiskName);
     newFileUrl = `/uploads/${newDiskName}`;
 
     const oldPath = path.join(uploadDir, oldDiskName);
@@ -260,7 +280,6 @@ router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'cont
     const oldDiskName = path.basename(oldFileUrl);
     const newDiskName = path.basename(newFileUrl);
 
-    // Match both relative (/uploads/old.jpg) and absolute (https://host/uploads/old.jpg)
     const cascadeSQL = (table, column) => pool.query(
       `UPDATE ${table}
        SET ${column} = REPLACE(${column}, $1, $2)
