@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff, CornerDownRight } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, AlertCircle, Loader2, ImageOff, CornerDownRight, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
 import ImageUploadCrop from "@/components/image-upload-crop.tsx";
@@ -89,6 +89,19 @@ function collectDescendantIds(categoryId: string | number, categories: Category[
     }
   }
   return result;
+}
+
+/**
+ * Returns the sibling categories for a given category.
+ * For root categories (parent_id === null), siblings are other roots in the same section.
+ * For child categories, siblings are categories with the same parent_id.
+ */
+function getCategorySiblings(cat: Category, allCategories: Category[]): Category[] {
+  if (cat.parent_id !== null) {
+    return allCategories.filter((c) => c.parent_id === cat.parent_id);
+  }
+  // Root: siblings share the same section
+  return allCategories.filter((c) => c.parent_id === null && c.section_id === cat.section_id);
 }
 
 // ─── Category form ─────────────────────────────────────────────────────────────
@@ -261,6 +274,7 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [savingId, setSavingId] = useState<string | number | null>(null);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   useEffect(() => { void loadData(); }, []);
 
@@ -329,6 +343,40 @@ export default function CategoriesPage() {
     }
   };
 
+  /**
+   * Move a category up or down within its sibling group.
+   * Optimistically updates local state, then persists to backend.
+   */
+  const handleMoveCategory = async (id: string | number, direction: -1 | 1) => {
+    const cat = categories.find((c) => String(c.id) === String(id));
+    if (!cat) return;
+
+    const siblings = getCategorySiblings(cat, categories);
+    const sibIdx = siblings.findIndex((c) => String(c.id) === String(id));
+    const targetIdx = sibIdx + direction;
+    if (targetIdx < 0 || targetIdx >= siblings.length) return;
+
+    // Find the actual positions of these two siblings in the global categories array
+    const posA = categories.findIndex((c) => String(c.id) === String(siblings[sibIdx].id));
+    const posB = categories.findIndex((c) => String(c.id) === String(siblings[targetIdx].id));
+    if (posA === -1 || posB === -1) return;
+
+    // Swap in the global array (optimistic update)
+    const newCats = [...categories];
+    [newCats[posA], newCats[posB]] = [newCats[posB], newCats[posA]];
+    setCategories(newCats);
+
+    try {
+      setReordering(true);
+      await api.reorderCategories(newCats.map((c) => c.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось изменить порядок");
+      await loadData();
+    } finally {
+      setReordering(false);
+    }
+  };
+
   const listProps = {
     allCategories: categories,
     sections,
@@ -337,8 +385,10 @@ export default function CategoriesPage() {
     onSaveEdit: saveEdit,
     onCancelEdit: () => setEditingId(null),
     onDelete: handleDelete,
+    onMove: handleMoveCategory,
     savingId,
     deletingId,
+    reordering,
   };
 
   return (
@@ -458,8 +508,10 @@ type ListProps = {
   onSaveEdit: (id: string | number, data: CategoryFormData) => void;
   onCancelEdit: () => void;
   onDelete: (id: string | number) => void;
+  onMove: (id: string | number, direction: -1 | 1) => void;
   savingId: string | number | null;
   deletingId: string | number | null;
+  reordering: boolean;
 };
 
 function SectionGroup({ section, categories, allCategories, sections, ...rest }: { section: Section } & ListProps) {
@@ -482,7 +534,7 @@ function SectionGroup({ section, categories, allCategories, sections, ...rest }:
 }
 
 function CategoryList({
-  categories, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
+  categories, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, onMove, savingId, deletingId, reordering,
 }: ListProps) {
   return (
     <div className="divide-y divide-border">
@@ -498,8 +550,10 @@ function CategoryList({
           onSaveEdit={onSaveEdit}
           onCancelEdit={onCancelEdit}
           onDelete={onDelete}
+          onMove={onMove}
           savingId={savingId}
           deletingId={deletingId}
+          reordering={reordering}
         />
       ))}
       {categories.length === 0 && (
@@ -512,13 +566,20 @@ function CategoryList({
 }
 
 function CategoryRow({
-  cat, depth, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, savingId, deletingId,
+  cat, depth, allCategories, sections, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete, onMove, savingId, deletingId, reordering,
 }: {
   cat: Category;
   depth: number;
 } & Omit<ListProps, "categories">) {
   const [childrenOpen, setChildrenOpen] = useState(true);
   const children = allCategories.filter((c) => c.parent_id === cat.id);
+
+  // Determine position among siblings for disabling ↑↓ buttons
+  const siblings = getCategorySiblings(cat, allCategories);
+  const sibIdx = siblings.findIndex((c) => String(c.id) === String(cat.id));
+  const isFirst = sibIdx === 0;
+  const isLast = sibIdx === siblings.length - 1;
+  const isBusy = savingId !== null || deletingId !== null || reordering;
 
   return (
     <>
@@ -584,10 +645,31 @@ function CategoryRow({
                 : "БЕЗ РАЗДЕЛА"}
             </span>
           )}
+
+          {/* Reorder buttons — always visible for discoverability */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              onClick={() => onMove(cat.id, -1)}
+              disabled={isFirst || isBusy}
+              className="p-1.5 rounded hover:bg-muted disabled:opacity-30 transition-opacity"
+              title="Переместить выше"
+            >
+              <ArrowUp className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => onMove(cat.id, 1)}
+              disabled={isLast || isBusy}
+              className="p-1.5 rounded hover:bg-muted disabled:opacity-30 transition-opacity"
+              title="Переместить ниже"
+            >
+              <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => onStartEdit(cat.id)}
-              disabled={savingId !== null || deletingId !== null}
+              disabled={isBusy}
               className="p-1.5 rounded hover:bg-muted disabled:opacity-50"
             >
               <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -616,8 +698,10 @@ function CategoryRow({
           onSaveEdit={onSaveEdit}
           onCancelEdit={onCancelEdit}
           onDelete={onDelete}
+          onMove={onMove}
           savingId={savingId}
           deletingId={deletingId}
+          reordering={reordering}
         />
       ))}
     </>
