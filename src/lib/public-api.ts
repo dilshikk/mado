@@ -24,6 +24,7 @@ async function publicFetch<T>(path: string): Promise<T> {
 
 export const publicApi = {
   getPage: (slug: string) => publicFetch<PageData>(`/pages/${encodeURIComponent(slug)}`),
+  getSections: () => publicFetch<PublicSection[]>('/sections'),
   getCategories: () => publicFetch<PublicCategory[]>('/categories'),
   getDishes: (params?: Record<string, string>) => {
     const query = params ? new URLSearchParams(params).toString() : '';
@@ -82,6 +83,19 @@ export type PageData = {
   meta_description_tr: string | null;
 };
 
+/** A top-level menu tab (e.g. Food / Beverages / Desserts / Takeaway), now DB-driven. */
+export type PublicSection = {
+  id: number;
+  slug: string;
+  label: string;
+  label_ru: string | null;
+  label_uz: string | null;
+  label_en: string | null;
+  label_tr: string | null;
+  position: number;
+  categoryCount: number;
+};
+
 export type PublicCategory = {
   id: number;
   label: string;
@@ -90,6 +104,13 @@ export type PublicCategory = {
   label_en: string | null;
   label_tr: string | null;
   tab: string;
+  section_id: number | null;
+  section_slug: string | null;
+  section_label: string | null;
+  section_label_ru: string | null;
+  section_label_uz: string | null;
+  section_label_en: string | null;
+  section_label_tr: string | null;
   image_url: string | null;
   position: number;
   dishCount: number;
