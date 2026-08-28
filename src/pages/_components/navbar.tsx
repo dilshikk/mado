@@ -15,6 +15,7 @@ const NAV_LABELS: Record<"ru" | "uz" | "en" | "tr", readonly { label: string; hr
     { label: "Рестораны", href: "/locations" },
     { label: "Отзывы", href: "/reviews" },
     { label: "Карьера", href: "/careers" },
+    { label: "FAQ", href: "/faq" },
     { label: "Контакты", href: "/contact" },
   ],
   uz: [
@@ -25,6 +26,7 @@ const NAV_LABELS: Record<"ru" | "uz" | "en" | "tr", readonly { label: string; hr
     { label: "Restoranlar", href: "/locations" },
     { label: "Sharhlar", href: "/reviews" },
     { label: "Karyera", href: "/careers" },
+    { label: "FAQ", href: "/faq" },
     { label: "Aloqa", href: "/contact" },
   ],
   en: [
@@ -35,6 +37,7 @@ const NAV_LABELS: Record<"ru" | "uz" | "en" | "tr", readonly { label: string; hr
     { label: "Locations", href: "/locations" },
     { label: "Reviews", href: "/reviews" },
     { label: "Careers", href: "/careers" },
+    { label: "FAQ", href: "/faq" },
     { label: "Contact", href: "/contact" },
   ],
   tr: [
@@ -45,6 +48,7 @@ const NAV_LABELS: Record<"ru" | "uz" | "en" | "tr", readonly { label: string; hr
     { label: "Şubelerimiz", href: "/locations" },
     { label: "Yorumlar", href: "/reviews" },
     { label: "Kariyer", href: "/careers" },
+    { label: "SSS", href: "/faq" },
     { label: "İletişim", href: "/contact" },
   ],
 };
