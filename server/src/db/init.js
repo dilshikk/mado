@@ -77,6 +77,11 @@ const initDb = async () => {
     // Safe migration: section_id FK on menu_categories (categories are now children of menu_sections)
     await pool.query(`ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS section_id INT REFERENCES menu_sections(id) ON DELETE SET NULL`);
 
+    // Safe migration: parent_id self-reference FK on menu_categories.
+    // Categories can now nest inside another category (e.g. "Напитки" > "Горячие напитки" > "Холодные напитки"),
+    // in addition to belonging to a top-level section.
+    await pool.query(`ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES menu_categories(id) ON DELETE SET NULL`);
+
     // Seed default sections (Food / Beverages / Desserts / Takeaway) if none exist yet
     const defaultSections = [
       { slug: 'food', label_ru: 'Еда', label_uz: 'Taomlar', label_en: 'Food', label_tr: 'Yemekler', position: 0 },
