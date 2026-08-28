@@ -3,7 +3,7 @@ import {
   Plus, Edit2, Trash2, Search, Loader2, AlertCircle, X,
   DatabaseZap, UtensilsCrossed, ChevronDown, CheckSquare,
   Square, Eye, EyeOff, Archive, FileText, FolderInput,
-  CheckCircle2, ChevronUp, ImageOff,
+  CheckCircle2, ChevronUp, ImageOff, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
@@ -343,6 +343,7 @@ export default function DishesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
@@ -450,6 +451,9 @@ export default function DishesPage() {
   // Hierarchically sorted categories for all dropdowns / selects
   const sortedCategories = useMemo(() => getSortedCategories(categories), [categories]);
 
+  // Reorder arrows are only shown when exactly one category is selected and no other filters are active
+  const canReorder = categoryFilter !== "all" && search.trim() === "" && statusFilter === "all";
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
@@ -536,6 +540,40 @@ export default function DishesPage() {
       setError(err instanceof Error ? err.message : "Не удалось удалить блюда");
     } finally {
       setBulkLoading(false);
+    }
+  };
+
+  /**
+   * Move a dish up or down within the currently filtered list.
+   * Only available when a specific category is selected with no other filters.
+   * Optimistically updates local state, then persists to backend.
+   */
+  const handleMoveDish = async (id: string | number, direction: -1 | 1) => {
+    if (!canReorder || categoryFilter === "all") return;
+    const idx = filtered.findIndex((d) => d.id === id);
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= filtered.length) return;
+
+    // Compute the new ordered list
+    const newFiltered = [...filtered];
+    [newFiltered[idx], newFiltered[targetIdx]] = [newFiltered[targetIdx], newFiltered[idx]];
+
+    // Swap in the global dishes array (optimistic update)
+    const posA = dishes.findIndex((d) => d.id === filtered[idx].id);
+    const posB = dishes.findIndex((d) => d.id === filtered[targetIdx].id);
+    if (posA === -1 || posB === -1) return;
+    const newDishes = [...dishes];
+    [newDishes[posA], newDishes[posB]] = [newDishes[posB], newDishes[posA]];
+    setDishes(newDishes);
+
+    try {
+      setReordering(true);
+      await api.reorderDishes(categoryFilter, newFiltered.map((d) => d.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось изменить порядок");
+      await loadDishes();
+    } finally {
+      setReordering(false);
     }
   };
 
@@ -673,6 +711,14 @@ export default function DishesPage() {
             )}
           </div>
 
+          {/* Hint when reorder is available */}
+          {canReorder && filtered.length > 1 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg text-xs text-blue-700 dark:text-blue-400">
+              <ArrowUp className="w-3.5 h-3.5 shrink-0" />
+              Используйте стрелки ↑↓ для изменения порядка блюд в этой категории. Порядок отобразится на сайте.
+            </div>
+          )}
+
           {/* Dishes list */}
           {filtered.length === 0 ? (
             <div className="text-center py-16">
@@ -680,9 +726,10 @@ export default function DishesPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {filtered.map((dish) => {
+              {filtered.map((dish, dishIndex) => {
                 const isSelected = selected.has(dish.id);
                 const isMenuOpen = openMenuId === dish.id;
+                const isBusy = savingId === dish.id || deletingId === dish.id || reordering;
 
                 return (
                   <div
@@ -729,13 +776,13 @@ export default function DishesPage() {
                           <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Новое</span>
                         )}
                         {dish.is_signature && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">⭐</span>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">Фирм.</span>
                         )}
                         {dish.is_vegetarian && (
                           <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Вег</span>
                         )}
                         {dish.is_spicy && (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">🌶</span>
+                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Остр.</span>
                         )}
                       </div>
                       <p className="text-xs text-gray-400 truncate mt-0.5">{getDishTranslationPreview(dish)}</p>
@@ -751,6 +798,28 @@ export default function DishesPage() {
                       {STATUS_META[dish.status].icon}
                       {STATUS_META[dish.status].label}
                     </div>
+
+                    {/* Reorder buttons — only shown when a single category filter is active */}
+                    {canReorder && (
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleMoveDish(dish.id, -1)}
+                          disabled={dishIndex === 0 || isBusy}
+                          className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 transition-opacity"
+                          title="Переместить выше"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                        <button
+                          onClick={() => handleMoveDish(dish.id, 1)}
+                          disabled={dishIndex === filtered.length - 1 || isBusy}
+                          className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 transition-opacity"
+                          title="Переместить ниже"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Row action menu — opens downward with its own scroll so it
                         never gets clipped under the sticky top navbar */}
