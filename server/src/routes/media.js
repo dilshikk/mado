@@ -39,11 +39,12 @@ function withFullUrl(req, row) {
 /**
  * Sanitize a user-provided filename into a safe on-disk filename.
  * Keeps ASCII alphanumerics, hyphens, underscores, and dots.
- * Replaces everything else with a hyphen and collapses runs.
+ * Replaces spaces and other characters with hyphens.
  */
 function sanitizeDiskName(name) {
   return name
     .trim()
+    .replace(/\s+/g, '-')           // spaces → hyphens
     .replace(/[^a-zA-Z0-9._-]/g, '-')
     .replace(/-{2,}/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -196,9 +197,10 @@ router.post(
 /**
  * PATCH /media/:id/rename
  *
- * Renames both the display name (filename) and the physical file on disk.
- * Cascades the new file_url to dishes.image_url, promotions.image_url,
- * and menu_categories.image_url wherever they reference the old path.
+ * Renames both the display name (filename) AND the physical file on disk.
+ * The new disk filename matches exactly what the user typed (sanitized for FS safety).
+ * Cascades the updated file_url to dishes.image_url, promotions.image_url,
+ * and menu_categories.image_url wherever they referenced the old path.
  */
 router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'content_manager']), async (req, res) => {
   const { id } = req.params;
@@ -216,35 +218,36 @@ router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'cont
     return res.status(404).json({ error: 'File not found' });
   }
   const file = existing.rows[0];
+  const oldFileUrl = file.file_url;
 
-  // ── 2. Determine new disk filename ───────────────────────────────────────────
+  // ── 2. Compute new disk filename ─────────────────────────────────────────────
   // Only rename files stored locally in /uploads/
-  const isLocal = typeof file.file_url === 'string' && file.file_url.startsWith('/uploads/');
+  const isLocal = typeof oldFileUrl === 'string' && oldFileUrl.startsWith('/uploads/');
 
-  let newFileUrl = file.file_url; // default: keep old URL if external
+  let newFileUrl = oldFileUrl; // keep old URL for external files
 
   if (isLocal) {
-    const oldDiskName = path.basename(file.file_url); // e.g. orig-1787887561860.jpg
-    const ext = path.extname(oldDiskName);             // e.g. .jpg
+    const oldDiskName = path.basename(oldFileUrl);       // e.g. orig-1787887561860.jpg
+    const oldExt = path.extname(oldDiskName);            // e.g. .jpg
 
-    // Build new disk filename: sanitized display name + timestamp to avoid collisions
-    const baseName = sanitizeDiskName(
-      path.extname(newDisplayName) ? newDisplayName : `${newDisplayName}${ext}`
-    );
-    // If baseName already has an extension matching, use as-is; otherwise append
-    const newDiskName = `${Date.now()}-${baseName}`;
+    // Build the new disk name: sanitize what the user typed and preserve the
+    // original extension when the user didn't provide one.
+    const userExt = path.extname(newDisplayName);
+    const baseSanitized = sanitizeDiskName(newDisplayName);
+    // Ensure the disk name has an extension
+    const newDiskName = userExt
+      ? baseSanitized
+      : `${baseSanitized}${oldExt}`;
+
     newFileUrl = `/uploads/${newDiskName}`;
 
     const oldPath = path.join(uploadDir, oldDiskName);
     const newPath = path.join(uploadDir, newDiskName);
 
-    if (fs.existsSync(oldPath)) {
+    if (oldPath !== newPath && fs.existsSync(oldPath)) {
       fs.renameSync(oldPath, newPath);
     }
-    // If old file is missing, we still update the DB paths so they're consistent
   }
-
-  const oldFileUrl = file.file_url;
 
   // ── 3. Update media table ────────────────────────────────────────────────────
   const updated = await pool.query(
@@ -252,25 +255,17 @@ router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'cont
     [newDisplayName, newFileUrl, id]
   );
 
-  // ── 4. Cascade update all tables that store image URLs ───────────────────────
-  // These tables store either the relative path (/uploads/xxx) or the full
-  // absolute URL (https://domain/uploads/xxx). We match on the path suffix.
+  // ── 4. Cascade: update image_url in all tables that reference this file ──────
   if (isLocal && oldFileUrl !== newFileUrl) {
-    const oldDiskName = path.basename(oldFileUrl); // e.g. orig-1787887561860.jpg
+    const oldDiskName = path.basename(oldFileUrl);
     const newDiskName = path.basename(newFileUrl);
 
-    // Helper: replace the old disk filename inside an image_url with the new one.
-    // Works for both relative (/uploads/old.jpg) and absolute (https://x.com/uploads/old.jpg).
+    // Match both relative (/uploads/old.jpg) and absolute (https://host/uploads/old.jpg)
     const cascadeSQL = (table, column) => pool.query(
       `UPDATE ${table}
-       SET ${column} = REGEXP_REPLACE(${column}, $1, $2)
+       SET ${column} = REPLACE(${column}, $1, $2)
        WHERE ${column} LIKE $3`,
-      [
-        // Pattern: match the old disk filename at the end of the URL path
-        oldDiskName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), // escape regex special chars
-        newDiskName,
-        `%${oldDiskName}`,
-      ]
+      [oldDiskName, newDiskName, `%${oldDiskName}`]
     );
 
     await Promise.all([
@@ -280,7 +275,7 @@ router.patch('/:id/rename', authenticate, authorize(['admin', 'marketing', 'cont
     ]);
   }
 
-  // ── 5. Log activity ──────────────────────────────────────────────────────────
+  // ── 5. Log ───────────────────────────────────────────────────────────────────
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'update', 'media', id, `Renamed file: ${file.filename} → ${newDisplayName}`]
