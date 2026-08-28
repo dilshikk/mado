@@ -30,6 +30,10 @@ export const publicApi = {
     const query = params ? new URLSearchParams(params).toString() : '';
     return publicFetch<PublicDish[]>(`/dishes${query ? `?${query}` : ''}`);
   },
+  getFaq: (category?: string) => {
+    const query = category ? `?category=${encodeURIComponent(category)}` : '';
+    return publicFetch<PublicFaqItem[]>(`/faq${query}`);
+  },
 };
 
 /**
@@ -142,4 +146,18 @@ export type PublicDish = {
   category_label_en: string | null;
   category_label_tr: string | null;
   tab: string;
+};
+
+export type PublicFaqItem = {
+  id: number;
+  category: string;
+  question_ru: string | null;
+  question_uz: string | null;
+  question_en: string | null;
+  question_tr: string | null;
+  answer_ru: string | null;
+  answer_uz: string | null;
+  answer_en: string | null;
+  answer_tr: string | null;
+  position?: number;
 };
