@@ -559,7 +559,9 @@ export default function DishesPage() {
    * Optimistically updates local state, then persists to backend.
    */
   const handleMoveDish = async (id: string | number, direction: -1 | 1) => {
-    if (!canReorder || categoryFilter === "all") return;
+    // canReorder already guarantees categoryFilter !== "all", but we re-check
+    // via typeof to narrow the type for TypeScript.
+    if (!canReorder || typeof categoryFilter !== "number") return;
     const idx = filtered.findIndex((d) => d.id === id);
     const targetIdx = idx + direction;
     if (targetIdx < 0 || targetIdx >= filtered.length) return;
