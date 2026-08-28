@@ -43,7 +43,7 @@ router.get('/', async (req, res) => {
     query += ` AND c.parent_id = $${params.length}`;
   }
 
-  query += ' ORDER BY c.tab, c.position';
+  query += ' ORDER BY c.position';
 
   const result = await pool.query(query, params);
 
@@ -59,6 +59,30 @@ router.get('/', async (req, res) => {
   }));
 
   res.json(categoriesWithCounts);
+});
+
+// Reorder all categories — accepts a fully ordered array of category IDs.
+// Must be defined BEFORE /:id so Express does not treat "reorder" as an id param.
+router.put('/reorder/all', authenticate, authorize(['admin', 'content_manager']), async (req, res) => {
+  const { orderedIds } = req.body;
+
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    return res.status(400).json({ error: 'orderedIds array is required' });
+  }
+
+  await Promise.all(
+    orderedIds.map((categoryId, index) =>
+      pool.query('UPDATE menu_categories SET position = $1, updated_at = NOW() WHERE id = $2', [index, categoryId])
+    )
+  );
+
+  await pool.query(
+    'INSERT INTO activity_log (user_id, action, target_type, details) VALUES ($1, $2, $3, $4)',
+    [req.user.id, 'update', 'category', 'Reordered menu categories']
+  );
+
+  const result = await pool.query(`SELECT ${CATEGORY_FIELDS} FROM menu_categories ORDER BY position`);
+  res.json(result.rows);
 });
 
 // Get single category with dishes
@@ -108,8 +132,6 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
 
   const fallbackLabelRu = label_ru && String(label_ru).trim() ? String(label_ru).trim() : primaryLabel;
 
-  // Compute next position in a separate query (avoids reusing $6 with two
-  // different inferred types inside the same statement, which Postgres rejects).
   const positionResult = await pool.query(
     'SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM menu_categories WHERE tab = $1',
     [tab]
@@ -123,7 +145,6 @@ router.post('/', authenticate, authorize(['admin', 'content_manager']), async (r
     [fallbackLabelRu, label_ru, label_uz, label_en, label_tr, tab, section_id ?? null, parent_id ?? null, image_url, nextPosition]
   );
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'create', 'category', result.rows[0].id, `Created category: ${fallbackLabelRu}`]
@@ -145,7 +166,6 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     if (parentCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Parent category not found' });
     }
-    // Prevent creating a cycle: the chosen parent cannot be a descendant of this category
     let ancestorId = parent_id;
     for (let depth = 0; depth < 20 && ancestorId; depth++) {
       if (String(ancestorId) === String(id)) {
@@ -170,7 +190,6 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     }
   });
 
-  // Keep the legacy `label` column in sync with the primary localized name
   if (label_ru !== undefined || label_uz !== undefined || label_en !== undefined || label_tr !== undefined) {
     const normalizedLabels = [label_ru, label_uz, label_en, label_tr].map((value) => typeof value === 'string' ? value.trim() : '');
     const primaryLabel = normalizedLabels.find((value) => value.length > 0);
@@ -197,7 +216,6 @@ router.put('/:id', authenticate, authorize(['admin', 'content_manager']), async 
     return res.status(404).json({ error: 'Category not found' });
   }
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'update', 'category', id, `Updated category: ${result.rows[0].label}`]
@@ -216,7 +234,6 @@ router.delete('/:id', authenticate, authorize(['admin', 'content_manager']), asy
     return res.status(404).json({ error: 'Category not found' });
   }
 
-  // Log activity
   await pool.query(
     'INSERT INTO activity_log (user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)',
     [req.user.id, 'delete', 'category', id, `Deleted category: ${result.rows[0].label}`]
