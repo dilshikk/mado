@@ -160,8 +160,8 @@ export default function Story() {
 
           <motion.div initial={{ opacity: 0, scale: 0.94 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: "easeOut" }}
             className="overflow-hidden rounded-xl shadow-xl">
-            <img src="https://images.unsplash.com/photo-1773209928058-cfd3314acc7c?auto=format&fit=crop&w=1000&q=80"
-              alt="Праздничный стол с турецкими блюдами" className="aspect-4/3 w-full object-cover" />
+            <img src="https://mado.uz/uploads/orig-1788210437120.jpg"
+              alt="" className="aspect-4/3 w-full object-cover" />
           </motion.div>
         </div>
       </section>
