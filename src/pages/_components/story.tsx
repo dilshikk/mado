@@ -12,31 +12,35 @@ type Slide = {
 
 const KITCHEN_SLIDES: Slide[] = [
   {
-    src: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
-    alt: "Турецкое ассорти на гриле",
+    src: "https://mado.uz/uploads/breakfast.jpg",
+    alt: "Деревенский завтрак",
   },
   {
-    src: "https://images.unsplash.com/photo-1598110750624-207050c4f28c?auto=format&fit=crop&w=1200&q=80",
-    alt: "Ручная турецкая пахлава",
+    src: "https://mado.uz/uploads/dolama.jpg",
+    alt: "Фисташковая долама",
   },
   {
-    src: "https://images.unsplash.com/photo-1765448856945-481569592cf3?auto=format&fit=crop&w=1200&q=80",
-    alt: "Повар готовит в традиционной кухне",
+    src: "https://mado.uz/uploads/kunefe.jpg",
+    alt: "Кюнефе",
   },
 ];
 
 const HERITAGE_SLIDES: Slide[] = [
   {
-    src: "https://images.unsplash.com/photo-1767796778449-33beb2bf89d6?auto=format&fit=crop&w=1200&q=80",
-    alt: "Турецкие сладости лукум",
+    src: "https://mado.uz/uploads/orig-1788208854976.jpg",
+    alt: "",
   },
   {
-    src: "https://images.unsplash.com/photo-1776993298437-f07c40d2d94d?auto=format&fit=crop&w=1200&q=80",
-    alt: "Праздничный стол в турецком ресторане",
+    src: "https://mado.uz/uploads/orig-1788208854980.jpg",
+    alt: "",
   },
   {
-    src: "https://images.unsplash.com/photo-1773209927920-2230d6a18614?auto=format&fit=crop&w=1200&q=80",
-    alt: "Повар готовит блюда для гостей",
+    src: "https://mado.uz/uploads/orig-1788208854978.jpg",
+    alt: "",
+  },
+  {
+    src: "https://mado.uz/uploads/orig-1788208854979.jpg",
+    alt: "",
   },
 ];
 
