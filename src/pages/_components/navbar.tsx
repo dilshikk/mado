@@ -48,7 +48,7 @@ const NAV_LABELS: Record<"ru" | "uz" | "en" | "tr", readonly { label: string; hr
     { label: "Şubelerimiz", href: "/locations" },
     { label: "Yorumlar", href: "/reviews" },
     { label: "Kariyer", href: "/careers" },
-    { label: "SSS", href: "/faq" },
+    { label: "FAQ", href: "/faq" },
     { label: "İletişim", href: "/contact" },
   ],
 };
