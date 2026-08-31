@@ -53,7 +53,7 @@ export default function Footer() {
       className="relative overflow-hidden border-t border-border bg-[#143968] text-primary-foreground bg-cover bg-center bg-no-repeat max-[1535px]:!bg-none"
       style={{
         backgroundImage:
-          "url(https://hercules-cdn.com/file_A2x69jw8GXlfnDc64BEyN6yi)",
+          "url(https://mado.uz/uploads/orig-1788209747358.jpg)",
       }}
     >
       <div className="relative mx-auto max-w-[1140px] px-6 py-16">
@@ -133,7 +133,7 @@ export default function Footer() {
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="example@gmail.com"
+                          placeholder="example@mail.com"
                           className="border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground placeholder:text-primary-foreground/40"
                           {...field}
                         />
