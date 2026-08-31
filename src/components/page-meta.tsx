@@ -5,6 +5,8 @@ import type { PageData } from "@/lib/public-api.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const DEFAULT_TITLE = "MADO Tashkent";
+
 function getMetaTitle(page: PageData, lang: LangCode): string {
   const langKey = `meta_title_${lang}` as keyof PageData;
   const langVal = page[langKey];
@@ -16,7 +18,8 @@ function getMetaTitle(page: PageData, lang: LangCode): string {
   const titleVal = page[titleKey];
   if (titleVal && typeof titleVal === "string" && titleVal.trim()) return titleVal;
 
-  return page.title;
+  // Fallback: never return undefined/"undefined"
+  return page.title?.trim() || DEFAULT_TITLE;
 }
 
 function getMetaDescription(page: PageData, lang: LangCode): string {
@@ -31,7 +34,8 @@ function getOgTitle(page: PageData, lang: LangCode): string {
   const langKey = `meta_title_${lang}` as keyof PageData;
   const langVal = page[langKey];
   if (langVal && typeof langVal === "string" && langVal.trim()) return langVal;
-  return page.meta_title ?? page.title;
+  // Fallback: never return undefined/"undefined"
+  return page.meta_title?.trim() || page.title?.trim() || DEFAULT_TITLE;
 }
 
 function setMetaTag(name: string, content: string, attr: "name" | "property" = "name") {
@@ -71,7 +75,8 @@ export default function PageMeta({ slug, lang }: PageMetaProps) {
     const ogTitle = getOgTitle(page, lang);
     const ogImage = page.og_image ?? "";
 
-    document.title = title;
+    // Guard: never set title to "undefined" or empty
+    if (title) document.title = title;
     setMetaTag("description", description);
     setMetaTag("og:title", ogTitle, "property");
     setMetaTag("og:description", description, "property");
@@ -88,5 +93,5 @@ export function getPageTitle(page: PageData | null, lang: LangCode, fallback: st
   const key = `title_${lang}` as keyof PageData;
   const val = page[key];
   if (val && typeof val === "string" && val.trim()) return val;
-  return page.title || fallback;
+  return page.title?.trim() || fallback;
 }
