@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Plus, Edit2, Trash2, Check, X, ChevronDown, ChevronRight, Search, Loader2, AlertCircle,
+  Plus, Edit2, Trash2, ChevronDown, ChevronRight, Search, Loader2, AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import api from "@/lib/api.ts";
@@ -59,17 +59,6 @@ const EMPTY_FORM: FaqFormData = {
   question_ru: "", question_uz: "", question_en: "", question_tr: "",
   answer_ru: "", answer_uz: "", answer_en: "", answer_tr: "",
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getDisplayText(
-  ru: string | null,
-  uz: string | null,
-  en: string | null,
-  tr: string | null,
-): string {
-  return [ru, uz, en, tr].find((v): v is string => typeof v === "string" && v.trim() !== "") ?? "—";
-}
 
 // ─── FAQ Form ─────────────────────────────────────────────────────────────────
 
@@ -134,7 +123,6 @@ function FaqForm({
             )}
           >
             <span>{l.flag}</span> {l.label}
-            {/* dot indicator if has content */}
             {(form[`question_${l.code}` as keyof FaqFormData] as string).trim() && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             )}
@@ -345,7 +333,6 @@ export default function FaqPage() {
         </div>
       </div>
 
-      {/* Add form */}
       {adding && (
         <FaqForm
           onSubmit={handleAdd}
@@ -354,7 +341,6 @@ export default function FaqPage() {
         />
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -408,7 +394,6 @@ export default function FaqPage() {
                         ) : (
                           <div className="flex items-start gap-3 px-4 py-4 hover:bg-muted/20">
                             <div className="flex-1 min-w-0">
-                              {/* Show all 4 languages */}
                               <div className="space-y-2">
                                 {LANGS.map((l) => {
                                   const q = item[`question_${l.code}` as keyof FaqItem] as string | null;
@@ -428,7 +413,6 @@ export default function FaqPage() {
                                     </div>
                                   );
                                 })}
-                                {/* Fallback if nothing set */}
                                 {!LANGS.some((l) => (item[`question_${l.code}` as keyof FaqItem] as string | null)?.trim()) && (
                                   <p className="text-sm text-muted-foreground italic">Нет текста</p>
                                 )}
@@ -465,7 +449,7 @@ export default function FaqPage() {
             );
           })}
 
-          {items.length === 0 && !loading && (
+          {items.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm">Нет вопросов. Добавьте первый!</p>
             </div>
