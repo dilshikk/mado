@@ -12,9 +12,9 @@ import { highlightsText } from "@/lib/i18n/home.ts";
 
 const ICONS = [IceCreamCone, Cake, Coffee];
 const IMAGES = [
-  "https://hercules-cdn.com/file_pufuhQShef4uFjB7yOwT4cM8",
-  "https://hercules-cdn.com/file_VKPbNpeYeiy5CmAhJ20YwDHt",
-  "https://hercules-cdn.com/file_c9jJ1YCm3AMZ6M4kB4c9FIEZ",
+  "https://mado.uz/uploads/orig-1788209414052.jpg",
+  "https://mado.uz/uploads/orig-1788209451444.jpg",
+  "https://mado.uz/uploads/orig-1788209605356.jpg",
 ];
 
 export default function Highlights() {
@@ -83,8 +83,8 @@ export default function Highlights() {
             asChild
           >
             <a
-              href="https://oddmenu.com/p/mado-restaurant"
-              target="_blank"
+              href="https://mado.uz/menu"
+              target="_top"
               rel="noopener noreferrer"
             >
               {t.viewMenuBtn} <ArrowRight className="size-4" />
