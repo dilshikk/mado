@@ -9,20 +9,20 @@ import { storyPageText } from "@/lib/i18n/story.ts";
 
 const HISTORY_PHOTOS = [
   {
-    src: "https://hercules-cdn.com/file_IUbrA2y7LoDS590BCXoZDMXC",
-    alt: "Мехмет Саит Канбур готовит традиционное мороженое MADO",
+    src: "https://mado.uz/uploads/orig-1788212516954.jpg",
+    alt: "",
   },
   {
-    src: "https://hercules-cdn.com/file_yZgdagcUptsyh3vAhJ1PW2mL",
-    alt: "Старинный способ взбивания мороженого maras dondurma",
+    src: "https://mado.uz/uploads/orig-1788212532316.jpg",
+    alt: "",
   },
   {
-    src: "https://hercules-cdn.com/file_n7Thyh5sztIT3wyuOTrqmKOT",
-    alt: "Мороженое растягивается как тесто вручную",
+    src: "https://mado.uz/uploads/orig-1788212544711.jpg",
+    alt: "",
   },
   {
-    src: "https://hercules-cdn.com/file_UtqAtW60KCa6eusilKYLKX1H",
-    alt: "Мороженое MADO нарезают ножом по традиционной технологии",
+    src: "https://mado.uz/uploads/orig-1788212548147.jpg",
+    alt: "",
   },
 ] as const;
 
@@ -30,20 +30,20 @@ const FEATURE_ICONS = [UtensilsCrossed, Bike, Wine, IceCreamCone];
 
 const GALLERY_STRIP = [
   {
-    src: "https://hercules-cdn.com/file_zHFz2EjzlyoLPkp7dFOxyIOI",
-    alt: "Дондурма с мёдом и миндалём",
+    src: "https://mado.uz/uploads/orig-1788212733154.jpg",
+    alt: "",
   },
   {
-    src: "https://hercules-cdn.com/file_bRWtS51R48M2E98BBZ26KGhN",
-    alt: "Пахлава с фисташками и каймаком",
+    src: "https://mado.uz/uploads/orig-1788212725860.jpg",
+    alt: "",
   },
   {
-    src: "https://hercules-cdn.com/file_quDvQLQZKt3c9ZiCW05PUT2S",
-    alt: "Пахлава со шпинатом, политая мёдом",
+    src: "https://mado.uz/uploads/orig-1788212725857.jpg",
+    alt: "",
   },
   {
-    src: "https://hercules-cdn.com/file_MMxOPjlxQUlhpQrks4PZJQlj",
-    alt: "Фисташковое мороженое в вафельном рожке",
+    src: "https://mado.uz/uploads/orig-1788212725855.jpg",
+    alt: "",
   },
 ] as const;
 
@@ -60,7 +60,7 @@ export default function Story() {
         className="relative flex h-[280px] items-center justify-center overflow-hidden bg-primary bg-cover bg-center sm:h-[340px]"
         style={{
           backgroundImage:
-            "url(https://images.unsplash.com/photo-1759756312579-fa70a9667c8c?auto=format&fit=crop&w=1600&q=80)",
+            "url(https://mado.uz/uploads/orig-1788213280887.jpg)",
         }}
       >
         <div className="absolute inset-0 bg-primary/60" />
@@ -89,7 +89,7 @@ export default function Story() {
           className="absolute inset-0 bg-cover bg-center opacity-[0.08]"
           style={{
             backgroundImage:
-              "url(https://images.unsplash.com/photo-1784651169392-0460eee0bbb6?auto=format&fit=crop&w=1600&q=80)",
+              "url(https://mado.uz/uploads/orig-1788213438444.jpg)",
           }}
         />
         <div className="relative mx-auto max-w-[1140px] px-6">
@@ -141,7 +141,7 @@ export default function Story() {
 
       <section
         className="relative overflow-hidden bg-primary bg-cover bg-center py-16"
-        style={{ backgroundImage: "url(https://images.unsplash.com/photo-1679867646687-3a7cb8cbfb81?auto=format&fit=crop&w=1600&q=80)" }}
+        style={{ backgroundImage: "url(https://mado.uz/uploads/orig-1788213650955.jpg)" }}
       >
         <div className="absolute inset-0 bg-primary/75" />
         <div className="relative mx-auto grid max-w-[1140px] grid-cols-1 items-center gap-10 px-6 lg:grid-cols-2">
