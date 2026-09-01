@@ -11,6 +11,7 @@ import MenuPage from "./pages/menu/page.tsx";
 import ReviewsPublicPage from "./pages/reviews/page.tsx";
 import FaqPublicPage from "./pages/faq/page.tsx";
 import QrRedirect from "./pages/QrRedirect.tsx";
+import ParkInMall from "./pages/ParkInMall.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminLayout from "./pages/admin/layout.tsx";
 import AdminLoginPage from "./pages/admin/login.tsx";
@@ -51,8 +52,9 @@ export default function App() {
           <Route path="/reviews" element={<ReviewsPublicPage />} />
           <Route path="/faq" element={<FaqPublicPage />} />
 
-          {/* QR-code menu redirect → PDF until /menu is ready */}
+          {/* QR-code menu pages */}
           <Route path="/qr" element={<QrRedirect />} />
+          <Route path="/parkinmall" element={<ParkInMall />} />
 
           {/* Admin login — public */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
