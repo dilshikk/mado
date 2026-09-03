@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/use-language.ts";
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-const PDF_URL = "https://mado.uz/uploads/menu.pdf";
+const PDF_URL = "https://mado.uz/uploads/parkmenu.pdf";
 
 export default function ParkInMall() {
   const containerRef = useRef<HTMLDivElement>(null);
