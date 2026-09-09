@@ -9,6 +9,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 const PDF_URL = "https://mado.uz/uploads/menu.pdf";
 
+// Cap the device pixel ratio we render at so very high-DPI phones (3x, 4x)
+// don't produce enormous canvases that slow down rendering.
+const MAX_DEVICE_SCALE = 3;
+
 export default function QrRedirect() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -35,20 +39,29 @@ export default function QrRedirect() {
         setTotal(pdf.numPages);
         setLoading(false);
 
+        // Render at the device's actual pixel density so pages stay sharp on
+        // Retina/high-DPI screens, capped to avoid excessive canvas sizes.
+        const devicePixelScale = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_SCALE);
+
         for (let i = 1; i <= pdf.numPages; i++) {
           if (cancelled) break;
 
           const page = await pdf.getPage(i);
-          const scale = Math.min(window.innerWidth / page.getViewport({ scale: 1 }).width, 2);
-          const viewport = page.getViewport({ scale });
+          const displayScale = Math.min(window.innerWidth / page.getViewport({ scale: 1 }).width, 2);
+          const renderScale = displayScale * devicePixelScale;
+          const viewport = page.getViewport({ scale: renderScale });
 
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           if (!ctx) continue;
 
+          // Canvas buffer is rendered at full device resolution...
           canvas.width = viewport.width;
           canvas.height = viewport.height;
+          // ...but displayed at the intended CSS size, so it looks sharp
+          // instead of blurry/upscaled.
           canvas.style.width = "100%";
+          canvas.style.height = "auto";
           canvas.style.display = "block";
           canvas.style.marginBottom = "4px";
           canvas.style.backgroundColor = "#fff";
